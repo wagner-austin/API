@@ -40,7 +40,7 @@ COLOSSUS_MODELS: JSONObject = {
     "cache": "/home/corvis/models",
     "first_port": 8091,
     "last_port": 8094,
-    "idle_seconds": 1800,
+    "idle_seconds": 600,
 }
 
 #: The catalog's Ornith 9B, as fleet-mcp renders it on a claimed job.
@@ -137,7 +137,7 @@ class TestNodeModels:
             cache="/home/corvis/models",
             first_port=8091,
             last_port=8106,
-            idle_seconds=1800,
+            idle_seconds=600,
         )
 
     def test_an_idle_span_that_is_not_positive_is_refused(self) -> None:

@@ -348,8 +348,8 @@ def _idle(queue: FakeQueue, runner: FakeRun) -> tuple[str, ...]:
 
 
 IDLE_LINE = (
-    f"ended ornith-1.5-9b {JOB} idle 1803 s with no request, "
-    "past its 1800 s; llama-server stopped\n"
+    f"ended ornith-1.5-9b {JOB} idle 603 s with no request, "
+    "past its 600 s; llama-server stopped\n"
 )
 
 
@@ -372,7 +372,7 @@ class TestIdlePass:
         assert _report(queue, 0) == {
             "action": "ended",
             "jobId": JOB,
-            "detail": "idle 1803 s with no request, past its 1800 s; llama-server stopped",
+            "detail": "idle 603 s with no request, past its 600 s; llama-server stopped",
         }
 
     def test_an_end_the_queue_refused_is_forgotten_all_the_same(self) -> None:

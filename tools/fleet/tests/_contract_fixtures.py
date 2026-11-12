@@ -39,7 +39,7 @@ COLOSSUS_MODELS: Final = NodeModels(
     cache="/home/corvis/models",
     first_port=8091,
     last_port=8094,
-    idle_seconds=1800,
+    idle_seconds=600,
 )
 
 

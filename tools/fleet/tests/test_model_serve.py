@@ -266,7 +266,7 @@ class TestScanAndForget:
                 ok(""),
                 ok(
                     f"serving ornith-1.5-9b {JOB} 8091 42\n"
-                    f"ended glimmer-30b {JOB} idle 1803 s with no request, past its 1800 s; "
+                    f"ended glimmer-30b {JOB} idle 603 s with no request, past its 600 s; "
                     "llama-server stopped\n"
                 ),
             ]
@@ -280,7 +280,7 @@ class TestScanAndForget:
                 EndedModel(
                     model_id="glimmer-30b",
                     job_id=JOB,
-                    why="idle 1803 s with no request, past its 1800 s; llama-server stopped",
+                    why="idle 603 s with no request, past its 600 s; llama-server stopped",
                 ),
             ),
         )
