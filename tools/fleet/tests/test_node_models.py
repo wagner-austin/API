@@ -348,8 +348,7 @@ def _idle(queue: FakeQueue, runner: FakeRun) -> tuple[str, ...]:
 
 
 IDLE_LINE = (
-    f"ended ornith-1.5-9b {JOB} idle 603 s with no request, "
-    "past its 600 s; llama-server stopped\n"
+    f"ended ornith-1.5-9b {JOB} idle 603 s with no request, past its 600 s; llama-server stopped\n"
 )
 
 
