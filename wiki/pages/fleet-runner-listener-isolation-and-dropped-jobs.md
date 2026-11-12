@@ -21,14 +21,15 @@ source_git_blobs:
   "tools/fleet/src/fleet/core/runner_reap_dropped.py": 99720a7f2a335f205c722df15154ecba8f792da0
   "tools/fleet/src/fleet/core/runner_reaper_render.py": 227d7a140ce000cd24092278131aa38039c4ff89
   "tools/fleet/tests/test_runner_placement_host.py": 04b55c10f12ad279b5d1ee39a9db6423fb98157d
-  "tools/fleet/registry/machines/lavender.json": fa509b236c620f5e39147cbf6bd3fd11c88c004f
+  "tools/fleet/registry/machines/lavender.json": 75849078ae55bb6b684fa6a06f6f2c96b22ee173
   "tools/fleet/registry/projects/tools/fleet-execution-runners.json": baeefbb12b207d6e5b71acd6fc7f60f8c6f99858
-  "tools/fleet/runners.json": 7a4527ba0b4fcdc55554a6451a6fda8a481030f2
+  "tools/fleet/runners.json": 43fe7f532c4f974ef67d16d9491aee7043fa84bf
 provenance:
   - "2026-11-01 lavender pin review: the registry now declares Rust 1.98.1 and appends its measurement to the existing notes. The cited reimage/WSL history remains verbatim; board task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1."
   - "2026-11-02 lavender pin review: the machine file's dispatch gained models null as its last key; the cited lines are unchanged; board task b9235198-f688-4eb2-8068-71377481e1d9."
   - "2026-11-05 runner pin review: lavender was reinstalled with the fleet's NixOS on 2026-11-03, which the opening now says from the machine file's notes (now line 25), and it serves seven runner installs, not eight, per runners.json; the job scope and reaper renders lost their Ubuntu provision functions (API 04c8dcf69), which none of this page's claims rested on, and every locator moved with its file; board task 1b7a7624-e767-42b4-a1d9-888b87d6fd32."
-fact_checked: "2026-11-05"
+  - "2026-11-12 runner pin review: lavender.json's dispatch gained netns 2.3.6 and its notes at line 25 are unchanged; runners.json gave two of lavender's MCPs runners the mcps-fleet-ci label beside lavender, added pipx to the base packages and appended a sedona host, while lavender's installs at 11-61 are still the seven the page counts; board task 96ef0809-a111-4120-9d24-5b35bdc408bc."
+fact_checked: "2026-11-12"
 confidence: high
 hubs: [infrastructure]
 ---

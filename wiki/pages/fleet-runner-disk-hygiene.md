@@ -20,10 +20,11 @@ source_git_blobs:
   "tools/fleet/tests/test_runner_hygiene_host.py": 16c5ae8a97684784b9c63810196c10089d418c3b
   "tools/fleet/tests/test_runner_audit_host.py": 9cb400df0deed94ea83aeb9dfbab27bb3b2691af
   "tools/fleet/tests/test_runner_disk_host.py": c4d503617359533a0fdfeefb70dc4b5157461aa1
-  "tools/fleet/runners.json": 7a4527ba0b4fcdc55554a6451a6fda8a481030f2
+  "tools/fleet/runners.json": 43fe7f532c4f974ef67d16d9491aee7043fa84bf
 provenance:
   - "2026-11-05 runner pin review after the Ubuntu runner recipe was deleted (API 04c8dcf69): the provision's restart of an idle unit lacking a hook (render_hooks_live_lines) is gone, so that sentence is withdrawn and the reaper's between-jobs restart stands alone; the chown -R sentence is now the Ubuntu-era history ci_clean.py records; runners.json's assets lost their provision_command; locators moved with the files; board task 1b7a7624-e767-42b4-a1d9-888b87d6fd32."
-fact_checked: "2026-11-05"
+  - "2026-11-12 runner pin review: runners.json's base gained pipx among its nix packages, so lavender's disk ceiling moved from line 100 to 101; two lavender MCPs runners gained the mcps-fleet-ci label and a sedona host was appended, neither of which this page's claims rest on; the four assets still sit at 62-91; board task 96ef0809-a111-4120-9d24-5b35bdc408bc."
+fact_checked: "2026-11-12"
 confidence: high
 hubs: [infrastructure]
 ---
@@ -58,7 +59,7 @@ ci-clean removes only the runners' unpacked self-updates (682 MB in each install
 
 The hygiene case requires every unit's drop-in to name the hook and the installed hook to be the render. It also requires no file in the job trees of any idle install whose hook ran after its last job started.[^hygiene] Fleet job 3e2ab692 (`tools/fleet-execution-runners` at API 796767077 on lavender) passed all 12 cases. lavender's root used 128 GB of its 150 GB, both MCPs installs read 0 files after their hook, the audit's 52 host rows read OK, and the reinstated jar read exactly 2 DRIFT rows.[^job]
 
-[^ceiling]: `tools/fleet/tests/test_runner_disk_host.py:6` -- "2026-10-30 that row failed lavender at 190 GB against 150 while every"; `tools/fleet/runners.json:100` -- `"ceiling_gb": 150,`.
+[^ceiling]: `tools/fleet/tests/test_runner_disk_host.py:6` -- "2026-10-30 that row failed lavender at 190 GB against 150 while every"; `tools/fleet/runners.json:101` -- `"ceiling_gb": 150,`.
 [^disk-case]: `tools/fleet/tests/test_runner_disk_host.py:36` -- `assert used <= disk["ceiling_gb"]`.
 [^measured]: `tools/fleet/src/fleet/core/runner_work_clear.py:3-12` -- module docstring: "seven installs' ``_work`` trees held 29437 MB. 12095 MB of it was two venvs"
 [^unread]: `tools/fleet/src/fleet/core/runner_work_clear.py:14-22` -- "None of it is read again. Every workflow of every repository a runner here"
