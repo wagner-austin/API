@@ -118,6 +118,11 @@
         "remote": "https://github.com/wagner-austin/osrs-lab.git",
         "ref": "main",
         "directory": "osrs-lab"
+      },
+      {
+        "remote": "https://github.com/wagner-austin/coax-drone.git",
+        "ref": "main",
+        "directory": "coax-drone"
       }
     ]
   }
