@@ -13,8 +13,8 @@
   "netbootWifi": false,
   "secureBoot": "enforced",
   "installDisk": {
-    "rule": "only-disk",
-    "serial": null
+    "rule": "serial",
+    "serial": "Inland_SATA_SSD_IB25ADL0256S01189"
   },
   "tunnel": null,
   "guest": null,
