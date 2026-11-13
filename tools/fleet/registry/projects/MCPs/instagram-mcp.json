@@ -2,7 +2,11 @@
   "worker_ram_gb": 0.5,
   "minimum_workers": 2,
   "expected_minutes": 10,
+  "exclusive_resources": [
+    "corvis-fleet-testdb"
+  ],
   "required_tags": [
+    "testdb",
     "cxx"
   ],
   "source": {
@@ -27,6 +31,17 @@
           "-C",
           "scripts/fleet-prepare",
           "workspace-build"
+        ]
+      },
+      {
+        "phase": "test-database",
+        "argv": [
+          "make",
+          "-s",
+          "-C",
+          "scripts/fleet-prepare",
+          "test-database",
+          "CONTAINER=corvis-fleet-testdb"
         ]
       }
     ],
