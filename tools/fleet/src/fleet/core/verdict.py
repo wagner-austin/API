@@ -29,6 +29,12 @@ from typing import Final
 from typing_extensions import TypedDict
 
 from fleet.core.build_steps import read_build_steps
+from fleet.core.check_figures import (
+    BudgetOutcome,
+    read_budget_reading,
+    read_coverage_reading,
+    read_test_counts,
+)
 from fleet.core.linux_unit_end import UNIT_ENDED_LINE
 from fleet.core.mutation_verdict import read_mutation
 from fleet.core.release_artifact import read_artifact
@@ -53,86 +59,6 @@ VERDICT_PREFIX: Final = "FLEET-CHECK"
 #: MCPs/packages/db and 826 for MCPs/mcp-shared. Fifteen hundred holds the
 #: largest with 1.8 times its length to grow into.
 LOG_TAIL_LINES: Final = 1500
-
-#: ``N passed`` as both vitest (``Tests  887 passed (887)``) and pytest
-#: (``1166 passed in 12.3s``) print it; the LAST occurrence is the suite's
-#: own total, after any per-file lines.
-PASSED: Final[re.Pattern[str]] = re.compile(r"(\d+) passed")
-
-#: ``N failed``, the same two families, read only off the line that carries
-#: the passed total: both runners print the two counts on that one line
-#: (``Tests  2 failed | 885 passed (887)``, ``3 failed, 1166 passed in
-#: 12.3s``), and anywhere else in the tail a service's own log can say it.
-#: Read off the whole tail, MCPs/watcher's ``attempt 1/3 failed, retrying``
-#: made a run of 2312 passed and none failed read ``2312p/3f`` (FLEET-CHECK
-#: 0bce943c, colossus, 2026-10-11).
-FAILED: Final[re.Pattern[str]] = re.compile(r"(\d+) failed")
-
-#: pytest-cov's total row: ``TOTAL  5756  0  1526  0  100%`` (branches on)
-#: or ``TOTAL  5756  0  100%``; the last percentage on the row is the total.
-PYTEST_TOTAL: Final[re.Pattern[str]] = re.compile(r"^TOTAL\s.*?(\d+(?:\.\d+)?)%\s*$", re.MULTILINE)
-
-#: vitest's v8 text reporter row for the whole tree: ``All files | 100 |
-#: 100 | 100 | 100 |``, statements then branches. Printed only when a file
-#: is under threshold in the default configuration, which is why its
-#: absence on a passing run is not a defect but ``unread``.
-VITEST_ALL_FILES: Final[re.Pattern[str]] = re.compile(
-    r"^All files\s*\|\s*(\d+(?:\.\d+)?)\s*\|\s*(\d+(?:\.\d+)?)\s*\|", re.MULTILINE
-)
-
-#: osrs-lab's Gradle total row: ``COVERAGE TOTAL: lines 592/592 branches
-#: 378/378``, covered over total summed from each module's JaCoCo XML report
-#: by its check-summary init script (board task fd8e5f9b). Gradle and
-#: JaCoCo print no count of their own (a refused gate prints a rounded
-#: ratio, ``lines covered ratio is 0.7``), so the counts are the summary's.
-#: Its tests are ``TESTS TOTAL: 68 passed, 0 failed, 0 skipped of 68``, which
-#: :data:`PASSED` and :data:`FAILED` already read.
-GRADLE_COVERAGE_TOTAL: Final[re.Pattern[str]] = re.compile(
-    r"^COVERAGE TOTAL: lines (\d+/\d+) branches (\d+/\d+)$", re.MULTILINE
-)
-
-#: The sign node's built-in runner opens each summary line with, named rather
-#: than written, since the character reads as a Latin ``i`` (ruff RUF001).
-NODE_TEST_SIGN: Final = "\N{INFORMATION SOURCE}"
-
-#: node's built-in runner (``node --test``, coax-drone/site) closes with its
-#: own totals, one per line, each behind U+2139 INFORMATION SOURCE and a
-#: space: ``<i> tests 60``, ``<i> pass 60``, ``<i> fail 0``, ``<i>`` standing
-#: for :data:`NODE_TEST_SIGN` here. It prints no
-#: ``N passed``, so until MCPs board task ed8e76a7 every coax-drone/site
-#: verdict read ``tests=unread`` over 49 to 60 green tests (FLEET-CHECK
-#: d533d7b3, 7a3bb896, 602098fd, 5c236243). The LAST of each is the run's: a
-#: nested ``node --test`` inside a case would print its own first.
-NODE_TEST_PASS: Final[re.Pattern[str]] = re.compile(rf"^{NODE_TEST_SIGN} pass (\d+)$", re.MULTILINE)
-
-#: node's failed total, ``<i> fail 2``, printed beside the passed one on
-#: every run, a green one included.
-NODE_TEST_FAIL: Final[re.Pattern[str]] = re.compile(rf"^{NODE_TEST_SIGN} fail (\d+)$", re.MULTILINE)
-
-#: node's ``--experimental-test-coverage`` row for the whole tree:
-#: ``<i> all files     | 100.00 |   100.00 |  100.00 |``, lines, branches
-#: and functions in that order, over the modules ``--test-coverage-include``
-#: names.
-NODE_TEST_ALL_FILES: Final[re.Pattern[str]] = re.compile(
-    rf"^{NODE_TEST_SIGN} all files\s*\|\s*(\d+(?:\.\d+)?)\s*\|\s*(\d+(?:\.\d+)?)\s*\|", re.MULTILINE
-)
-
-#: vitest's threshold refusal, which names the figure that missed.
-VITEST_THRESHOLD: Final[re.Pattern[str]] = re.compile(
-    r"Coverage for (statements|branches|functions|lines) \((\d+(?:\.\d+)?)%\) does not meet"
-)
-
-#: maketools' check budget verdict for a check that stayed within it:
-#: ``CHECK BUDGET: <package> took 37s of 300s (<split>).`` (MCPs board task
-#: 1b152218), printed by check-lock in MCPs and by check-budget here.
-BUDGET_WITHIN: Final[re.Pattern[str]] = re.compile(r"CHECK BUDGET: \S+ took (\d+)s of (\d+)s")
-
-#: The same rule's verdict for a check past it, which exits non-zero after
-#: every suite passed: ``CHECK OVER BUDGET: <package> took 1261s, over the
-#: 300s budget by 961s.``
-BUDGET_OVER: Final[re.Pattern[str]] = re.compile(
-    r"CHECK OVER BUDGET: \S+ took (\d+)s, over the (\d+)s budget"
-)
 
 #: A terminal's colour codes, which vitest writes into the transcript too.
 ANSI: Final[re.Pattern[str]] = re.compile(r"\x1b\[[0-9;]*m")
@@ -297,100 +223,47 @@ def read_slowest(tail: str) -> str:
 
 
 def read_tests(tail: str) -> str:
-    """Read the test counts off a transcript tail.
-
-    node's built-in runner's own totals are read first, the last
-    :data:`NODE_TEST_PASS` and :data:`NODE_TEST_FAIL` lines, when the tail
-    holds both: they are the run's, while an ``N passed`` in such a
-    transcript could be a case's own title. Otherwise the passed total is
-    the last ``N passed`` in the tail, and the failed count is read off that
-    same line only (:data:`FAILED` says why).
+    """Render the test counts off a transcript tail (:func:`read_test_counts`).
 
     Args:
         tail: The transcript's last lines.
 
     Returns:
-        ``<passed>p/<failed>f`` when a passed count was read (a missing
-        failed count beside ``N passed`` is zero: vitest and pytest print it
-        only when non-zero), else ``unread``.
+        ``<passed>p/<failed>f`` when a passed count was read, else
+        ``unread``.
     """
-    node_passed: str | None = None
-    for match in NODE_TEST_PASS.finditer(tail):
-        node_passed = match.group(1)
-    node_failed: str | None = None
-    for match in NODE_TEST_FAIL.finditer(tail):
-        node_failed = match.group(1)
-    if node_passed is not None and node_failed is not None:
-        return f"{node_passed}p/{node_failed}f"
-    totals: re.Match[str] | None = None
-    for match in PASSED.finditer(tail):
-        totals = match
-    if totals is None:
-        return "unread"
-    line_start = tail.rfind("\n", 0, totals.start()) + 1
-    line_end = tail.find("\n", totals.end())
-    failed = FAILED.search(tail, line_start, len(tail) if line_end == -1 else line_end)
-    return f"{totals.group(1)}p/{'0' if failed is None else failed.group(1)}f"
+    counts = read_test_counts(tail)
+    return "unread" if counts is None else f"{counts['passed']}p/{counts['failed']}f"
 
 
 def read_coverage(tail: str) -> str:
-    """Read the coverage figures off a transcript tail.
+    """Render the coverage figures off a transcript tail (:func:`read_coverage_reading`).
 
     Args:
         tail: The transcript's last lines.
 
     Returns:
-        ``statements=<n>% branches=<n>%`` from vitest's tree row,
-        ``total=<n>%`` from pytest-cov's, ``lines=<c>/<t> branches=<c>/<t>``
-        from the Gradle summary's, ``lines=<n>% branches=<n>%`` from node's
-        built-in runner's tree row, ``<figure>=<n>% below threshold`` from
-        vitest's refusal, else ``unread``.
+        The figures as the runner printed them, else ``unread``.
     """
-    vitest = VITEST_ALL_FILES.search(tail)
-    if vitest is not None:
-        return f"statements={vitest.group(1)}% branches={vitest.group(2)}%"
-    pytest_total: str | None = None
-    for match in PYTEST_TOTAL.finditer(tail):
-        pytest_total = match.group(1)
-    if pytest_total is not None:
-        return f"total={pytest_total}%"
-    gradle = GRADLE_COVERAGE_TOTAL.search(tail)
-    if gradle is not None:
-        return f"lines={gradle.group(1)} branches={gradle.group(2)}"
-    node_total: re.Match[str] | None = None
-    for match in NODE_TEST_ALL_FILES.finditer(tail):
-        node_total = match
-    if node_total is not None:
-        return f"lines={node_total.group(1)}% branches={node_total.group(2)}%"
-    threshold = VITEST_THRESHOLD.search(tail)
-    if threshold is not None:
-        return f"{threshold.group(1)}={threshold.group(2)}% below threshold"
-    return "unread"
+    reading = read_coverage_reading(tail)
+    return "unread" if reading is None else reading["rendered"]
 
 
 def read_budget(tail: str) -> str:
-    """Read the check budget verdict off a transcript tail.
-
-    A check over its budget exits non-zero with every suite green, so its
-    row reads like any other red one unless the line says which failure it
-    was; this field is how a fleet row reads as the budget's loud failure.
+    """Render the check budget verdict off a transcript tail (:func:`read_budget_reading`).
 
     Args:
         tail: The transcript's last lines.
 
     Returns:
-        ``over:<took>s/<budget>s`` from the over-budget verdict,
-        ``within:<took>s/<budget>s`` from the within-budget one, else
-        ``unread`` (a package whose check predates the budget, or a run
-        that stopped before the verdict printed).
+        ``over:<took>s/<budget>s`` past the budget, ``within:<took>s/<budget>s``
+        inside it, else ``unread``.
     """
-    over = BUDGET_OVER.search(tail)
-    if over is not None:
-        return f"over:{over.group(1)}s/{over.group(2)}s"
-    within = BUDGET_WITHIN.search(tail)
-    if within is not None:
-        return f"within:{within.group(1)}s/{within.group(2)}s"
-    return "unread"
+    reading = read_budget_reading(tail)
+    if reading is None:
+        return "unread"
+    word = "over" if reading["outcome"] is BudgetOutcome.EXCEEDED else "within"
+    return f"{word}:{reading['seconds']}s/{reading['bound']}s"
 
 
 def read_unit_end(tail: str) -> str | None:
@@ -513,25 +386,13 @@ def render_verdict(verdict: Verdict) -> str:
 
 __all__ = [
     "ANSI",
-    "BUDGET_OVER",
-    "BUDGET_WITHIN",
     "CHECK_BANNER",
-    "FAILED",
-    "GRADLE_COVERAGE_TOTAL",
     "LOG_TAIL_LINES",
-    "NODE_TEST_ALL_FILES",
-    "NODE_TEST_FAIL",
-    "NODE_TEST_PASS",
-    "NODE_TEST_SIGN",
-    "PASSED",
     "PYTEST_CALL",
-    "PYTEST_TOTAL",
     "SLOWEST_FILES",
     "VERDICT_PREFIX",
-    "VITEST_ALL_FILES",
     "VITEST_FILE",
     "VITEST_FILE_MARKS",
-    "VITEST_THRESHOLD",
     "Verdict",
     "judge",
     "read_budget",

@@ -95,11 +95,60 @@ def read_run_summary(tail: str) -> RunSummary:
     )
 
 
+#: One phase of :attr:`RunSummary.phases`, as :mod:`fleet.core.phase_markers`
+#: appends it: ``<phase>:<seconds>s``.
+PHASE_ENTRY: Final[re.Pattern[str]] = re.compile(r"^([a-z][a-z0-9-]*):(\d+)s$")
+
+
+class PhaseSeconds(TypedDict):
+    """One phase's whole seconds.
+
+    Attributes:
+        phase: Its name.
+        seconds: Its seconds, summed over each time the build ran it.
+    """
+
+    phase: str
+    seconds: int
+
+
+def phase_seconds(summary: RunSummary) -> list[PhaseSeconds]:
+    """Each phase a build's summary names, with its seconds, typed.
+
+    A phase the build ran twice (two ``deps`` installs, MCPs board task
+    abb0a10e) is one entry carrying both runs' seconds, in the order it first
+    ran: MCPs keeps one row per phase (migration 957's key).
+
+    Args:
+        summary: The build's summary (:func:`read_run_summary`).
+
+    Returns:
+        The phases in first-run order; none for a build that ran none or a
+        summary that was not read.
+
+    Raises:
+        ValueError: When an entry is not ``<phase>:<seconds>s``, which no
+            build prints (:func:`fleet.core.phase_markers.sh_phase_lines`).
+    """
+    if summary["phases"] in (UNREAD, "none"):
+        return []
+    totals: dict[str, int] = {}
+    for entry in summary["phases"].split(","):
+        match = PHASE_ENTRY.match(entry)
+        if match is None:
+            raise ValueError(f"phase entry {entry!r} is not <phase>:<seconds>s")
+        totals[match.group(1)] = totals.get(match.group(1), 0) + int(match.group(2))
+    return [PhaseSeconds(phase=phase, seconds=seconds) for phase, seconds in totals.items()]
+
+
 __all__ = [
+    "PHASE_ENTRY",
     "RUN_SUMMARY",
     "RUN_SUMMARY_MARKER",
     "UNREAD",
+    "PhaseSeconds",
     "RunSummary",
+    "phase_seconds",
     "read_run_summary",
     "sh_run_summary_line",
 ]

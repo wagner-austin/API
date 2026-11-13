@@ -60,6 +60,7 @@ from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import NodeConfig
 from fleet.core import (
     cache_generations,
+    check_result,
     collect,
     dialect,
     dispatch,
@@ -134,6 +135,7 @@ def settle(
                 f"{read['unreachable']}"
             ),
         )
+    results_path = retained_results_path(node["stage_root"], row["run_id"])
     judged = verdict.judge(
         job_id=job["job_id"],
         project=row["project"],
@@ -143,7 +145,7 @@ def settle(
         tail=tail,
         ended_unix=ended_unix,
         log_path=names.retained_log_path(node["stage_root"], row["run_id"]),
-        results_path=retained_results_path(node["stage_root"], row["run_id"]),
+        results_path=results_path,
         run_id=row["run_id"],
         workers=row["workers"],
     )
@@ -173,6 +175,16 @@ def settle(
             status=ClosingStatus.PASSED if exit_code == 0 else ClosingStatus.FAILED,
             exit_code=exit_code,
             detail=line,
+            # The node lane runs only check, lint and test, so every close
+            # here carries its typed result (MCPs board task 601eef87).
+            result=check_result.encode_check_result(
+                tail=tail,
+                run_id=row["run_id"],
+                node=row["node"],
+                started_unix=row["started_unix"],
+                ended_unix=ended_unix,
+                results_path=results_path,
+            ),
         )
     dispatch.finish(
         loaded.leases,

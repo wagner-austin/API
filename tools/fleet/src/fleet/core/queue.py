@@ -273,6 +273,7 @@ def report_close(
     status: ClosingStatus,
     exit_code: int | None,
     detail: str,
+    result: JSONObject | None,
     identity: JSONObject,
 ) -> DispatchJob:
     """Report a job's result.
@@ -280,7 +281,11 @@ def report_close(
     ``exit_code`` must agree with ``status`` and the queue refuses the pair if
     it does not -- ``passed`` needs 0, ``failed`` needs non-zero, ``refused``
     needs none. That is not a rule this function softens: a runner that got it
-    wrong should hear about it here rather than store a wrong answer.
+    wrong should hear about it here rather than store a wrong answer. A
+    check's typed ``result`` (:func:`fleet.core.check_result.encode_check_result`)
+    is stored in the close's own transaction (MCPs board task 601eef87), so a
+    result the queue refuses leaves the job running and the settle reports
+    it again.
 
     Args:
         credentials: Endpoint and headers.
@@ -288,6 +293,8 @@ def report_close(
         status: ``passed``, ``failed`` or ``refused``.
         exit_code: The command's exit code, or None when it never ran.
         detail: One line the submitter will read.
+        result: A check's typed result, or None for a job that is no check
+            or never ran.
         identity: From :func:`identity_arguments`.
 
     Returns:
@@ -295,7 +302,8 @@ def report_close(
 
     Raises:
         AppError: Any transport or contract failure from the underlying call,
-            including the queue refusing an inconsistent status/exit pair.
+            including the queue refusing an inconsistent status/exit pair or
+            the result.
     """
     arguments: JSONObject = {
         "action": "close",
@@ -306,6 +314,8 @@ def report_close(
     }
     if exit_code is not None:
         arguments["exitCode"] = exit_code
+    if result is not None:
+        arguments["result"] = result
     return decode_reported(
         call_mcp_tool(_test_hooks.http_post, credentials, "dispatch_report", arguments)
     )

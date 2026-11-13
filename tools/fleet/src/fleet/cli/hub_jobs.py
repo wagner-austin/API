@@ -130,6 +130,7 @@ def rebuild_job(
         status=ClosingStatus.PASSED if result["returncode"] == 0 else ClosingStatus.FAILED,
         exit_code=result["returncode"],
         detail=rebuild.describe_result(result),
+        result=None,
     )
 
 
@@ -205,6 +206,7 @@ def session_job(
         status=ClosingStatus.PASSED if result["returncode"] == 0 else ClosingStatus.FAILED,
         exit_code=result["returncode"],
         detail=restart.describe_result(result, invocation),
+        result=None,
     )
 
 
@@ -295,6 +297,7 @@ def netboot_job(
         status=outcome["status"],
         exit_code=outcome["exit_code"],
         detail=outcome["detail"],
+        result=None,
     )
 
 

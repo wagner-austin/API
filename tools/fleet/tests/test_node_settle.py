@@ -13,10 +13,17 @@ cleanly, and the next start settles the same run with the same verdict.
 
 from __future__ import annotations
 
+import datetime
 import pathlib
 
 import pytest
-from platform_core.json_utils import dump_json_str, narrow_json_to_str
+from platform_core.json_utils import (
+    dump_json_str,
+    load_json_str,
+    narrow_json_to_dict,
+    narrow_json_to_str,
+    require_int,
+)
 
 from fleet.cli import node_agent
 from fleet.core import _test_hooks
@@ -168,6 +175,50 @@ class TestASettleLogsEachFactOnce:
         assert len(verdict_lines) == 1
         assert verdict_lines[0].endswith(f"run={DEMO_RUN_ID}: {verdict}")
         assert len(followed_lines) == 1
+
+
+class TestTheCloseCarriesTheTypedResult:
+    """MCPs board task 601eef87: the close's typed result is read off the
+    tail its verdict line is, and names the run and node the start reported."""
+
+    def test_the_result_is_the_tail_s_figures_with_the_run_s_span(
+        self, sourced_config: pathlib.Path
+    ) -> None:
+        launch(sourced_config)
+        launched = load_json_str(_ledger(sourced_config).splitlines()[-1])
+        started = require_int(narrow_json_to_dict(launched), "started_unix")
+        _test_hooks.run = FakeRun(
+            [*READ_AND_TAIL, *retire_replies(), *asked(sourced_config, fetch=True)]
+        )
+        answering_queue = FakeQueue(
+            [
+                held_answer(taskId=VERDICT_TASK),
+                dump_json_str({"job": queue_job(status="passed")}),
+                dump_json_str({"claimed": None}),
+            ]
+        )
+        _test_hooks.http_post = answering(answering_queue)
+
+        assert node_agent.main(node_argv(sourced_config)) == 0
+
+        assert answering_queue.arguments[1]["result"] == {
+            "runId": DEMO_RUN_ID,
+            "node": "lavender",
+            "banner": True,
+            "testsPassed": 887,
+            "testsFailed": 0,
+            "testsSkipped": None,
+            "beganAt": datetime.datetime.fromtimestamp(started, tz=datetime.UTC).isoformat(),
+            "endedAt": "2025-09-04T15:34:20+00:00",
+            "budget": {"outcome": "unavailable"},
+            "artifact": None,
+            "coverage": [
+                {"measure": "statements", "percent": 100.0},
+                {"measure": "branches", "percent": 100.0},
+            ],
+            "phases": [],
+            "failedCases": None,
+        }
 
 
 #: The line systemd's ``ExecStopPost=`` appends for a unit ended for memory

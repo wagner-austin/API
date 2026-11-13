@@ -12,7 +12,7 @@ import pathlib
 import pytest
 from platform_core.error_codes_tooling import StackEndpointErrorCode
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import JSONObject, dump_json_str
 from platform_core.mcp_testing import DECLARED_FLEET_URL, stack_endpoint_files
 
 from fleet.contracts.dispatch import ClosingStatus, DispatchLane
@@ -253,11 +253,35 @@ class TestReport:
             status=ClosingStatus.FAILED,
             exit_code=1,
             detail="make check exited 1",
+            result=None,
             identity=RUNNER_IDENTITY,
         )
 
         assert endpoint.arguments[0]["exitCode"] == 1
         assert endpoint.arguments[0]["status"] == "failed"
+        assert "result" not in endpoint.arguments[0]
+
+    def test_close_sends_a_check_s_typed_result_beside_its_line(self) -> None:
+        """MCPs board task 601eef87: the queue stores it in the close's own transaction."""
+        endpoint = FakeQueue([dump_json_str({"job": queue_job(status="failed")})])
+        _test_hooks.http_post = endpoint
+        result: JSONObject = {
+            "runId": "libs-demo-lavender-1757000000",
+            "node": "lavender",
+            "failedCases": None,
+        }
+
+        queue.report_close(
+            QUEUE_CREDENTIALS,
+            job_id="aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+            status=ClosingStatus.FAILED,
+            exit_code=1,
+            detail="make check exited 1",
+            result=result,
+            identity=RUNNER_IDENTITY,
+        )
+
+        assert endpoint.arguments[0]["result"] == result
 
     def test_close_omits_the_exit_code_for_a_refusal(self) -> None:
         """``refused`` means the command never ran, so there is nothing to
@@ -272,6 +296,7 @@ class TestReport:
             status=ClosingStatus.REFUSED,
             exit_code=None,
             detail="no node had capacity",
+            result=None,
             identity=RUNNER_IDENTITY,
         )
 
@@ -293,6 +318,7 @@ class TestReport:
                 status=ClosingStatus.PASSED,
                 exit_code=0,
                 detail="green",
+                result=None,
                 identity=RUNNER_IDENTITY,
             )
 

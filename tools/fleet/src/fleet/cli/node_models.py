@@ -132,6 +132,7 @@ def _unload(
             status=ClosingStatus.REFUSED,
             exit_code=None,
             detail=f"{fault.code}: {fault.message}",
+            result=None,
         )
         return
     said = (
@@ -147,7 +148,13 @@ def _unload(
         f"and {after} after it"
     )
     job_close.close(
-        credentials, job, identity, status=ClosingStatus.PASSED, exit_code=0, detail=detail
+        credentials,
+        job,
+        identity,
+        status=ClosingStatus.PASSED,
+        exit_code=0,
+        detail=detail,
+        result=None,
     )
 
 
@@ -186,6 +193,7 @@ def _load(
                 f"MODEL_BACKEND: {alias} serves models on {models['backend']}, and "
                 f"{model['model_id']} is measured on {', '.join(model['backends'])} only"
             ),
+            result=None,
         )
         return
     binary = models["servers"].get(model["server"])
@@ -201,6 +209,7 @@ def _load(
                 f"{alias} has not built; its machine file declares "
                 f"{', '.join(models['servers'])}"
             ),
+            result=None,
         )
         return
     try:
@@ -213,6 +222,7 @@ def _load(
             status=ClosingStatus.REFUSED,
             exit_code=None,
             detail=f"{fault.code}: {fault.message}",
+            result=None,
         )
         return
     endpoint = outcome["endpoint"]
@@ -233,6 +243,7 @@ def _load(
         status=outcome["status"],
         exit_code=None if outcome["status"] is ClosingStatus.REFUSED else 1,
         detail=outcome["detail"],
+        result=None,
     )
 
 

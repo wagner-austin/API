@@ -178,6 +178,7 @@ def reconcile(
             status=ClosingStatus.PASSED if passed else ClosingStatus.FAILED,
             exit_code=0 if passed else 1,
             detail="Native controller outcome (adapter exit status): " + detail,
+            result=None,
         )
     finally:
         leases.release_if_held(lease_path, run_id=run_id, now_unix=_test_hooks.now())

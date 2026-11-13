@@ -26,9 +26,19 @@ which a reader reports as results missing rather than as a clean run.
 
 from __future__ import annotations
 
+import re
 from typing import Final
 
 from fleet.core.names import LOGS_DIRECTORY
+
+#: The opening token of the line the tail read prints for the kept reports'
+#: digest (:func:`sh_results_digest_line`).
+RESULTS_DIGEST_MARKER: Final = "FLEET_RESULTS"
+
+#: That line, as :func:`read_results_digest` reads it back.
+RESULTS_DIGEST_LINE: Final[re.Pattern[str]] = re.compile(
+    rf"^{RESULTS_DIGEST_MARKER}: ([0-9a-f]{{64}})$", re.MULTILINE
+)
 
 #: The directory a check's runners write their reports to, in the directory
 #: its recipe runs in.
@@ -104,6 +114,46 @@ def sh_isolated_results_lines(*, recipe: str, target: str) -> list[str]:
     ]
 
 
+def sh_results_digest_line(target: str) -> str:
+    """The ``sh`` line that prints the digest of a run's kept reports, before its retire.
+
+    The digest is what MCPs stores beside the check's result (MCPs board task
+    601eef87, migration 957's ``results_digest``), so a reader that copies the
+    reports back can tell it holds the bytes the run kept. It is the SHA-256
+    of ``sha256sum``'s output over every file under the copy, each named
+    ``./<path>`` relative to it and sorted bytewise by name: one line per
+    file, ``<hex>  ./<path>``. A copy holding no file prints no line, as a
+    run whose recipe wrote none keeps none.
+
+    Args:
+        target: The dispatch's absolute remote directory.
+
+    Returns:
+        One line, run by the tail read (:func:`fleet.core.run_registry.log_tail_script`).
+    """
+    kept = f'"{run_results_path(target)}"'
+    return (
+        f'if [ -d {kept} ] && [ -n "$(find {kept} -type f -print -quit)" ]; then '
+        f'digest="$(cd {kept} && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum '
+        f"| sha256sum | cut -d ' ' -f 1)\"; printf '{RESULTS_DIGEST_MARKER}: %s\\n' \"$digest\"; fi"
+    )
+
+
+def read_results_digest(tail: str) -> str | None:
+    """Read the kept reports' digest off the tail read's answer.
+
+    Args:
+        tail: What the tail read printed.
+
+    Returns:
+        The last digest line's SHA-256, or None when the run kept no report.
+    """
+    last: re.Match[str] | None = None
+    for match in RESULTS_DIGEST_LINE.finditer(tail):
+        last = match
+    return None if last is None else last.group(1)
+
+
 def sh_retire_lines(*, target: str, retained: str) -> list[str]:
     """The ``sh`` lines a retire moves the run's results to where they are kept.
 
@@ -122,10 +172,14 @@ def sh_retire_lines(*, target: str, retained: str) -> list[str]:
 
 __all__ = [
     "RECIPE_RESULTS_NAME",
+    "RESULTS_DIGEST_LINE",
+    "RESULTS_DIGEST_MARKER",
     "RUN_RESULTS_NAME",
+    "read_results_digest",
     "retained_results_path",
     "run_results_path",
     "sh_isolated_results_lines",
+    "sh_results_digest_line",
     "sh_results_lines",
     "sh_retire_lines",
 ]

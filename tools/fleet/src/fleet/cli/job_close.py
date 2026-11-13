@@ -58,6 +58,7 @@ def refuse(
         status=ClosingStatus.REFUSED,
         exit_code=None,
         detail=detail,
+        result=None,
         identity=identity,
     )
     _log.info("refused %s: %s", job["job_id"], detail)
@@ -72,6 +73,7 @@ def close(
     status: ClosingStatus,
     exit_code: int | None,
     detail: str,
+    result: JSONObject | None,
 ) -> DispatchJob:
     """Close a job this runner started, with how it ended, and log it.
 
@@ -83,6 +85,9 @@ def close(
             ``failed`` with a non-zero exit and ``refused`` with none.
         exit_code: Its exit status, or None for ``refused``.
         detail: The line the submitter reads.
+        result: A node check's typed result
+            (:func:`fleet.core.check_result.encode_check_result`), or None for
+            a hub job, a model or a research job, which carry none.
 
     Returns:
         The job, which a hub job hands back whatever became of it.
@@ -96,6 +101,7 @@ def close(
         status=status,
         exit_code=exit_code,
         detail=detail,
+        result=result,
         identity=identity,
     )
     _log.info("%s: %s", encode_job_line(job), detail)

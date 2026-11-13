@@ -11,9 +11,9 @@ printed no coverage table.
 
 from __future__ import annotations
 
-from fleet.core import verdict
+from fleet.core import check_figures, verdict
 
-INFO = verdict.NODE_TEST_SIGN
+INFO = check_figures.NODE_TEST_SIGN
 
 #: The end of fleet job 5c236243's transcript, from its last case to the
 #: banner (log loki:/home/corvis/fleet/stage/logs/coax-drone-site-loki-1794573532.log).
