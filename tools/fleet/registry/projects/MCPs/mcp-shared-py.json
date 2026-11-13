@@ -1,7 +1,7 @@
 {
   "worker_ram_gb": 0.3,
   "minimum_workers": 4,
-  "expected_minutes": 6,
+  "expected_minutes": 10,
   "required_tags": [],
   "source": {
     "remote": "https://github.com/wagner-austin/MCPs.git",
