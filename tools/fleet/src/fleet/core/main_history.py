@@ -202,7 +202,7 @@ def read_mains(
         try:
             reads.append(read_main(mirrors_root, repository, remote))
         except AppError as refused:
-            unread.append(f"{repository}: {refused.code.value}: {refused.message}")
+            unread.append(f"{repository}: {refused.code}: {refused.message}")
     return tuple(reads), tuple(unread)
 
 

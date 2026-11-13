@@ -243,16 +243,15 @@ class TestPublishMains:
         assert heads == (
             main_history.MainHistoryHead(repository="MCPs", head="b" * 40, depth=3, added=2),
         )
+        sent: JSONObject = {
+            "repositories": [
+                {"repository": "MCPs", "headDepth": 3, "commits": ["b" * 40, "a" * 40]}
+            ],
+            "readAt": READ_AT,
+            **IDENTITY,
+        }
         assert endpoint.tools == ["dispatch_main_publish"]
-        assert endpoint.arguments == [
-            {
-                "repositories": [
-                    {"repository": "MCPs", "headDepth": 3, "commits": ["b" * 40, "a" * 40]}
-                ],
-                "readAt": READ_AT,
-                **IDENTITY,
-            }
-        ]
+        assert endpoint.arguments == [sent]
 
     @pytest.mark.parametrize(
         ("answer", "words"),
