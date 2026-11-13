@@ -102,6 +102,10 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     assert prepared["MCPs/instagram-mcp"] == (
         {"phase": "install", "argv": (*PREPARE, "install")},
         {"phase": "workspace-build", "argv": (*PREPARE, "workspace-build")},
+        InstallStep(
+            phase="test-database",
+            argv=(*PREPARE, "test-database", "CONTAINER=corvis-fleet-testdb"),
+        ),
     )
     assert unprepared == ["MCPs/phone-release-execution"]
     # Board task 007bfc7e: these lanes run execution and its nested proxy
@@ -153,8 +157,9 @@ def test_a_test_database_step_names_its_container_and_its_phase() -> None:
     # 30 again since the package dropped its Windows lane (MCPs board task
     # c8cb0ac5); 31 since MCPs/execution-lead-lacrymal (MCPs board task
     # 770837b7); 32 since MCPs/execution-served-diphtheria, for its
-    # usage-limit case (MCPs board task ea46a7a4).
-    assert len(databases) == 32
+    # usage-limit case (MCPs board task ea46a7a4); 33 since
+    # MCPs/instagram-mcp, for its scheduled publications (MCPs board task 4fd6d24a).
+    assert len(databases) == 33
     assert {step["phase"] for step in databases} == {"test-database"}
     assert {step["argv"][5:] for step in databases} == {("CONTAINER=corvis-fleet-testdb",)}
 
