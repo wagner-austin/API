@@ -115,7 +115,7 @@ from fleet.contracts.dispatch import (
     DispatchLane,
     encode_job_line,
 )
-from fleet.core import _test_hooks, netboot_adopt, netboot_arm, queue, rebuild, tick_run
+from fleet.core import _test_hooks, declared, netboot_adopt, netboot_arm, queue, rebuild, tick_run
 
 _log = get_logger(__name__)
 
@@ -458,7 +458,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             _log.info("%s", line)
     if lane is not DispatchLane.HUB:
         return 0
-    hub_passes.publish_pass(credentials, identity, repo_root=project_root)
+    registry = declared.read_declared(project_root)
+    hub_passes.publish_pass(credentials, identity, registry)
+    hub_passes.main_pass(credentials, identity, registry, mirrors_root=loaded.mirrors)
     hub_passes.observe_pass(
         loaded.workspace["machines"], identity, loaded.workspace["native_evidence_seconds"]
     )

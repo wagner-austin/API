@@ -96,10 +96,14 @@ class DeclaredSource(TypedDict):
     Attributes:
         repository: Repository identity of the declared source remote.
         directory: Exact source path, empty for the repository root.
+        remote: The declared remote itself, which the hub fetches the
+            repository's default branch from (:mod:`fleet.core.main_history`);
+            the queue's publication sends only the repository and directory.
     """
 
     repository: str
     directory: str
+    remote: str
 
 
 class DeclaredProject(TypedDict):
@@ -345,7 +349,9 @@ def read_declared(checkout: pathlib.Path) -> RegistryRead | str:
                 source=None
                 if source is None
                 else DeclaredSource(
-                    repository=repository_name(source["remote"]), directory=source["path"]
+                    repository=repository_name(source["remote"]),
+                    directory=source["path"],
+                    remote=source["remote"],
                 ),
             )
         )
