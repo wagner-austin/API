@@ -14,7 +14,7 @@ seconds, so one worker of half a gigabyte holds it.
 
 from __future__ import annotations
 
-from fleet.contracts.source import ProjectSource
+from fleet.contracts.source import InstallStep, ProjectCompanion, ProjectSource
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace, require_project
 from tests._registry import shipped_document
@@ -32,4 +32,24 @@ def test_the_site_check_runs_from_a_clean_coax_drone_export_on_any_linux_node() 
         path="site",
         install=(),
         companions=(),
+    )
+
+
+def test_the_full_check_bootstraps_pinned_freecad_and_stages_shared_python() -> None:
+    """The root lane must reach the actual CAD suite and its external guard library."""
+    project = require_project(decode_fleet_workspace(shipped_document()), "coax-drone")
+
+    assert project["required_tags"] == (NodeTag.LINUX,)
+    assert project["node"] is None
+    assert project["minimum_workers"] == 2
+    assert project["worker_ram_gb"] == 2.0
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/coax-drone.git",
+        path="",
+        install=(InstallStep(phase="install", argv=("make", "freecad-environment")),),
+        companions=(
+            ProjectCompanion(
+                remote="https://github.com/wagner-austin/MCPs.git", ref="main", directory="MCPs"
+            ),
+        ),
     )
