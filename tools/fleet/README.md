@@ -1585,7 +1585,9 @@ Chromium's own coverage. It needs no image, install step or companion, only a
 Linux node with node 22.8 or later for the coverage thresholds; every node
 measured on 2026-11-12 runs v24.22.1. Fleet job 5c236243 passed it at
 coax-drone 4484f0c on loki, 60 tests in 209 s at one worker.
-The repository's root check, which needs FreeCAD's kernel, is not declared.
+The repository's root check, which needs FreeCAD's kernel, is the separate
+project `coax-drone` (06e04ed3f): its install step bootstraps the pinned
+FreeCAD environment and it stages MCPs beside the export as a companion.
 
 ## A project that names its node: `node`
 
