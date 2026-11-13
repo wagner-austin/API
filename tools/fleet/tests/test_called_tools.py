@@ -33,6 +33,7 @@ CALLED: Final[frozenset[str]] = frozenset(
         "dispatch_claim",
         "dispatch_get",
         "dispatch_list",
+        "dispatch_main_publish",
         "dispatch_publisher_tick",
         "dispatch_registry_publish",
         "dispatch_report",
@@ -51,8 +52,11 @@ CALLED: Final[frozenset[str]] = frozenset(
 #: MCPs d3ea102d2. The 21st was :func:`fleet.core.native_wake._post`'s
 #: ``task_post`` of each Codex wake stage (MCPs board task 562cfa7a). The
 #: runner's own verdict ``task_post`` was removed for MCPs board task
-#: 52017b1e, the queue's close posting every outcome, which leaves 20.
-CALL_SITES: Final[int] = 20
+#: 52017b1e, the queue's close posting every outcome, which leaves 20. The
+#: 21st is :func:`fleet.core.main_history.publish_mains`'s
+#: ``dispatch_main_publish`` (MCPs board task 8b3dcb31), which fleet-mcp
+#: serves since MCPs 83d18456a.
+CALL_SITES: Final[int] = 21
 
 
 def constants(tree: ast.Module) -> dict[str, str]:
