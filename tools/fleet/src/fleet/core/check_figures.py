@@ -192,14 +192,14 @@ def read_test_counts(tail: str) -> SuiteCounts | None:
         node_failed = match.group(1)
     if node_passed is not None and node_failed is not None:
         return SuiteCounts(passed=int(node_passed), failed=int(node_failed))
-    totals: re.Match[str] | None = None
-    for match in PASSED.finditer(tail):
-        totals = match
-    if totals is None:
+    found: tuple[re.Match[str], str] | None = None
+    for line in tail.split("\n"):
+        for match in PASSED.finditer(line):
+            found = (match, line)
+    if found is None:
         return None
-    line_start = tail.rfind("\n", 0, totals.start()) + 1
-    line_end = tail.find("\n", totals.end())
-    failed = FAILED.search(tail, line_start, len(tail) if line_end == -1 else line_end)
+    totals, totals_line = found
+    failed = FAILED.search(totals_line)
     return SuiteCounts(
         passed=int(totals.group(1)), failed=0 if failed is None else int(failed.group(1))
     )
@@ -216,7 +216,7 @@ def _fraction(covered: str, total: str) -> list[float]:
         One percentage rounded to two places, or none when the total is 0.
     """
     whole = int(total)
-    return [] if whole == 0 else [round(int(covered) * 100 / whole, 2)]
+    return [round(int(covered) * 100 / whole, 2)] if whole else []
 
 
 def read_coverage_reading(tail: str) -> CoverageReading | None:

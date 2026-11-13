@@ -39,6 +39,15 @@ class TestTheCounts:
             "failed": 2,
         }
 
+    def test_the_last_total_on_the_last_line_carrying_one_is_the_suite_s(self) -> None:
+        tail = (
+            "Test Files  2 failed | 60 passed (62)\n"
+            "case says 1 passed, 2 passed and 3 passed\n"
+            "trailing log line"
+        )
+        assert read_test_counts(tail) == {"passed": 3, "failed": 0}
+        assert read_test_counts("\n7 failed | 9 passed") == {"passed": 9, "failed": 7}
+
     def test_a_tail_with_no_passed_total_is_unread(self) -> None:
         assert read_test_counts(f"{NODE_TEST_SIGN} pass 60\n") is None
 

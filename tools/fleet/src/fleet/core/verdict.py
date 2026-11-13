@@ -60,6 +60,12 @@ VERDICT_PREFIX: Final = "FLEET-CHECK"
 #: largest with 1.8 times its length to grow into.
 LOG_TAIL_LINES: Final = 1500
 
+#: How the verdict line spells each budget outcome: ``over:347s/300s``.
+BUDGET_WORDS: Final[dict[BudgetOutcome, str]] = {
+    BudgetOutcome.EXCEEDED: "over",
+    BudgetOutcome.WITHIN: "within",
+}
+
 #: A terminal's colour codes, which vitest writes into the transcript too.
 ANSI: Final[re.Pattern[str]] = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -262,8 +268,7 @@ def read_budget(tail: str) -> str:
     reading = read_budget_reading(tail)
     if reading is None:
         return "unread"
-    word = "over" if reading["outcome"] is BudgetOutcome.EXCEEDED else "within"
-    return f"{word}:{reading['seconds']}s/{reading['bound']}s"
+    return f"{BUDGET_WORDS[reading['outcome']]}:{reading['seconds']}s/{reading['bound']}s"
 
 
 def read_unit_end(tail: str) -> str | None:
@@ -386,6 +391,7 @@ def render_verdict(verdict: Verdict) -> str:
 
 __all__ = [
     "ANSI",
+    "BUDGET_WORDS",
     "CHECK_BANNER",
     "LOG_TAIL_LINES",
     "PYTEST_CALL",
