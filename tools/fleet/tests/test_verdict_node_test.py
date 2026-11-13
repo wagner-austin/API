@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from fleet.core import verdict
 
-INFO = "ℹ"
+INFO = verdict.NODE_TEST_SIGN
 
 #: The end of fleet job 5c236243's transcript, from its last case to the
 #: banner (log loki:/home/corvis/fleet/stage/logs/coax-drone-site-loki-1794573532.log).
@@ -91,9 +91,12 @@ class TestNodeTestTotals:
 
     def test_the_sign_must_open_the_line(self) -> None:
         assert verdict.read_tests(f"log: {INFO} pass 60\nlog: {INFO} fail 0\n") == "unread"
-        assert verdict.read_coverage(f"log: {INFO} all files | 100.00 | 100.00 | 100.00 |\n") == "unread"
+        row = f"log: {INFO} all files | 100.00 | 100.00 | 100.00 |\n"
+
+        assert verdict.read_coverage(row) == "unread"
 
     def test_the_verdict_line_carries_both(self) -> None:
+        logs = "/home/corvis/fleet/stage/logs/coax-drone-site-loki-1794573532"
         line = verdict.render_verdict(
             verdict.judge(
                 job_id="5c236243-19f5-4c1e-bdc3-0a24077feec1",
@@ -103,8 +106,8 @@ class TestNodeTestTotals:
                 exit_code=0,
                 tail=PASSED_TAIL,
                 ended_unix=1794573744,
-                log_path="/home/corvis/fleet/stage/logs/coax-drone-site-loki-1794573532.log",
-                results_path="/home/corvis/fleet/stage/logs/coax-drone-site-loki-1794573532.results",
+                log_path=f"{logs}.log",
+                results_path=f"{logs}.results",
                 run_id="coax-drone-site-loki-1794573532",
                 workers=1,
             )

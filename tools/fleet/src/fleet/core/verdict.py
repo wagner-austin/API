@@ -91,26 +91,30 @@ GRADLE_COVERAGE_TOTAL: Final[re.Pattern[str]] = re.compile(
     r"^COVERAGE TOTAL: lines (\d+/\d+) branches (\d+/\d+)$", re.MULTILINE
 )
 
+#: The sign node's built-in runner opens each summary line with, named rather
+#: than written, since the character reads as a Latin ``i`` (ruff RUF001).
+NODE_TEST_SIGN: Final = "\N{INFORMATION SOURCE}"
+
 #: node's built-in runner (``node --test``, coax-drone/site) closes with its
 #: own totals, one per line, each behind U+2139 INFORMATION SOURCE and a
 #: space: ``<i> tests 60``, ``<i> pass 60``, ``<i> fail 0``, ``<i>`` standing
-#: for that sign here and written as its escape in the patterns. It prints no
+#: for :data:`NODE_TEST_SIGN` here. It prints no
 #: ``N passed``, so until MCPs board task ed8e76a7 every coax-drone/site
 #: verdict read ``tests=unread`` over 49 to 60 green tests (FLEET-CHECK
 #: d533d7b3, 7a3bb896, 602098fd, 5c236243). The LAST of each is the run's: a
 #: nested ``node --test`` inside a case would print its own first.
-NODE_TEST_PASS: Final[re.Pattern[str]] = re.compile(r"^ℹ pass (\d+)$", re.MULTILINE)
+NODE_TEST_PASS: Final[re.Pattern[str]] = re.compile(rf"^{NODE_TEST_SIGN} pass (\d+)$", re.MULTILINE)
 
 #: node's failed total, ``<i> fail 2``, printed beside the passed one on
 #: every run, a green one included.
-NODE_TEST_FAIL: Final[re.Pattern[str]] = re.compile(r"^ℹ fail (\d+)$", re.MULTILINE)
+NODE_TEST_FAIL: Final[re.Pattern[str]] = re.compile(rf"^{NODE_TEST_SIGN} fail (\d+)$", re.MULTILINE)
 
 #: node's ``--experimental-test-coverage`` row for the whole tree:
 #: ``<i> all files     | 100.00 |   100.00 |  100.00 |``, lines, branches
 #: and functions in that order, over the modules ``--test-coverage-include``
 #: names.
 NODE_TEST_ALL_FILES: Final[re.Pattern[str]] = re.compile(
-    r"^ℹ all files\s*\|\s*(\d+(?:\.\d+)?)\s*\|\s*(\d+(?:\.\d+)?)\s*\|", re.MULTILINE
+    rf"^{NODE_TEST_SIGN} all files\s*\|\s*(\d+(?:\.\d+)?)\s*\|\s*(\d+(?:\.\d+)?)\s*\|", re.MULTILINE
 )
 
 #: vitest's threshold refusal, which names the figure that missed.
@@ -518,6 +522,7 @@ __all__ = [
     "NODE_TEST_ALL_FILES",
     "NODE_TEST_FAIL",
     "NODE_TEST_PASS",
+    "NODE_TEST_SIGN",
     "PASSED",
     "PYTEST_CALL",
     "PYTEST_TOTAL",
