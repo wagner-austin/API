@@ -107,6 +107,9 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
             argv=(*PREPARE, "test-database", "CONTAINER=corvis-fleet-testdb"),
         ),
     )
+    instagram = decode_fleet_workspace(shipped_document())["projects"]["MCPs/instagram-mcp"]
+    assert instagram["exclusive_resources"] == ("corvis-fleet-testdb",)
+    assert NodeTag.TESTDB in instagram["required_tags"]
     assert unprepared == ["MCPs/phone-release-execution"]
     # Board task 007bfc7e: these lanes run execution and its nested proxy
     # twin. The existing planner includes their dependencies and generated
