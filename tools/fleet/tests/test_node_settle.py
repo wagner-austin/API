@@ -43,9 +43,12 @@ from tests.conftest import DEMO_RUN_ID, FakeRun, failed, ok, retire_replies
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
-#: The node's answers up to the verdict: the result read and the tail read,
-#: each a script sent and then run.
-READ_AND_TAIL = (ok(""), ok("0 1757000060"), ok(""), ok(PASSING_TAIL))
+#: The node's answers up to the tail read: the result read, a script sent and
+#: then run, and the tail read's script sent.
+READ_TO_TAIL = (ok(""), ok("0 1757000060"), ok(""))
+
+#: Those answers, then the tail read's run answering a passing tail.
+READ_AND_TAIL = (*READ_TO_TAIL, ok(PASSING_TAIL))
 
 
 def _ledger(config_path: pathlib.Path) -> str:
@@ -202,7 +205,7 @@ class TestTheCloseCarriesTheTypedResult:
         started = require_int(narrow_json_to_dict(launched), "started_unix")
         _test_hooks.run = FakeRun(
             [
-                *READ_AND_TAIL[:-1],
+                *READ_TO_TAIL,
                 ok(PASSING_TAIL + failures_line),
                 *retire_replies(),
                 *asked(sourced_config, fetch=True),
