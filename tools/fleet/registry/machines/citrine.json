@@ -4,27 +4,27 @@
   "user": "corvis",
   "enabled": true,
   "disabledUntil": null,
-  "duties": [],
+  "duties": [
+    "netboot",
+    "storage"
+  ],
   "standby": [],
   "ledger_observer": "fleet-arm",
   "tailnetIp": "100.110.35.206",
-  "reachKey": null,
-  "bootMac": "6c:2b:59:7d:88:3d",
+  "reachKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHJS1TpJeEJCiEWL7lqytCBN9Dcxpl2lECQlUswenF/E corvis@citrine duty host",
+  "bootMac": null,
   "netbootWifi": false,
-  "secureBoot": "enforced",
-  "installDisk": {
-    "rule": "serial",
-    "serial": "Inland_SATA_SSD_IB25ADL0256S01189"
-  },
+  "secureBoot": null,
+  "installDisk": null,
   "tunnel": null,
   "guest": null,
   "ciWorkersPerRunner": null,
   "boot": {
     "units": []
   },
-  "notes": "citrine, the Dell PowerEdge T330 of service tag 9C0Y9T2 (iDRAC8 at LAN 192.168.10.186), the fleet's storage machine to be: emerald's two WD Red Plus 4 TB disks move into its bays 1 and 2 at the storage cutover, which moves the storage duty here. It was admitted as pc-7d883d (admission 2a8b5026, the operator, 2026-11-11: \"yes admit pc-7d883d, wipe it\" and \"and itkk be named citrine?\") and reinstalled with the fleet's NixOS by the netboot installer from MCPs 96585ad7243c onto the Inland SSD IB25ADL0256S01189 in bay 0 behind its PERC H330 in HBA mode (arm 2d47f3db), adopted at 100.110.35.206 on 2026-11-12T01:00:16.393Z, and Secure Boot enforced on its own keys from 01:05Z. Measured by the reimage probe (MCPs board task 42316005): 8 logical cores, 31.2 GiB, no CUDA device, Rust, g++, rootless docker or test database. Renamed from pc-7d883d for MCPs board task 52b4e19f.",
+  "notes": "citrine, the Dell PowerEdge T330 of service tag 9C0Y9T2 (iDRAC8 at LAN 192.168.10.186), the fleet's storage and netboot machine since the storage cutover of 2026-11-13 (MCPs board task ea3191d4): emerald's two WD Red Plus 4 TB disks hold the pool tank in its bays, and every client mounts it at citrine's own tailnet address. Its reachKey is its own ~/.ssh/id_ed25519 (SHA256:sKW1mKMtrorrzXAWricKk0evMcDUGaigFhwTrVo/xhQ), which every node admits as the netboot duty's holder. bootMac, secureBoot and installDisk are null because the netboot duty's holder serves every install, its own included. On 2026-11-13 bays 1 and 3 lost the data link to WD-WX32D763CR1E (bay 1 never detected it; bay 3 counted 477 link drops and 483 CRC errors in an hour, against 1 and 0 for the disk in bay 2), and in bay 5 it reads clean, so the disks sit in bays 2 and 5. It was admitted as pc-7d883d (admission 2a8b5026, the operator, 2026-11-11: \"yes admit pc-7d883d, wipe it\" and \"and itkk be named citrine?\") and reinstalled with the fleet's NixOS by the netboot installer from MCPs 96585ad7243c onto the Inland SSD IB25ADL0256S01189 in bay 0 behind its PERC H330 in HBA mode (arm 2d47f3db), adopted at 100.110.35.206 on 2026-11-12T01:00:16.393Z, and Secure Boot enforced on its own keys from 01:05Z. Measured by the reimage probe (MCPs board task 42316005): 8 logical cores, 31.2 GiB, no CUDA device, Rust, g++, rootless docker or test database. Renamed from pc-7d883d for MCPs board task 52b4e19f.",
   "dispatch": {
-    "held": "Storage machine to be (MCPs board task 52b4e19f): no Docker, compiler or test database, so no check can run here.",
+    "held": "The storage and netboot machine (MCPs board task ea3191d4): no Docker, compiler or test database, so no check can run here.",
     "stage_root": "/home/corvis/fleet/stage",
     "logical_cores": 8,
     "ram_gb": 31.2,
