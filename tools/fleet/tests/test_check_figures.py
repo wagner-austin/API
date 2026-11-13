@@ -167,6 +167,7 @@ def test_the_result_carries_every_figure_the_tail_printed() -> None:
         started_unix=1757000000,
         ended_unix=1757000060,
         results_path="/home/corvis/fleet/stage/logs/MCPs-fleet-mcp-lavender-1794578820.results",
+        transcript_path="/home/corvis/fleet/stage/logs/MCPs-fleet-mcp-lavender-1794578820.log",
     ) == {
         "runId": "MCPs-fleet-mcp-lavender-1794578820",
         "node": "lavender",
@@ -191,4 +192,5 @@ def test_the_result_carries_every_figure_the_tail_printed() -> None:
             {"phase": "check", "seconds": 30},
         ],
         "failedCases": None,
+        "transcriptPath": "/home/corvis/fleet/stage/logs/MCPs-fleet-mcp-lavender-1794578820.log",
     }

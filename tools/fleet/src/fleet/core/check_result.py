@@ -51,6 +51,7 @@ def encode_check_result(
     started_unix: int,
     ended_unix: int,
     results_path: str,
+    transcript_path: str,
 ) -> JSONObject:
     """Build a check's typed result from its tail and its run.
 
@@ -62,6 +63,10 @@ def encode_check_result(
         ended_unix: When the check ended, as the verdict reads it.
         results_path: Where the retire keeps the run's reports
             (:func:`fleet.core.check_results.retained_results_path`).
+        transcript_path: Where the retire keeps the run's transcript
+            (:func:`fleet.core.names.retained_log_path`), the path the
+            verdict line names as ``log=``; MCPs stores it as the result's
+            ``transcript_path`` (MCPs migration 960, board task d9872e99).
 
     Returns:
         The ``result`` argument of ``dispatch_report``'s close.
@@ -114,6 +119,7 @@ def encode_check_result(
         "coverage": coverage_value,
         "phases": phases_value,
         "failedCases": None if failed_cases is None else list[JSONValue](failed_cases),
+        "transcriptPath": transcript_path,
     }
 
 

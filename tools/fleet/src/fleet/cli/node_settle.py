@@ -136,6 +136,7 @@ def settle(
             ),
         )
     results_path = retained_results_path(node["stage_root"], row["run_id"])
+    log_path = names.retained_log_path(node["stage_root"], row["run_id"])
     judged = verdict.judge(
         job_id=job["job_id"],
         project=row["project"],
@@ -144,7 +145,7 @@ def settle(
         exit_code=exit_code,
         tail=tail,
         ended_unix=ended_unix,
-        log_path=names.retained_log_path(node["stage_root"], row["run_id"]),
+        log_path=log_path,
         results_path=results_path,
         run_id=row["run_id"],
         workers=row["workers"],
@@ -184,6 +185,7 @@ def settle(
                 started_unix=row["started_unix"],
                 ended_unix=ended_unix,
                 results_path=results_path,
+                transcript_path=log_path,
             ),
         )
     dispatch.finish(
