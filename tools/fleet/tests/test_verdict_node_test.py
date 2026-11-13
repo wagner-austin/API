@@ -85,6 +85,11 @@ class TestNodeTestTotals:
         assert verdict.read_tests(nested + PASSED_TAIL) == "60p/0f"
         assert verdict.read_coverage(nested + PASSED_TAIL) == "lines=100.00% branches=100.00%"
 
+    def test_lines_and_branches_are_read_from_their_own_columns(self) -> None:
+        row = f"{INFO} all files     |  97.30 |    88.89 |  100.00 | \n"
+
+        assert verdict.read_coverage(row) == "lines=97.30% branches=88.89%"
+
     def test_a_pass_line_without_its_fail_line_is_not_a_total(self) -> None:
         assert verdict.read_tests(f"{INFO} pass 60\n") == "unread"
         assert verdict.read_tests(f"{INFO} fail 0\n") == "unread"
