@@ -29,6 +29,8 @@ from __future__ import annotations
 import re
 from typing import Final
 
+from platform_core.json_utils import load_json_str, narrow_json_to_list, narrow_json_to_str
+
 from fleet.core.names import LOGS_DIRECTORY
 
 #: The opening token of the line the tail read prints for the kept reports'
@@ -39,6 +41,21 @@ RESULTS_DIGEST_MARKER: Final = "FLEET_RESULTS"
 RESULTS_DIGEST_LINE: Final[re.Pattern[str]] = re.compile(
     rf"^{RESULTS_DIGEST_MARKER}: ([0-9a-f]{{64}})$", re.MULTILINE
 )
+
+#: The opening token of the line the tail read prints for the failures the
+#: check's own reports name (:func:`sh_failures_line`).
+FAILURES_MARKER: Final = "FLEET_FAILURES"
+
+#: That line, as :func:`read_failed_cases` reads it back.
+FAILURES_LINE: Final[re.Pattern[str]] = re.compile(rf"^{FAILURES_MARKER}: (.*)", re.MULTILINE)
+
+#: The file MCPs' check lock writes into :data:`RECIPE_RESULTS_NAME` once its
+#: runners return: a JSON array of every failure the reports name, possibly
+#: none, written only when the directory holds a report (MCPs
+#: ``packages/maketools/src/maketools/check_reports.py``, ``write_failures``;
+#: the name copies ``check_results.FAILURES_FILE_NAME`` for the reason
+#: :data:`RECIPE_RESULTS_NAME` does).
+FAILURES_FILE_NAME: Final = "failures.json"
 
 #: The directory a check's runners write their reports to, in the directory
 #: its recipe runs in.
@@ -154,6 +171,53 @@ def read_results_digest(tail: str) -> str | None:
     return None if last is None else last.group(1)
 
 
+def sh_failures_line(target: str) -> str:
+    """The ``sh`` line that prints the failures a run's kept reports name, before its retire.
+
+    The names are what MCPs stores as the check's failed cases (MCPs board
+    task d26709c0, migration 959): maketools parses the JUnit and mypy
+    reports it kept and writes :data:`FAILURES_FILE_NAME` beside them, and
+    this repository shares no package with it, so the runner sends what that
+    file holds rather than parsing the reports a second time. A run whose
+    check wrote no such file prints no line, and its close sends the names
+    as unread. An assignment, so a ``cat`` that fails ends the read under
+    ``set -e`` rather than printing a line with no names.
+
+    Args:
+        target: The dispatch's absolute remote directory.
+
+    Returns:
+        One line, run by the tail read (:func:`fleet.core.run_registry.log_tail_script`).
+    """
+    names = f'"{run_results_path(target)}/{FAILURES_FILE_NAME}"'
+    return (
+        f'if [ -f {names} ]; then failures="$(cat {names})"; '
+        f"printf '{FAILURES_MARKER}: %s\\n' \"$failures\"; fi"
+    )
+
+
+def read_failed_cases(tail: str) -> list[str] | None:
+    """Read the failures the kept reports name off the tail read's answer.
+
+    Args:
+        tail: What the tail read printed.
+
+    Returns:
+        The last failures line's names, possibly none, or None when the run
+        kept no :data:`FAILURES_FILE_NAME`, so its names were never read.
+
+    Raises:
+        platform_core.json_utils.InvalidJsonError: When the line is not JSON.
+        platform_core.json_utils.JSONTypeError: When it is not an array of strings.
+    """
+    last: re.Match[str] | None = None
+    for match in FAILURES_LINE.finditer(tail):
+        last = match
+    if last is None:
+        return None
+    return [narrow_json_to_str(name) for name in narrow_json_to_list(load_json_str(last.group(1)))]
+
+
 def sh_retire_lines(*, target: str, retained: str) -> list[str]:
     """The ``sh`` lines a retire moves the run's results to where they are kept.
 
@@ -171,13 +235,18 @@ def sh_retire_lines(*, target: str, retained: str) -> list[str]:
 
 
 __all__ = [
+    "FAILURES_FILE_NAME",
+    "FAILURES_LINE",
+    "FAILURES_MARKER",
     "RECIPE_RESULTS_NAME",
     "RESULTS_DIGEST_LINE",
     "RESULTS_DIGEST_MARKER",
     "RUN_RESULTS_NAME",
+    "read_failed_cases",
     "read_results_digest",
     "retained_results_path",
     "run_results_path",
+    "sh_failures_line",
     "sh_isolated_results_lines",
     "sh_results_digest_line",
     "sh_results_lines",

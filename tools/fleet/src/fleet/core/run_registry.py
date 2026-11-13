@@ -33,7 +33,7 @@ from typing import Final
 
 from fleet.contracts.check_unit import CHECK_UNIT
 from fleet.core import names
-from fleet.core.check_results import sh_results_digest_line
+from fleet.core.check_results import sh_failures_line, sh_results_digest_line
 from fleet.core.commit_tree import COMMIT_PATTERN
 from fleet.core.dialect import PROLOGUE
 from fleet.core.linux_unit_end import unit_end_path, unit_end_script
@@ -146,7 +146,7 @@ def launch_script(*, target: str, run_id: str, registry_commit: str) -> str:
 
 
 def log_tail_script(target: str, lines: int) -> str:
-    """Print the transcript's last lines, its registry commit, then its kept reports' digest.
+    """Print the transcript's tail, its registry commit, its kept reports' digest and failures.
 
     Args:
         target: Absolute remote directory holding the export.
@@ -154,9 +154,11 @@ def log_tail_script(target: str, lines: int) -> str:
 
     Returns:
         The script's text; an absent transcript prints no lines, a run
-        whose launch recorded no commit prints no registry line, and a run
+        whose launch recorded no commit prints no registry line, a run
         that kept no report prints no digest line
-        (:func:`fleet.core.check_results.sh_results_digest_line`).
+        (:func:`fleet.core.check_results.sh_results_digest_line`), and a
+        run whose check named no failures file prints no failures line
+        (:func:`fleet.core.check_results.sh_failures_line`).
     """
     log = names.log_path(target)
     recorded = registry_commit_path(target)
@@ -167,6 +169,7 @@ def log_tail_script(target: str, lines: int) -> str:
         f"if [ -f '{recorded}' ]; then commit=\"$(cat '{recorded}')\"; "
         f"printf '{REGISTRY_MARKER}: %s\\n' \"$commit\"; fi\n"
         f"{sh_results_digest_line(target)}\n"
+        f"{sh_failures_line(target)}\n"
     )
 
 

@@ -10,11 +10,13 @@ a person reads; both are read off the same tail by the same readers
 The result carries the run and node the start reported, which the queue
 compares with the claim, so a restarted runner's report of an earlier run is
 refused by its run id. A figure the tail does not print is ``None`` or
-absent, never zero. The failed cases are ``None``: their names are in the
-kept JUnit reports, which only MCPs' maketools ``check_reports`` parses, and
-this repository shares no package with it, so the runner sends them unread
-(MCPs migration 959) and the kept reports' path and digest let a reader find
-and verify them.
+absent, never zero. The failed cases are the names MCPs' maketools wrote
+beside the kept reports, which only its ``check_reports`` parses, read off
+the tail (:func:`fleet.core.check_results.read_failed_cases`, MCPs board
+task d26709c0). A check that wrote no such file, one whose project's check
+runs no maketools lock or one stopped before its runners returned, sends
+them as ``None``, unread (MCPs migration 959), and the kept reports' path
+and digest let a reader find and verify them.
 """
 
 from __future__ import annotations
@@ -24,7 +26,7 @@ import datetime
 from platform_core.json_utils import JSONObject, JSONValue
 
 from fleet.core.check_figures import read_budget_reading, read_coverage_reading, read_test_counts
-from fleet.core.check_results import read_results_digest
+from fleet.core.check_results import read_failed_cases, read_results_digest
 from fleet.core.run_summary import phase_seconds, read_run_summary
 from fleet.core.verdict import CHECK_BANNER
 
@@ -66,12 +68,17 @@ def encode_check_result(
 
     Raises:
         ValueError: From :func:`fleet.core.run_summary.phase_seconds` on a
-            summary line no build prints.
+            summary line no build prints, and from
+            :func:`fleet.core.check_results.read_failed_cases` on a failures
+            line that is not JSON.
+        TypeError: From :func:`fleet.core.check_results.read_failed_cases`
+            on a failures line that is JSON but not an array of strings.
     """
     counts = read_test_counts(tail)
     coverage = read_coverage_reading(tail)
     budget = read_budget_reading(tail)
     digest = read_results_digest(tail)
+    failed_cases = read_failed_cases(tail)
     budget_value: JSONObject = (
         {"outcome": "unavailable"}
         if budget is None
@@ -106,7 +113,7 @@ def encode_check_result(
         "artifact": None if digest is None else {"path": results_path, "digest": digest},
         "coverage": coverage_value,
         "phases": phases_value,
-        "failedCases": None,
+        "failedCases": None if failed_cases is None else list[JSONValue](failed_cases),
     }
 
 

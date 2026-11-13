@@ -181,14 +181,32 @@ class TestTheCloseCarriesTheTypedResult:
     """MCPs board task 601eef87: the close's typed result is read off the
     tail its verdict line is, and names the run and node the start reported."""
 
+    @pytest.mark.parametrize(
+        ("failures_line", "failed_cases"),
+        [
+            ("", None),
+            (
+                'FLEET_FAILURES: ["packages/db/tests/test_a.py::test_bad"]\n',
+                ["packages/db/tests/test_a.py::test_bad"],
+            ),
+        ],
+    )
     def test_the_result_is_the_tail_s_figures_with_the_run_s_span(
-        self, sourced_config: pathlib.Path
+        self,
+        sourced_config: pathlib.Path,
+        failures_line: str,
+        failed_cases: list[str] | None,
     ) -> None:
         launch(sourced_config)
         launched = load_json_str(_ledger(sourced_config).splitlines()[-1])
         started = require_int(narrow_json_to_dict(launched), "started_unix")
         _test_hooks.run = FakeRun(
-            [*READ_AND_TAIL, *retire_replies(), *asked(sourced_config, fetch=True)]
+            [
+                *READ_AND_TAIL[:-1],
+                ok(PASSING_TAIL + failures_line),
+                *retire_replies(),
+                *asked(sourced_config, fetch=True),
+            ]
         )
         answering_queue = FakeQueue(
             [
@@ -217,7 +235,7 @@ class TestTheCloseCarriesTheTypedResult:
                 {"measure": "branches", "percent": 100.0},
             ],
             "phases": [],
-            "failedCases": None,
+            "failedCases": failed_cases,
         }
 
 

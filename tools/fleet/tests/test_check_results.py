@@ -12,14 +12,21 @@ import hashlib
 import pathlib
 import subprocess
 
+import pytest
+from platform_core.json_utils import InvalidJsonError, JSONTypeError
+
 from fleet.core import dialect, names
 from fleet.core.check_results import (
+    FAILURES_FILE_NAME,
+    FAILURES_MARKER,
     RECIPE_RESULTS_NAME,
     RESULTS_DIGEST_MARKER,
     RUN_RESULTS_NAME,
+    read_failed_cases,
     read_results_digest,
     retained_results_path,
     run_results_path,
+    sh_failures_line,
     sh_isolated_results_lines,
     sh_results_digest_line,
     sh_results_lines,
@@ -27,8 +34,17 @@ from fleet.core.check_results import (
 )
 from tests._host_bash import host_bash
 
+#: What MCPs' maketools ``write_failures`` wrote for a check whose suite
+#: failed one case and whose mypy refused one line: ``json.dumps`` of the
+#: sorted names, then a newline.
+WRITTEN_FAILURES = (
+    '["packages/db/src/a.py:3 [arg-type]", "packages/db/tests/test_a.py::test_bad \\"quoted\\""]\n'
+)
+
 
 def test_the_names_are_one_spelling() -> None:
+    assert FAILURES_FILE_NAME == "failures.json"
+    assert FAILURES_MARKER == "FLEET_FAILURES"
     assert RECIPE_RESULTS_NAME == ".check-results"
     assert RUN_RESULTS_NAME == "check-results"
     assert run_results_path("/s/run-1/run-1") == "/s/run-1/run-1/check-results"
@@ -189,3 +205,56 @@ def test_the_last_digest_line_is_the_one_read() -> None:
 
     assert read_results_digest(tail) == "b" * 64
     assert read_results_digest(f"{RESULTS_DIGEST_MARKER}: {'a' * 63}\n") is None
+
+
+def test_the_tail_read_prints_the_names_maketools_wrote(tmp_path: pathlib.Path) -> None:
+    target = tmp_path / "run-1"
+    kept = pathlib.Path(run_results_path(target.as_posix()))
+    kept.mkdir(parents=True)
+    (kept / FAILURES_FILE_NAME).write_text(WRITTEN_FAILURES, encoding="utf-8")
+
+    completed = run_lines([sh_failures_line(target.as_posix())], tmp_path)
+
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout == f"{FAILURES_MARKER}: {WRITTEN_FAILURES}"
+    assert read_failed_cases(completed.stdout) == [
+        "packages/db/src/a.py:3 [arg-type]",
+        'packages/db/tests/test_a.py::test_bad "quoted"',
+    ]
+
+
+def test_a_file_naming_none_reads_as_none_and_no_file_as_unread(
+    tmp_path: pathlib.Path,
+) -> None:
+    named_none = tmp_path / "run-1"
+    unread = tmp_path / "run-2"
+    kept = pathlib.Path(run_results_path(named_none.as_posix()))
+    kept.mkdir(parents=True)
+    (kept / FAILURES_FILE_NAME).write_text("[]", encoding="utf-8")
+    pathlib.Path(run_results_path(unread.as_posix())).mkdir(parents=True)
+
+    none_named = run_lines([sh_failures_line(named_none.as_posix())], tmp_path)
+    none_read = run_lines([sh_failures_line(unread.as_posix())], tmp_path)
+
+    assert none_named.stdout == f"{FAILURES_MARKER}: []\n", none_named.stderr
+    assert read_failed_cases(none_named.stdout) == []
+    assert none_read.returncode == 0, none_read.stderr
+    assert none_read.stdout == ""
+    assert read_failed_cases(none_read.stdout) is None
+
+
+def test_the_last_failures_line_is_the_one_read() -> None:
+    tail = f'{FAILURES_MARKER}: ["a"]\n{FAILURES_MARKER}: ["b"]\nx {FAILURES_MARKER}: ["c"]\n'
+
+    assert read_failed_cases(tail) == ["b"]
+
+
+def test_a_failures_line_that_is_no_array_of_names_is_refused() -> None:
+    with pytest.raises(InvalidJsonError):
+        read_failed_cases(f"{FAILURES_MARKER}: [\n")
+    with pytest.raises(InvalidJsonError):
+        read_failed_cases(f"{FAILURES_MARKER}: \n")
+    with pytest.raises(JSONTypeError):
+        read_failed_cases(f'{FAILURES_MARKER}: {{"a": 1}}\n')
+    with pytest.raises(JSONTypeError):
+        read_failed_cases(f'{FAILURES_MARKER}: ["a", 1]\n')

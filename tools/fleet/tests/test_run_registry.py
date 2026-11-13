@@ -17,7 +17,7 @@ import pytest
 
 from fleet.contracts.check_unit import CHECK_UNIT
 from fleet.core import dialect, names, run_registry, verdict
-from fleet.core.check_results import sh_results_digest_line
+from fleet.core.check_results import sh_failures_line, sh_results_digest_line
 from fleet.core.dialect import PROLOGUE, SH_INVOCATION
 from fleet.core.linux_unit_end import unit_end_path
 from fleet.core.run_summary import UNREAD
@@ -122,6 +122,7 @@ class TestTheTailReadPrintsTheCommit:
             f"commit=\"$(cat '{TARGET}/registry-commit.txt')\"; "
             f"printf 'FLEET_REGISTRY: %s\\n' \"$commit\"; fi\n"
             f"{sh_results_digest_line(TARGET)}\n"
+            f"{sh_failures_line(TARGET)}\n"
         )
 
     def test_sh_prints_the_last_lines_and_the_commit(self, tmp_path: pathlib.Path) -> None:
