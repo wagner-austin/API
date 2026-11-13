@@ -145,7 +145,7 @@ def expected_digest(kept: pathlib.Path) -> str:
     """
     names_sorted = sorted(
         (f"./{path.relative_to(kept).as_posix()}" for path in kept.rglob("*") if path.is_file()),
-        key=lambda name: name.encode("utf-8"),
+        key=str.encode,
     )
     listing = "".join(
         f"{hashlib.sha256((kept / name[2:]).read_bytes()).hexdigest()}  {name}\n"
