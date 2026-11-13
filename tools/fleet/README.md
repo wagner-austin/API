@@ -933,8 +933,10 @@ FLEET-CHECK 3f2a9c1e MCPs/packages/wiki-search sha=<40 hex> node=lavender exit=0
 ```
 
 `banner` is whether `=== ALL CHECKS PASSED ===` appeared; `tests` and
-`coverage` are read from vitest's or pytest-cov's own lines and say `unread`
-when neither printed them. `budget` is maketools' five-minute check budget
+`coverage` are read from vitest's, pytest-cov's, the Gradle summary's or node's
+built-in runner's own lines (node's `ℹ pass`, `ℹ fail` and `ℹ all files` rows,
+read as `tests=60p/0f coverage=lines=100.00% branches=100.00%`; MCPs board
+task ed8e76a7) and say `unread` when none printed them. `budget` is maketools' five-minute check budget
 verdict (MCPs board task 1b152218): `over:<took>s/<budget>s` from its
 `CHECK OVER BUDGET` line, which fails a check whose every suite passed,
 `within:<took>s/<budget>s` from its `CHECK BUDGET` line, and `unread` when
