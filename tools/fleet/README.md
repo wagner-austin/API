@@ -1571,14 +1571,18 @@ sources, and the same tags and workers as the observer.
 
 **`coax-drone/site`** (MCPs board task c88f1f08, 2026-11-12) is coax-drone's
 site directory's own `make check`, the pages lift.austinwagner.org serves: it
-installs the site's pinned TypeScript and type definitions from its own
-`package-lock.json`, type-checks every module, and runs the repository's
-`tests/site` under node's built-in runner at 100% of the covered modules'
+installs the site's pinned TypeScript, type definitions, Playwright and
+three.js from its own `package-lock.json`, installs Playwright's Chromium
+into the cache the fleet points it at, type-checks every module, and runs the
+site's `tests` under node's built-in runner at 100% of the covered modules'
 lines, branches and functions, reading the committed CAD export and wiki from
-the same clone. It needs no image, install step or companion, only a Linux
-node with node 22.8 or later for the coverage thresholds; every node measured
-on 2026-11-12 runs v24.22.1. Run on the session host, the tree committed as
-coax-drone 311d05b passed its 45 tests.
+the same clone; its browser cases open the pages in headless Chromium with
+SwiftShader's software WebGL, and the last of them holds `pages.mjs` and
+`model.mjs`, which only a browser runs, to every line and branch from
+Chromium's own coverage. It needs no image, install step or companion, only a
+Linux node with node 22.8 or later for the coverage thresholds; every node
+measured on 2026-11-12 runs v24.22.1. Fleet job 5c236243 passed it at
+coax-drone 4484f0c on loki, 60 tests in 209 s at one worker.
 The repository's root check, which needs FreeCAD's kernel, is not declared.
 
 ## A project that names its node: `node`

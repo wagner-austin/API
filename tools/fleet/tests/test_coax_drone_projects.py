@@ -2,14 +2,17 @@
 
 The site in coax-drone's site/ directory shows the CAD export, its checks and
 the project wiki at lift.austinwagner.org. Its make check installs its own
-pinned TypeScript from site/package-lock.json, type-checks the site's modules
-and runs tests/site under node's built-in runner and coverage, reading the
-repository's committed exports and wiki from the same clone. So it declares no
-install step and no companion, and needs only a Linux node: its recipe is
-POSIX shell, and every node measured on 2026-11-12 (sedona, colossus,
+pinned TypeScript, Playwright and three.js from site/package-lock.json and
+Playwright's Chromium into the fleet's browser cache, type-checks the site's
+modules and runs site/tests under node's built-in runner and coverage, reading
+the repository's committed exports and wiki from the same clone. So it
+declares no install step and no companion, and needs only a Linux node: its
+recipe is POSIX shell, its browser cases draw WebGL with SwiftShader rather
+than a GPU, and every node measured on 2026-11-12 (sedona, colossus,
 lavender, demure, serendipity and pendragon) runs node v24.22.1, past the
-22.8 that node's coverage thresholds need. It runs 45 tests, which finish in
-seconds, so one worker of half a gigabyte holds it.
+22.8 that node's coverage thresholds need. Its 60 tests took 209 s on loki
+at one worker (fleet job 5c236243, coax-drone 4484f0c), the browser cases
+most of it, so one worker of half a gigabyte holds it.
 """
 
 from __future__ import annotations
