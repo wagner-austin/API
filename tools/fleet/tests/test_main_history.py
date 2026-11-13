@@ -160,12 +160,17 @@ class TestReadMain:
         assert read["commits"][0] == git(repo, "rev-parse", "main")
         assert read["commits"][-1] == git(repo, "rev-parse", "main~999")
 
-    def test_refuses_a_history_git_cannot_list(self, tmp_path: pathlib.Path) -> None:
+    @pytest.mark.parametrize("returncode", [128, -9])
+    def test_refuses_a_history_git_cannot_list(
+        self, tmp_path: pathlib.Path, returncode: int
+    ) -> None:
+        """A git that exits non-zero, or is killed by a signal, lists nothing."""
         remote = "https://github.com/wagner-austin/MCPs.git"
         mirror = export.mirror_path(tmp_path, export.remote_mirror_key(remote))
         mirror.mkdir()
         head = "a" * 40
-        _test_hooks.run = FakeRun([ok(""), ok(head), failed(128, f"fatal: bad object {head}")])
+        stderr = f"fatal: bad object {head}"
+        _test_hooks.run = FakeRun([ok(""), ok(head), failed(returncode, stderr)])
 
         with pytest.raises(AppError) as raised:
             main_history.read_main(tmp_path, "MCPs", remote)

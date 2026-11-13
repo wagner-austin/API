@@ -114,18 +114,18 @@ def source_remotes(projects: Sequence[DeclaredProject]) -> tuple[dict[str, str],
         source = project["source"]
         if source is not None:
             named.setdefault(source["repository"], set()).add(source["remote"])
-    agreed = {
-        repository: next(iter(remotes))
-        for repository, remotes in named.items()
-        if len(remotes) == 1
-    }
-    disagreeing = tuple(
-        f"{REMOTES_DISAGREE_CODE}: {repository}'s projects name {', '.join(sorted(remotes))}; "
-        "its main was not read"
-        for repository, remotes in sorted(named.items())
-        if len(remotes) > 1
-    )
-    return agreed, disagreeing
+    agreed: dict[str, str] = {}
+    disagreeing: list[str] = []
+    for repository, remotes in sorted(named.items()):
+        match sorted(remotes):
+            case [remote]:
+                agreed[repository] = remote
+            case several:
+                disagreeing.append(
+                    f"{REMOTES_DISAGREE_CODE}: {repository}'s projects name "
+                    f"{', '.join(several)}; its main was not read"
+                )
+    return agreed, tuple(disagreeing)
 
 
 def _listed(mirror: pathlib.Path, argv: Sequence[str]) -> str:
