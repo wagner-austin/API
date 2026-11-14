@@ -265,6 +265,9 @@ tools/hpc3/runs/*
 # the jobs cannot be re-submitted from any record. The negation is here so the
 # NEXT one is kept, which is the only half of this still reachable.
 !tools/hpc3/runs/tankpit-*.json
+# coax-drone's, kept from its first sweep (board task 0d5be1db) so a member can
+# be re-submitted from the record rather than reconstructed from the ledger.
+!tools/hpc3/runs/coax-*.json
 
 # The `mi` determinism campaign's run documents: gemm kernel arms, train_step
 # arms, module-boundary traces, known-answer probes, the probe ladder, the
