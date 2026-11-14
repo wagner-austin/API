@@ -1,0 +1,15 @@
+# Published digests of the coax-drone uncertainty sweep's payloads (board task 0d5be1db).
+#
+# Read by `hpc3-stage --expect-from`. Each payload is one `git archive --format=tar`
+# of coax-drone at a pushed commit, holding exactly the three study documents
+# the sweep reads (calc/budget/data/loaded-study.json, mission-study.json and
+# uncertainty-study.json) and every capture they pin under wiki/sources/. The
+# sweep also verifies each capture's own sha256 and stamps every shard with the
+# digest of the three documents' bytes, so this record guards the transfer and
+# the study code guards the content.
+#
+# Recorded 2026-11-14 from a second, independent `git archive` of coax-drone
+# 8fac9bbe6c6f9171e68544bc50307a25493ec957 piped straight to sha256sum, not from
+# the manifest or the staged file; both runs printed the same digest.
+
+90a4a3fb7f1f2870c91243f0c798af683ee9083fb1815f67c28299351697bcc1  coax-drone-uncertainty-payload-8fac9bb.tar

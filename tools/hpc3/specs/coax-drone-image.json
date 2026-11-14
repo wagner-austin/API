@@ -1,0 +1,34 @@
+{
+  "base_image": "python:3.11.16-slim-bookworm@sha256:528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84",
+  "env_prefix": "/opt/env",
+  "git_commit": "8fac9bbe6c6f9171e68544bc50307a25493ec957",
+  "system_packages": [],
+  "extra_index_urls": [],
+  "requirements": [
+    "packaging==26.3",
+    "typing-extensions==4.16.0"
+  ],
+  "wheels": [
+    "coax_drone_cad-0.1.0-py3-none-any.whl",
+    "mcp_shared_py-0.1.0-py3-none-any.whl"
+  ],
+  "expected_versions": {
+    "packaging": "26.3",
+    "typing-extensions": "4.16.0"
+  },
+  "required_symbols": [
+    {
+      "module": "calc.budget.uncertainty_cli",
+      "attribute": "main"
+    },
+    {
+      "module": "calc.budget.uncertainty_sweep",
+      "attribute": "evaluate_shard"
+    }
+  ],
+  "smoke_commands": [],
+  "labels": {
+    "org.corvis.env-source": "/pub/wagnera3/envs/coax-drone"
+  },
+  "project": "coax-drone"
+}

@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-uncertainty-payload-8fac9bb.tar",
+      "sha256": "90a4a3fb7f1f2870c91243f0c798af683ee9083fb1815f67c28299351697bcc1",
+      "size_bytes": 10168320
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone 8fac9bbe6c6f9171e68544bc50307a25493ec957",
+    "selection": "git archive --format=tar of calc/budget/data/{loaded,mission,uncertainty}-study.json and the 8 wiki/sources captures they pin",
+    "why": "the uncertainty sweep reads its studies and verifies their captures relative to a repository root, so each array member unpacks this one archive into node-local TMPDIR and points --repo-root at it",
+    "note": "board task 0d5be1db; the sweep stamps every shard with the identity of the three documents' bytes"
+  }
+}
