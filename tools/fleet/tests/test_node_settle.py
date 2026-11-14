@@ -182,23 +182,28 @@ class TestASettleLogsEachFactOnce:
 
 class TestTheCloseCarriesTheTypedResult:
     """MCPs board task 601eef87: the close's typed result is read off the
-    tail its verdict line is, and names the run and node the start reported."""
+    tail its verdict line is, and names the run and node the start reported.
+    Its test totals are the kept reports' (MCPs board task 000f9302): a tail
+    whose run kept none prints its summary and sends them unread."""
 
     @pytest.mark.parametrize(
-        ("failures_line", "failed_cases"),
+        ("summary_lines", "failed_cases", "totals"),
         [
-            ("", None),
+            ("", None, (None, None, None)),
             (
-                'FLEET_FAILURES: ["packages/db/tests/test_a.py::test_bad"]\n',
+                'FLEET_FAILURES: ["packages/db/tests/test_a.py::test_bad"]\n'
+                'FLEET_TOTALS: {"passed": 886, "failed": 1, "skipped": 4}\n',
                 ["packages/db/tests/test_a.py::test_bad"],
+                (886, 1, 4),
             ),
         ],
     )
     def test_the_result_is_the_tail_s_figures_with_the_run_s_span(
         self,
         sourced_config: pathlib.Path,
-        failures_line: str,
+        summary_lines: str,
         failed_cases: list[str] | None,
+        totals: tuple[int | None, int | None, int | None],
     ) -> None:
         launch(sourced_config)
         launched = load_json_str(_ledger(sourced_config).splitlines()[-1])
@@ -206,7 +211,7 @@ class TestTheCloseCarriesTheTypedResult:
         _test_hooks.run = FakeRun(
             [
                 *READ_TO_TAIL,
-                ok(PASSING_TAIL + failures_line),
+                ok(PASSING_TAIL + summary_lines),
                 *retire_replies(),
                 *asked(sourced_config, fetch=True),
             ]
@@ -226,9 +231,9 @@ class TestTheCloseCarriesTheTypedResult:
             "runId": DEMO_RUN_ID,
             "node": "lavender",
             "banner": True,
-            "testsPassed": 887,
-            "testsFailed": 0,
-            "testsSkipped": None,
+            "testsPassed": totals[0],
+            "testsFailed": totals[1],
+            "testsSkipped": totals[2],
             "beganAt": datetime.datetime.fromtimestamp(started, tz=datetime.UTC).isoformat(),
             "endedAt": "2025-09-04T15:34:20+00:00",
             "budget": {"outcome": "unavailable"},
