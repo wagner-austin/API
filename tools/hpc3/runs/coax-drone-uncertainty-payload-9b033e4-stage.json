@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-uncertainty-payload-9b033e4.tar",
+      "sha256": "b16cdde264101da502cd8cb1aa58ae0541ee6d65127d5a5a8bae4a2d1739d8a3",
+      "size_bytes": 53739520
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone 9b033e49272b6c86e20fa85faf2a5652acb61192, calc/budget tree 75cd2592afbecfc63384114dc94982a26e39ba0b",
+    "selection": "git archive --format=tar of pyproject.toml, calc/budget, tests/budget, exports/{challenge,mission,sizing,uncertainty}, exports/verification/uncertainty-mutation and wiki/sources",
+    "why": "the confirming uncertainty sweep and the last uncertainty_sweep mutation run, after the screen cache was replaced by screening up front; each member unpacks this archive into node-local TMPDIR and imports calc.budget from it",
+    "note": "board task 0d5be1db; the confirming shards must equal those of array 59583617 byte for byte"
+  }
+}

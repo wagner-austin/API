@@ -13,3 +13,30 @@
 # the manifest or the staged file; both runs printed the same digest.
 
 90a4a3fb7f1f2870c91243f0c798af683ee9083fb1815f67c28299351697bcc1  coax-drone-uncertainty-payload-8fac9bb.tar
+
+# The third sweep, which adds the hover, wind and reserve families, runs the
+# code from its payload rather than the image's wheel: the archive also holds
+# pyproject.toml, calc/budget and tests/budget, and every member puts the
+# unpacked tree first on PYTHONPATH and refuses to start unless calc.budget
+# resolves inside it. Recorded 2026-11-14 the same way from coax-drone
+# 29d7ca52ad96e70be2bbcd4d869f1b52467a38e2 (calc/budget tree
+# b83875376dca9726bb28a95b982225b6f48ba8dc, tests/budget tree
+# 3faf7812aa13332e252d4e94879a8504be1421f3).
+
+d1daa11b8c3d4b8ce4215dd8967fac35a856e7e352cb0c81b697f029c37380b2  coax-drone-uncertainty-payload-29d7ca5.tar
+
+# The confirming run of the same sweep, recorded the same way from coax-drone
+# 9b033e49272b6c86e20fa85faf2a5652acb61192 (calc/budget tree
+# 75cd2592afbecfc63384114dc94982a26e39ba0b), which screens each design point
+# up front instead of through a cache; its shards must equal 29d7ca5's byte for
+# byte, and it also carries the last uncertainty_sweep mutation run.
+
+b16cdde264101da502cd8cb1aa58ae0541ee6d65127d5a5a8bae4a2d1739d8a3  coax-drone-uncertainty-payload-9b033e4.tar
+
+# The refresh for board task 8a23f582's mass ledger, recorded the same way from
+# coax-drone 5d3a2c93e7a88911096b7252f910519401d45073 (calc/budget tree
+# c119465613b54c0095150743cf0bd815dd92e446): loaded-study.json now derives dry
+# mass from eleven counted allocations, so the documents identity changes while
+# every runtime input, 2.4 kg dry mass included, does not.
+
+935042084af3439b826955355ae96e73a48c774e72f1c73e8f5967c8bf297e7b  coax-drone-uncertainty-payload-5d3a2c9.tar
