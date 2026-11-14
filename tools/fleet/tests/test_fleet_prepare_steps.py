@@ -23,6 +23,9 @@ from tests._registry import shipped_document
 
 PREPARE = ("make", "-s", "-C", "scripts/fleet-prepare")
 
+#: The install steps only MCPs' execution rows run, from execution's own Makefile.
+EXECUTION_PREPARE = ("make", "-s", "-C", "execution/prepare")
+
 
 def _steps() -> dict[str, tuple[InstallStep, ...]]:
     """Every sourced project's install steps, from the real registry."""
@@ -123,10 +126,12 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     )
     # MCPs board task 1e0ee821: the deploy lane starts its rehearsals' image
     # build between the two and goes on while it builds, so the build runs
-    # beside the workspace build, the lint and the suite's first files.
+    # beside the workspace build, the lint and the suite's first files. It
+    # runs from execution's own Makefile (MCPs board task 2b1e55de): MCPs CI
+    # reads every target of scripts/fleet-prepare as an input of every check.
     assert prepared["MCPs/execution-deploy"] == (
         InstallStep(phase="install", argv=(*PREPARE, "install")),
-        InstallStep(phase="rehearsal-images", argv=(*PREPARE, "rehearsal-images")),
+        InstallStep(phase="rehearsal-images", argv=(*EXECUTION_PREPARE, "rehearsal-images")),
         lanes_build,
     )
     assert prepared["MCPs/packages/wiki-check"] == (
