@@ -421,7 +421,28 @@ class TestTheInputCheckHasASubject:
     #: renaming the flag would rename the expectation with it, and the loop
     #: would skip every command instead of failing. These are the strings on
     #: the command lines, and they are the reason the extractor exists.
-    _SPELLINGS = ("--payload", "--spec", "--items", "--corpus", "-xf")
+    _SPELLINGS = ("--payload", "--spec", "--items", "--corpus", "-xf", "--repo-root")
+
+    def test_every_coax_drone_sweep_member_declares_what_it_reads(self) -> None:
+        """Every member, not one pinned member and not only known spellings.
+
+        Each coax-drone sweep member reads its code and documents from a
+        staged payload, an archive it unpacks or a tree it runs in, so a
+        member declaring nothing is a member preflight never checked. Review
+        be21e93f of board task e4585b04 counted 67 such commands at
+        2df828893, 16 of them (the 8fac9bb and b942cc8 sweeps, reading
+        --repo-root /pub/...) declaring nothing.
+        """
+        members = [
+            (name, command)
+            for name, command in _submitted_commands()
+            if name.startswith("coax-drone-") and ":" in name
+        ]
+        # 67 members across the uncertainty and mutation sweeps at 2df828893;
+        # the floor sits under that so retiring a document does not fail this.
+        assert len(members) >= 60
+        undeclared = [name for name, command in members if not declared_inputs(command)]
+        assert undeclared == []
 
     def test_a_command_naming_an_input_flag_yields_that_input(self) -> None:
         """The sharp form, with no count to keep up to date.

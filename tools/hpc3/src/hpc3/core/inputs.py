@@ -47,6 +47,13 @@ from hpc3.core.remote import run_remote
 #: uncertainty sweeps reads its payload as ``tar -xf /pub/...tar -C "$W"``,
 #: and with no spelling here preflight declared no input for any of them.
 #: The ``-C`` that follows names where it unpacks, which the job writes.
+#:
+#: ``--repo-root`` is the tree a command reads its code and documents from,
+#: a directory, which the presence probe's ``[ -e ]`` admits. Review
+#: be21e93f of board task e4585b04 found the 16 members of coax-drone's
+#: 8fac9bb and b942cc8 sweeps reading ``--repo-root /pub/.../payload/8fac9bb``
+#: with nothing declared; a root of ``"$W"``, node-local scratch, is no
+#: cluster path and declares nothing.
 INPUT_FLAGS: tuple[str, ...] = (
     "--payload",
     "--spec",
@@ -54,6 +61,7 @@ INPUT_FLAGS: tuple[str, ...] = (
     "--corpus",
     "--wrds-manifest",
     "-xf",
+    "--repo-root",
 )
 
 #: Flags whose value the job WRITES. Never required to exist. Kept as an

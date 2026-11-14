@@ -91,6 +91,14 @@ class TestWhichPathsAreInputs:
 
         assert declared_inputs(command) == ("/pub/w/coax/payload-893459e.tar",)
 
+    def test_a_staged_repository_root_is_an_input_and_a_scratch_one_is_not(self) -> None:
+        """The 8fac9bb sweep's shape reads its tree from /pub; later ones from $W."""
+        staged = "coax-uncertainty shard --repo-root /pub/w/coax/payload/8fac9bb --shard 0"
+        scratch = 'coax-uncertainty shard --repo-root "$W" --shard 0'
+
+        assert declared_inputs(staged) == ("/pub/w/coax/payload/8fac9bb",)
+        assert declared_inputs(scratch) == ()
+
     def test_where_an_archive_is_extracted_to_is_not_an_input(self) -> None:
         """``-C`` names the directory tar writes into, even on the cluster."""
         command = "tar -xf /pub/w/payload.tar -C /pub/w/unpacked"
