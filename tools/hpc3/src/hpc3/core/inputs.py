@@ -40,7 +40,21 @@ from hpc3.core.remote import run_remote
 
 #: Flags whose value is a file the job READS. A run naming one of these must
 #: have that file on the cluster before it is submitted.
-INPUT_FLAGS: tuple[str, ...] = ("--payload", "--spec", "--items", "--corpus", "--wrds-manifest")
+#:
+#: ``-xf`` is tar's extract-from-file: a job that unpacks its code and
+#: documents from a staged archive reads that archive before anything else.
+#: Measured 2026-11-14 (board task e4585b04): every member of coax-drone's
+#: uncertainty sweeps reads its payload as ``tar -xf /pub/...tar -C "$W"``,
+#: and with no spelling here preflight declared no input for any of them.
+#: The ``-C`` that follows names where it unpacks, which the job writes.
+INPUT_FLAGS: tuple[str, ...] = (
+    "--payload",
+    "--spec",
+    "--items",
+    "--corpus",
+    "--wrds-manifest",
+    "-xf",
+)
 
 #: Flags whose value the job WRITES. Never required to exist. Kept as an
 #: explicit list rather than "anything not an input" so that a flag nobody

@@ -94,6 +94,32 @@ def _by_project() -> dict[str, Workspace]:
     return owners
 
 
+def _submitted_commands() -> list[tuple[str, str]]:
+    """Every command a committed document would submit, as preflight sees it.
+
+    A run's own command, and each sweep member's command as
+    :func:`~hpc3.contracts.sweep.expand_sweep` builds it. Reading only a
+    document's top-level ``command`` skipped every sweep, which carries none,
+    so the extractor checks below could not see that ``tar -xf`` declared
+    nothing for any coax-drone sweep member (board task e4585b04).
+
+    Returns:
+        The document's name, with ``:<member>`` for a sweep member, and the
+        command.
+    """
+    owners = _by_project()
+    commands: list[tuple[str, str]] = []
+    for name, project, document in submissions():
+        if "members" in document:
+            for spec in expand_sweep(resolve_sweep(owners[project], document)):
+                commands.append((f"{name}:{spec['name']}", spec["command"]))
+            continue
+        command = document.get("command")
+        if isinstance(command, str):
+            commands.append((name, command))
+    return commands
+
+
 def _sweep_member_artifacts() -> dict[str, list[JSONValue]]:
     """Read the artifact every sweep member declares, grouped by project.
 
@@ -395,7 +421,7 @@ class TestTheInputCheckHasASubject:
     #: renaming the flag would rename the expectation with it, and the loop
     #: would skip every command instead of failing. These are the strings on
     #: the command lines, and they are the reason the extractor exists.
-    _SPELLINGS = ("--payload", "--spec", "--items", "--corpus")
+    _SPELLINGS = ("--payload", "--spec", "--items", "--corpus", "-xf")
 
     def test_a_command_naming_an_input_flag_yields_that_input(self) -> None:
         """The sharp form, with no count to keep up to date.
@@ -406,10 +432,7 @@ class TestTheInputCheckHasASubject:
         there in the command -- with no magic number and no exemption list.
         """
         checked = 0
-        for name, _project, document in submissions():
-            command = document.get("command")
-            if not isinstance(command, str):
-                continue
+        for name, command in _submitted_commands():
             for flag in self._SPELLINGS:
                 if f"{flag} /pub/" not in command:
                     continue
@@ -447,16 +470,13 @@ class TestTheInputCheckHasASubject:
         floor is the lesser half. Raising it alone would have made the number
         agree with CI while the check still measured the wrong set.
         """
-        declaring = [
-            name
-            for name, _project, document in submissions()
-            if isinstance(document.get("command"), str)
-            and declared_inputs(str(document["command"]))
-        ]
+        declaring = [name for name, command in _submitted_commands() if declared_inputs(command)]
 
         assert len(declaring) >= 20
         assert "code-style-run-train-v2.json" in declaring
         assert "code-style-run-gen-v2-base.json" in declaring
+        # A sweep member that reads its payload with tar -xf (board task e4585b04).
+        assert "coax-drone-uncertainty-893459e.json:uncertainty-893459e-shard0of8" in declaring
 
     def test_an_output_flag_is_not_mistaken_for_an_input(self) -> None:
         """The committed documents as an independent check on the split.
@@ -465,10 +485,7 @@ class TestTheInputCheckHasASubject:
         ever added to ``INPUT_FLAGS`` the first run of everything would be
         refused, and it would be refused in production rather than here.
         """
-        for name, _project, document in submissions():
-            command = document.get("command")
-            if not isinstance(command, str):
-                continue
+        for name, command in _submitted_commands():
             for path in declared_inputs(command):
                 assert "/results/" not in path, f"{name}: {path} is written, not read"
                 assert "/generated/" not in path, f"{name}: {path} is written, not read"

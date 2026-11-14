@@ -75,6 +75,28 @@ class TestWhichPathsAreInputs:
                 assert "/generated/" not in path
                 assert "/artifacts/" not in path
 
+    def test_an_archive_a_job_extracts_is_an_input(self) -> None:
+        """A sweep member that unpacks its code from a staged archive reads it.
+
+        The shape of every coax-drone uncertainty member: before 2026-11-14
+        (board task e4585b04) this declared nothing, so preflight never asked
+        whether the payload was there.
+        """
+        command = (
+            'bash -c \'set -eu; W="$TMPDIR/coax"; mkdir -p "$W"; '
+            'tar -xf /pub/w/coax/payload-893459e.tar -C "$W"; '
+            'coax-uncertainty shard --repo-root "$W" --shard 0 --shards 8 '
+            "--out /pub/w/coax/uncertainty/893459e/shard-0-of-8.json'"
+        )
+
+        assert declared_inputs(command) == ("/pub/w/coax/payload-893459e.tar",)
+
+    def test_where_an_archive_is_extracted_to_is_not_an_input(self) -> None:
+        """``-C`` names the directory tar writes into, even on the cluster."""
+        command = "tar -xf /pub/w/payload.tar -C /pub/w/unpacked"
+
+        assert declared_inputs(command) == ("/pub/w/payload.tar",)
+
     def test_a_results_path_under_an_input_flag_would_still_be_an_input(self) -> None:
         """Deliberate: the directory is a habit, the flag is a fact. A file
         under results/ passed to --payload IS read, and a checker that
