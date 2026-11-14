@@ -245,10 +245,17 @@ and the sweep verifies every capture those documents pin before computing, so
 two results of different inputs cannot be combined. The image carries the
 coax-drone wheel at the spec's commit and an mcp-shared-py wheel built from
 MCPs 55e38727; the spec has one commit field, so the second is recorded here.
-The payload is one staged, certified `git archive` of the study documents and
-their captures. It does not emit the shared `RunRecord` yet: coax-drone's
-pinned environment cannot import `platform_core`, and its results are compared
-only with each other.
+The payload is one staged, certified `git archive`. The first two sweeps'
+held only the study documents and their captures, run by the image's wheel;
+from `coax-drone-uncertainty-29d7ca5.json` on it also holds `calc/budget`,
+which each member puts first on `PYTHONPATH` and refuses to run unless
+`calc.budget` resolves inside it, so a sweep runs the commit its run document
+names without a new image, and the run document records that commit's
+`calc/budget` tree. Its mutation runs (`coax-drone-mutation-*.json`) unpack
+the same kind of archive and mutate their own copy. It does not emit the
+shared `RunRecord` yet (board task 33bdc088): coax-drone's pinned environment
+cannot import `platform_core`, and its results are compared only with each
+other.
 
 ## Not registered anywhere
 
