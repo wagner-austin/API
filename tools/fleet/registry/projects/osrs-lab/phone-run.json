@@ -1,0 +1,20 @@
+{
+  "worker_ram_gb": 1.5,
+  "minimum_workers": 2,
+  "expected_minutes": 25,
+  "required_tags": [
+    "linux",
+    "docker"
+  ],
+  "node": "diphtheria",
+  "exclusive_resources": [
+    "corvis-phone-device-tests"
+  ],
+  "source": {
+    "remote": "https://github.com/wagner-austin/osrs-lab.git",
+    "path": "phone-run",
+    "base_branch": "main",
+    "install": [],
+    "companions": []
+  }
+}

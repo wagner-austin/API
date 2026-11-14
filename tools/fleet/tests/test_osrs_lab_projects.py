@@ -47,6 +47,16 @@ input-policy (board task b2ee9cbe) runs the input boundary policy's own make
 check in the same image since osrs-lab 6176e3d, whose packaged-classes.gradle
 the recorder and the observer's login plugin artifact apply: on colossus it
 passed 5 tests in 18 s at lines 37/37 and branches 26/26.
+
+phone-run (MCPs board task ea59fdca) is not a suite but a live run of the
+phone bot against the Pixel 8 on diphtheria's USB, and the queue is the only
+way one starts: on 2026-11-14 osrs-lab containers started by hand on
+diphtheria shared its four cores with doc-extract-api's check, which passed
+every test and overran its budget three times (fleet jobs 43d0f554, 926a22d4
+and 13af2e26). Its make check builds mobile's classes in the same image, then
+runs the run's main on the host, where adb's server and the phone are, so it
+is pinned there, holds the device lease MCPs' phone lanes hold, and is
+staged on main's history, from which it names the commit it runs.
 """
 
 from __future__ import annotations
@@ -122,3 +132,27 @@ def test_only_the_release_gate_declares_the_jar_it_packs(directory: str) -> None
         else None
     )
     assert project["release_artifact"] == expected
+
+
+def test_the_phone_run_is_pinned_to_the_pixel_s_host_and_holds_its_device_lease() -> None:
+    """The live run goes only to diphtheria, one at a time with the phone lanes.
+
+    Its build needs execdocker's daemon as every osrs-lab build does, its main
+    needs the host's adb server, which only diphtheria's USB reaches, and it
+    shares MCPs' phone lanes' lease. It is staged on main's history, so its
+    tree's parent is the commit it names in its trace.
+    """
+    project = require_project(decode_fleet_workspace(shipped_document()), "osrs-lab/phone-run")
+
+    assert project["node"] == "diphtheria"
+    assert project["required_tags"] == (NodeTag.LINUX, NodeTag.DOCKER)
+    assert project["exclusive_resources"] == ("corvis-phone-device-tests",)
+    assert project["loopback_only"] is False
+    assert project["release_artifact"] is None
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/osrs-lab.git",
+        path="phone-run",
+        install=(),
+        companions=(),
+        base_branch="main",
+    )
