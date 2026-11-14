@@ -143,11 +143,14 @@ class TestSubmitSweep:
         Shards 2 and 3 of array 59589599 computed ten minutes and died unable
         to open their result, in a directory nothing had made (board task
         dcdec7d2)."""
+        artifacts = ("/pub/w/out/s0.json", "/pub/w/out/s1.json", None, "/pub/w/other/s3.json")
         members: list[JSONValue] = [
-            {"suffix": "s0", "command": "python a.py", "artifact": "/pub/w/out/s0.json"},
-            {"suffix": "s1", "command": "python a.py", "artifact": "/pub/w/out/s1.json"},
-            {"suffix": "s2", "command": "python a.py", "artifact": None},
-            {"suffix": "s3", "command": "python a.py", "artifact": "/pub/w/other/s3.json"},
+            {
+                "suffix": f"s{index}",
+                "command": "a --dry-run" if artifact is None else f"a --out {artifact}",
+                "artifact": artifact,
+            }
+            for index, artifact in enumerate(artifacts)
         ]
         _healthy(fake_run)
         fake_run.add("sbatch --array=", stdout="Submitted batch job 101\n")

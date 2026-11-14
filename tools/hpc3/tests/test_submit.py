@@ -153,8 +153,9 @@ class TestSubmit:
     ) -> None:
         """A job must not compute for its allocation and then fail to write (dcdec7d2)."""
         script_healthy_cluster(fake_run)
+        record = "/pub/wagnera3/results/arm-b-42/record.json"
         submit(
-            _spec(artifact="/pub/wagnera3/results/arm-b-42/record.json"),
+            _spec(command=f"python train.py --record {record}", artifact=record),
             host="hpc3",
             script_dir="/pub/wagnera3/jobs",
             log_dir="/pub/wagnera3/logs",
