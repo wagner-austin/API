@@ -111,10 +111,17 @@ def _connectivity_probe() -> list[str]:
 
     A compute node without outbound access fails deep inside pip with a
     resolver error, minutes in. Asking first turns that into one line.
+
+    The probe asks for headers only. It used to GET the index itself, about
+    48 MB, so on a slow link it timed out downloading a body the server had
+    already answered for: builds 59576639 and 59576714 (coax-drone, board
+    task 0d5be1db) printed ``pypi 200`` and were still refused as having no
+    outbound access after 18 and 26 MB of the index in 20 s.
     """
     return [
         'echo "--- connectivity probe ---"',
-        'if curl -sS -m 20 -o /dev/null -w "pypi %{http_code}\\n" https://pypi.org/simple/; then',
+        'if curl -sS --head -m 20 -o /dev/null -w "pypi %{http_code}\\n" '
+        "https://pypi.org/simple/; then",
         '    echo "outbound OK"',
         "else",
         '    echo "NO OUTBOUND ACCESS FROM THIS COMPUTE NODE" >&2',

@@ -79,6 +79,28 @@ class TestThePreemptionGuard:
         assert "--gres" not in _render()
 
 
+class TestTheConnectivityProbe:
+    """The probe measures whether the node reaches the index, not how fast."""
+
+    def test_it_asks_for_headers_and_never_downloads_the_index(self) -> None:
+        # A GET of the 48 MB index refused two coax-drone builds that had
+        # printed pypi 200, after 18 and 26 MB in the probe's 20 seconds.
+        probes = [line for line in _render().splitlines() if "https://pypi.org/simple/" in line]
+        assert probes == [
+            'if curl -sS --head -m 20 -o /dev/null -w "pypi %{http_code}\\n" '
+            "https://pypi.org/simple/; then"
+        ]
+
+    def test_an_unreachable_index_still_stops_the_build(self) -> None:
+        rendered = _render()
+        probe_at = rendered.index("--- connectivity probe ---")
+        refusal_at = rendered.index(
+            'echo "NO OUTBOUND ACCESS FROM THIS COMPUTE NODE" >&2\n    exit 3'
+        )
+        build_at = rendered.index("bash build.sh")
+        assert probe_at < refusal_at < build_at
+
+
 class TestTheEnvironment:
     """What the build needs before it can run at all."""
 
