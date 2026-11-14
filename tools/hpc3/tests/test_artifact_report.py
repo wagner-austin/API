@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from platform_core.errors import AppError
-from platform_core.json_utils import load_json_str, narrow_json_to_dict
+from platform_core.json_utils import load_json_str, narrow_json_to_dict, require_list
 from platform_core.mcp_testing import sent_arguments
 
 from hpc3.cli import artifact_report
@@ -45,9 +45,9 @@ def test_the_posted_report_is_the_measured_array(tmp_path: Path, fake_run: FakeR
     assert artifact_report.main(arguments(tmp_path, fake_run, (b"shard 0", b"shard 1"))) == 0
     report = narrow_json_to_dict(load_json_str(emitted[0]))
     assert (report["array"], report["local_dir"]) == ("101", str(tmp_path / "local"))
-    members = report["members"]
-    assert isinstance(members, list)
-    assert len(members) == 2
+    members = [narrow_json_to_dict(item) for item in require_list(report, "members")]
+    assert [member["job_id"] for member in members] == ["101_0", "101_1"]
+    assert [member["artifact_sha256"] for member in members] == [sha256_hex(b"shard 0"), sha256_hex(b"shard 1")]
     assert sent_arguments(board.bodies[-1])["body"] == "HPC3 ARTIFACT LOAD-REPORT\n" + emitted[0]
 
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from platform_core.errors import AppError
-from platform_core.json_utils import JSONValue
+from platform_core.json_utils import JSONValue, narrow_json_to_dict, require_dict, require_list
 
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.core.artifact_evidence import array_members, artifact_report, measure_member, require_artifact
@@ -94,8 +94,7 @@ def test_a_member_is_its_accounting_digest_and_instant(fake_run: FakeRun, tmp_pa
     assert measured["artifact_sha256"] == sha256_hex(b"shard zero")
     assert measured["artifact_mtime"] == INSTANT
     assert measured["local_path"] == str(local)
-    accounting = measured["accounting"]
-    assert isinstance(accounting, dict)
+    accounting = require_dict(measured, "accounting")
     assert (accounting["exit_code"], accounting["started_at"], accounting["ended_at"]) == ("0:0", START, END)
 
 
@@ -139,10 +138,9 @@ def test_the_report_measures_every_member_against_its_named_copy(fake_run: FakeR
         serve_member(fake_run, value, data)
     report = artifact_report([entry("7_0"), *members], "101", cluster(), tmp_path)
     assert (report["array"], report["local_dir"]) == ("101", str(tmp_path))
-    measured = report["members"]
-    assert isinstance(measured, list)
-    assert [item["job_id"] for item in measured if isinstance(item, dict)] == ["101_0", "101_1"]
-    assert [item["artifact_sha256"] for item in measured if isinstance(item, dict)] == [
+    measured = [narrow_json_to_dict(item) for item in require_list(report, "members")]
+    assert [item["job_id"] for item in measured] == ["101_0", "101_1"]
+    assert [item["artifact_sha256"] for item in measured] == [
         sha256_hex(b"shard 0"),
         sha256_hex(b"shard 1"),
     ]
