@@ -38,7 +38,7 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
 |---|---|---|---|---|---|---|---|---|
 | `cartridge-qa` | free-gpu | `A100` x1 | 8 | 64 | 720 | `890e444560d4` | yes | yes |
 | `cleargbm` | free | cpu | 4 | 16 | 60 | `0a525f532a9e` | yes | no |
-| `coax-drone` | free | cpu | 1 | 2 | 60 | `e30017eaa13d` | yes | no |
+| `coax-drone` | free | cpu | 1 | 2 | 60 | `45efd6a8232a` | yes | no |
 | `code-style` | free-gpu | `A100` x1 | 8 | 32 | 240 | `5dfd78a7eb14` | yes | no |
 | `floor` | free-gpu | `A100` x1 | 8 | 32 | 60 | `df841c661b9e` | yes | no |
 | `mi` | free-gpu | `A100` x1 | 8 | 64 | 240 | `55651342e15d` | yes | no |
