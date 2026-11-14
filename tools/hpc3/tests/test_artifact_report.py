@@ -73,7 +73,7 @@ def test_a_campaigns_arrays_are_named_together(
     failed = accounting_row(array_member(1), name=ARRAY_NAME, state="FAILED", exit="1:0")
     fake_run.add("-j 101_1 ", stdout=failed)
     argv = arguments(tmp_path, fake_run, (b"shard 0", b"shard 1"))
-    rerun = array_member(1, array="202")
+    rerun = array_member(1, "202")
     ledger.append(tmp_path / "ledger.jsonl", rerun)
     serve_member(fake_run, rerun, b"shard 1")
     argv[argv.index("101")] = "101,202"

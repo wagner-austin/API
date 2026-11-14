@@ -141,7 +141,7 @@ def test_a_campaign_resubmission_settles_the_artifact_its_first_member_failed(
     write_shards(tmp_path, 2)
     serve_member(fake_run, array_member(0), b"shard 0")
     serve_member(fake_run, array_member(1), b"shard 1", state="FAILED", exit="1:0")
-    rerun = array_member(1, array="202")
+    rerun = array_member(1, "202")
     serve_member(fake_run, rerun, b"shard 1")
     entries = [array_member(0), array_member(1), rerun]
     report = artifact_report(entries, ["101", "202"], cluster(), tmp_path)
@@ -184,7 +184,7 @@ def test_an_artifact_no_single_finished_member_completed_is_refused(
     message: str,
 ) -> None:
     write_shards(tmp_path, 1)
-    original, rerun = array_member(0), array_member(0, array="202")
+    original, rerun = array_member(0), array_member(0, "202")
     serve_member(fake_run, original, b"shard 0", **first)
     serve_member(fake_run, rerun, b"shard 0", **second)
     with pytest.raises(ValueError, match=f"HPC_EVIDENCE_ARRAY: .*{message}"):

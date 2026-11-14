@@ -149,7 +149,7 @@ def serve(
 ARRAY_NAME = "abl.sweep"
 
 
-def array_member(index: int, /, array: str = "101", **changes: JSONValue) -> LedgerEntry:
+def array_member(index: int, array: str = "101", /, **changes: JSONValue) -> LedgerEntry:
     """A recorded member of an array, as array submission records it.
 
     Its ledger name is the array's plus ``-shard<index>``, its experiment

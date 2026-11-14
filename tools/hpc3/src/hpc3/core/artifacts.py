@@ -93,12 +93,16 @@ def prepare_artifact_directories(host: str, artifacts: Sequence[str | None]) -> 
     Raises:
         AppError: When a directory cannot be created.
     """
-    directories = tuple(
-        dict.fromkeys(str(PurePosixPath(path).parent) for path in artifacts if path is not None)
-    )
+    directories: list[str] = []
+    for path in artifacts:
+        if path is None:
+            continue
+        directory = str(PurePosixPath(path).parent)
+        if directory not in directories:
+            directories.append(directory)
     for directory in directories:
         make_directory(host, directory)
-    return directories
+    return tuple(directories)
 
 
 __all__ = [
