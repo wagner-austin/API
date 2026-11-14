@@ -1,0 +1,20 @@
+{
+  "project": "coax-drone",
+  "name": "mutation-0005d90",
+  "minutes": 60,
+  "experiment": {
+    "board_task": "99eb27d3-4b48-4c2a-a10e-4ec4e243f08e",
+    "kind": "cosmic-ray-8.7.0",
+    "coax_drone_commit": "0005d9052bb214ca080a6af8769fdb14a5586bb6",
+    "payload_sha256": "2522af05b7d545a0eb97ca9910b25432e6729bc484e8f51e0ec5d79ea2c51109",
+    "modules": "1"
+  },
+  "members": [
+    {
+      "suffix": "rotor_head",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-0005d90.tar -C \"$W\"; mkdir -p /pub/wagnera3/coax-drone/mutation/0005d90; bash \"$W/exports/verification/rotor-head-mutation/run.sh\" rotor_head /pub/wagnera3/coax-drone/mutation/0005d90; test -f /pub/wagnera3/coax-drone/mutation/0005d90/rotor_head.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/0005d90/rotor_head.sqlite"
+    }
+  ],
+  "resumes_from_checkpoint": false
+}

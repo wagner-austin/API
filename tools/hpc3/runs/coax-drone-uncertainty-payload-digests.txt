@@ -63,3 +63,13 @@ b16cdde264101da502cd8cb1aa58ae0541ee6d65127d5a5a8bae4a2d1739d8a3  coax-drone-unc
 # 893459e it is not yet on origin and is pushed with the shards it produces.
 
 b0806f60abfad14f47b879bf4138bfbca0819bd08dd0c10e5c50f39f2d20149b  coax-drone-uncertainty-payload-a3e7250.tar
+
+# The rotor-head sweep for board task 99eb27d3: the torque-pulsed hinge and a
+# dual swashplate with six servos as the outermost design axis, 8,640 design
+# points and 34,568 cases. Recorded 2026-11-14 the same way from coax-drone
+# 4042caecc59620e4838b2f02e5f80baf087af78f (calc/budget tree
+# 3137f387757f780a81d91c0de59004def3833cd7, documents identity
+# 2d2f34a7c0490a6add6b5e703e0e598a1ec105c7c3e404866d7a35d5e6e2da03). Like
+# a3e7250 it is not yet on origin and is pushed with the shards it produces.
+
+385a03e98b5ca753877c6dd2b9038bd623f14752bd01a916c52d57d6cce1035e  coax-drone-uncertainty-payload-4042cae.tar

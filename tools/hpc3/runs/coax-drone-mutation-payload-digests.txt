@@ -68,3 +68,16 @@ f9a84869cb0dec19f17fca1413310c21b01fbb870c0b5ad8df8297100fc43c1b  coax-drone-mut
 # recorded the same way from coax-drone c609e95e83d4c51be3e991ae4f512a5045576741.
 
 e4a84d3a090e3d1e07ecc32a2fd86115e3ec96b35b15bc5d9afd02a07d1e05a5  coax-drone-mutation-payload-c609e95.tar
+
+# The rotor-head campaign for board task 99eb27d3 over the ten modules it added
+# or changed, with its configurations and runner under
+# exports/verification/rotor-head-mutation, recorded the same way from coax-drone
+# 4042caecc59620e4838b2f02e5f80baf087af78f in the session worktree, not yet pushed.
+
+3ba54cae817e784e3a74ba74211901c424eb9316e348455ff0585674aaba07a3  coax-drone-mutation-payload-4042cae.tar
+
+# The rotor_head rerun after the rewrite removing array 59599489's five
+# survivors, recorded the same way from coax-drone
+# 0005d9052bb214ca080a6af8769fdb14a5586bb6 in the session worktree, not yet pushed.
+
+2522af05b7d545a0eb97ca9910b25432e6729bc484e8f51e0ec5d79ea2c51109  coax-drone-mutation-payload-0005d90.tar

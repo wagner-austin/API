@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-mutation-payload-0005d90.tar",
+      "sha256": "2522af05b7d545a0eb97ca9910b25432e6729bc484e8f51e0ec5d79ea2c51109",
+      "size_bytes": 136867840
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone 0005d9052bb214ca080a6af8769fdb14a5586bb6",
+    "selection": "git archive --format=tar of pyproject.toml, calc/budget, calc/cylindrical, tests/budget, tests/test_attachment_loads.py, exports/{challenge,mission,sizing,uncertainty}, exports/verification/rotor-head-mutation and wiki/sources",
+    "why": "Reruns the Cosmic Ray campaign over rotor_head after the rewrite removing array 59599489's five survivors",
+    "note": "board task 99eb27d3; run.sh refuses to start unless calc.budget resolves inside the unpacked tree"
+  }
+}

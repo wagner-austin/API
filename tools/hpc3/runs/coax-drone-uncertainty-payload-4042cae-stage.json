@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-uncertainty-payload-4042cae.tar",
+      "sha256": "385a03e98b5ca753877c6dd2b9038bd623f14752bd01a916c52d57d6cce1035e",
+      "size_bytes": 136960000
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone 4042caecc59620e4838b2f02e5f80baf087af78f, calc/budget tree 3137f387757f780a81d91c0de59004def3833cd7",
+    "selection": "git archive --format=tar of pyproject.toml, calc/budget, tests/budget, exports/{challenge,mission,sizing,uncertainty}, exports/verification/uncertainty-mutation and wiki/sources",
+    "why": "the uncertainty sweep of the sizing model over both rotor heads, the torque-pulsed hinge and the dual swashplate with six servos, 8,640 design points; each member unpacks this archive into node-local TMPDIR and imports calc.budget from it",
+    "note": "board task 99eb27d3; documents identity 2d2f34a7c0490a6add6b5e703e0e598a1ec105c7c3e404866d7a35d5e6e2da03, and the commit reaches origin with the shards it produces"
+  }
+}

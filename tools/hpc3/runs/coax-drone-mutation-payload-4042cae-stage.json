@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-mutation-payload-4042cae.tar",
+      "sha256": "3ba54cae817e784e3a74ba74211901c424eb9316e348455ff0585674aaba07a3",
+      "size_bytes": 136867840
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone 4042caecc59620e4838b2f02e5f80baf087af78f",
+    "selection": "git archive --format=tar of pyproject.toml, calc/budget, calc/cylindrical, tests/budget, tests/test_attachment_loads.py, exports/{challenge,mission,sizing,uncertainty}, exports/verification/rotor-head-mutation and wiki/sources",
+    "why": "the Cosmic Ray campaign over the ten modules the rotor-head choice added or changed",
+    "note": "board task 99eb27d3; run.sh refuses to start unless calc.budget resolves inside the unpacked tree"
+  }
+}
