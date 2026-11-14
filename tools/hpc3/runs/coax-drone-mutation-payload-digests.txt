@@ -1,0 +1,14 @@
+# Published digests of the coax-drone mutation campaign's payloads (board task 0d5be1db).
+#
+# Read by `hpc3-stage --expect-from`. Each payload is one `git archive --format=tar`
+# of coax-drone at a pushed commit holding pyproject.toml, calc/budget, tests/budget,
+# the exports those tests read (challenge, mission, sizing, uncertainty), the
+# campaign's configurations and runner under exports/verification/uncertainty-mutation,
+# and wiki/sources. Each array member unpacks it into node-local TMPDIR and mutates
+# that copy, so the staged bytes are what every mutant is made from.
+#
+# Recorded 2026-11-14 from a second, independent `git archive` of coax-drone
+# 98dfe42b8e3ea53467c64827eb680ea0f30925ec piped straight to sha256sum, not from
+# the manifest or the staged file; both runs printed the same digest.
+
+116647876d3641a01a62dba5551475be7081e47c35272a6e04b121541cdbbdc7  coax-drone-mutation-payload-98dfe42.tar
