@@ -303,6 +303,8 @@ def test_the_totals_are_the_reports_never_a_printed_summary() -> None:
 
     assert read_test_totals(tail) == ReportTotals(passed=5024, failed=105, skipped=24)
     assert read_test_totals("105 failed, 5024 passed, 24 skipped in 119.27s\n") is None
+    nothing = f'{TOTALS_MARKER}: {{"passed": 0, "failed": 0, "skipped": 0}}\n'
+    assert read_test_totals(nothing) == ReportTotals(passed=0, failed=0, skipped=0)
 
 
 @pytest.mark.parametrize(
@@ -312,6 +314,7 @@ def test_the_totals_are_the_reports_never_a_printed_summary() -> None:
         ("[1, 2, 3]", JSONTypeError),
         ('{"passed": 1, "failed": 0}', JSONTypeError),
         ('{"passed": 1, "failed": 0, "skipped": 0, "errors": 0}', JSONTypeError),
+        ('{"passed": 1, "failed": 0, "tally": 0}', JSONTypeError),
         ('{"passed": 1, "failed": "0", "skipped": 0}', JSONTypeError),
         ('{"passed": true, "failed": 0, "skipped": 0}', JSONTypeError),
         ('{"passed": 1, "failed": 0, "skipped": -1}', JSONTypeError),
@@ -323,6 +326,7 @@ def test_the_totals_are_the_reports_never_a_printed_summary() -> None:
         "an array",
         "a key short",
         "a key more",
+        "another key in skipped's place",
         "a word for a count",
         "a boolean",
         "a negative skipped",
