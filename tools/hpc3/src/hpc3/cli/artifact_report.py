@@ -1,12 +1,13 @@
-"""Publish that a recorded job array's artifacts are, byte for byte, the files kept locally.
+"""Publish that a recorded sweep's artifacts are, byte for byte, the files kept locally.
 
-Run as ``python -m hpc3.cli.artifact_report --config <workspace> --array <id>
---local-dir <dir> --report-task <task>``. Every member of the array must have
-completed with exit 0 in Slurm's own accounting, written its artifact inside
-its allocation, and left an artifact whose cluster-side sha256 equals the
-same-named file in ``--local-dir``; only then is the measurement posted to
-the task as a load-report, the record a board audit can read for a claim
-that committed results came from those jobs.
+Run as ``python -m hpc3.cli.artifact_report --config <workspace> --array
+<id>[,<id>...] --local-dir <dir> --report-task <task>``, naming the sweep's
+first array and every hpc3-campaign resubmission. Each artifact must have
+exactly one declaring member that completed with exit 0 in Slurm's own
+accounting, none still running, written inside its allocation, whose
+cluster-side sha256 equals the same-named file in ``--local-dir``; only then
+is the measurement posted to the task as a load-report, the record a board
+audit can read for a claim that committed results came from those jobs.
 """
 
 from __future__ import annotations
@@ -52,7 +53,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     cluster = require_cluster(connection["cluster"])
     report = artifact_report(
         ledger.read(pathlib.Path(connection["ledger"]), cluster),
-        cli_args.require_flag(flags, "--array"),
+        cli_args.require_flag(flags, "--array").split(","),
         cluster,
         pathlib.Path(cli_args.require_flag(flags, "--local-dir")),
     )

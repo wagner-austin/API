@@ -149,15 +149,17 @@ def serve(
 ARRAY_NAME = "abl.sweep"
 
 
-def array_member(index: int, /, **changes: JSONValue) -> LedgerEntry:
-    """A recorded member of array 101, as array submission records it.
+def array_member(index: int, /, array: str = "101", **changes: JSONValue) -> LedgerEntry:
+    """A recorded member of an array, as array submission records it.
 
     Its ledger name is the array's plus ``-shard<index>``, its experiment
     records that suffix as ``member``, and its artifact is
-    ``/pub/out/shard-<index>.json``.
+    ``/pub/out/shard-<index>.json`` whichever array ran it, as a campaign's
+    resubmission of the same member declares the same artifact.
 
     Args:
         index: Its member number.
+        array: The array's id, 101 unless a case needs a second array.
         **changes: Alternate ledger fields.
 
     Returns:
@@ -169,7 +171,7 @@ def array_member(index: int, /, **changes: JSONValue) -> LedgerEntry:
         "artifact": f"/pub/out/shard-{index}.json",
     }
     fields.update(changes)
-    return entry(f"101_{index}", **fields)
+    return entry(f"{array}_{index}", **fields)
 
 
 def serve_member(fake: FakeRun, value: LedgerEntry, data: bytes, **accounting: str) -> None:

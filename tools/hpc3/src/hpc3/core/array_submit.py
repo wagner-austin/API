@@ -35,7 +35,16 @@ from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.preflight import Admission
 from hpc3.contracts.sweep import SweepSpec, expand_sweep
-from hpc3.core import audit, code_claim, drift, entrypoint, env_probe, ledger, remote
+from hpc3.core import (
+    artifacts,
+    audit,
+    code_claim,
+    drift,
+    entrypoint,
+    env_probe,
+    ledger,
+    remote,
+)
 from hpc3.core.array_sbatch import render_array_sbatch
 from hpc3.core.inflight import (
     check_artifact_is_free,
@@ -257,6 +266,7 @@ def submit_array(
         repo=repo,
     )
 
+    artifacts.prepare_artifact_directories(host, [members[index]["artifact"] for index, _ in rows])
     output = remote.run_remote(
         host, f"cd {script_dir} && sbatch --array={expression} {label}.sbatch"
     )

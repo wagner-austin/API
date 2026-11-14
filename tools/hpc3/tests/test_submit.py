@@ -148,6 +148,36 @@ class TestSubmit:
             _submit(tmp_path)
         assert excinfo.value.code is Hpc3ErrorCode.ENV_PATH_MISSING
 
+    def test_the_artifact_directory_exists_before_the_job_is_queued(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun
+    ) -> None:
+        """A job must not compute for its allocation and then fail to write (dcdec7d2)."""
+        script_healthy_cluster(fake_run)
+        submit(
+            _spec(artifact="/pub/wagnera3/results/arm-b-42/record.json"),
+            host="hpc3",
+            script_dir="/pub/wagnera3/jobs",
+            log_dir="/pub/wagnera3/logs",
+            ledger_path=tmp_path / "ledger.jsonl",
+            submitted_at=_AT,
+            submitter=_SUBMITTER,
+            cluster=cluster(),
+            charge_account="",
+            repo=PROJECT_REPO,
+        )
+        commands = fake_run.commands()
+        made = commands.index("mkdir -p '/pub/wagnera3/results/arm-b-42'")
+        real = next(i for i, c in enumerate(commands) if "sbatch " in c and "--test-only" not in c)
+        assert made < real
+
+    def test_a_job_writing_no_artifact_makes_no_artifact_directory(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun
+    ) -> None:
+        script_healthy_cluster(fake_run)
+        _submit(tmp_path)
+        made = [c for c in fake_run.commands() if c.startswith("mkdir -p")]
+        assert made == ["mkdir -p '/pub/wagnera3/jobs'", "mkdir -p '/pub/wagnera3/logs'"]
+
     def test_the_script_is_uploaded_once_not_twice(
         self, tmp_path: pathlib.Path, fake_run: FakeRun
     ) -> None:

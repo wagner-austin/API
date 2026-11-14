@@ -135,6 +135,35 @@ class TestSubmitSweep:
         ]
         assert submits == ["cd /j && sbatch --array=0-2 abl.rung.sbatch"]
 
+    def test_each_artifact_directory_exists_before_the_array_is_queued(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun
+    ) -> None:
+        """Created once each, before sbatch, and none for a member writing nothing.
+
+        Shards 2 and 3 of array 59589599 computed ten minutes and died unable
+        to open their result, in a directory nothing had made (board task
+        dcdec7d2)."""
+        members: list[JSONValue] = [
+            {"suffix": "s0", "command": "python a.py", "artifact": "/pub/w/out/s0.json"},
+            {"suffix": "s1", "command": "python a.py", "artifact": "/pub/w/out/s1.json"},
+            {"suffix": "s2", "command": "python a.py", "artifact": None},
+            {"suffix": "s3", "command": "python a.py", "artifact": "/pub/w/other/s3.json"},
+        ]
+        _healthy(fake_run)
+        fake_run.add("sbatch --array=", stdout="Submitted batch job 101\n")
+
+        assert _run(_document(members, throttle=None), tmp_path) == [
+            "101_0",
+            "101_1",
+            "101_2",
+            "101_3",
+        ]
+        commands = fake_run.commands()
+        made = [c for c in commands if c.startswith("mkdir -p '/pub/w/")]
+        assert made == ["mkdir -p '/pub/w/out'", "mkdir -p '/pub/w/other'"]
+        queued = next(i for i, c in enumerate(commands) if c.startswith("cd /j && sbatch --array="))
+        assert max(commands.index(c) for c in made) < queued
+
     def test_a_throttled_sweep_carries_the_throttle_on_both_sbatch_calls(
         self, tmp_path: pathlib.Path, fake_run: FakeRun
     ) -> None:

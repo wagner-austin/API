@@ -26,7 +26,7 @@ from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.drift import ImageDrift
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.ledger import LedgerEntry
-from hpc3.core import audit, ledger, preflight, remote
+from hpc3.core import artifacts, audit, ledger, preflight, remote
 from hpc3.core.inflight import (
     check_artifact_is_free,
     check_no_unrecorded_live_job,
@@ -181,6 +181,7 @@ def submit(
         repo=repo,
     )
 
+    artifacts.prepare_artifact_directories(host, [spec["artifact"]])
     output = remote.run_remote(host, f"cd {script_dir} && sbatch {label}.sbatch")
     job_id = parse_job_id(output)
 
