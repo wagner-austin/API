@@ -1,0 +1,35 @@
+{
+  "project": "coax-drone",
+  "name": "mutation-9cc7eaf",
+  "minutes": 240,
+  "experiment": {
+    "board_task": "d0c514e0-dff4-44f0-9859-357d751e0445",
+    "kind": "cosmic-ray-8.7.0",
+    "coax_drone_commit": "9cc7eaf045b14cfae2bb7f7689d8f4a5a0ed7228",
+    "payload_sha256": "fb522e3f08b86b7e1ec95a5856c0d4f85787c1d1f273b3f275485be8a54a2d7e",
+    "modules": "4"
+  },
+  "members": [
+    {
+      "suffix": "motor_catalog",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-9cc7eaf.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" motor_catalog /pub/wagnera3/coax-drone/mutation/9cc7eaf; test -f /pub/wagnera3/coax-drone/mutation/9cc7eaf/motor_catalog.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/9cc7eaf/motor_catalog.sqlite"
+    },
+    {
+      "suffix": "sizing",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-9cc7eaf.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" sizing /pub/wagnera3/coax-drone/mutation/9cc7eaf; test -f /pub/wagnera3/coax-drone/mutation/9cc7eaf/sizing.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/9cc7eaf/sizing.sqlite"
+    },
+    {
+      "suffix": "study",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-9cc7eaf.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" study /pub/wagnera3/coax-drone/mutation/9cc7eaf; test -f /pub/wagnera3/coax-drone/mutation/9cc7eaf/study.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/9cc7eaf/study.sqlite"
+    },
+    {
+      "suffix": "mission_simulation",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-9cc7eaf.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" mission_simulation /pub/wagnera3/coax-drone/mutation/9cc7eaf; test -f /pub/wagnera3/coax-drone/mutation/9cc7eaf/mission_simulation.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/9cc7eaf/mission_simulation.sqlite"
+    }
+  ],
+  "resumes_from_checkpoint": false
+}
