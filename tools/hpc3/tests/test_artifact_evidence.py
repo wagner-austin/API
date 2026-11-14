@@ -144,12 +144,11 @@ def test_an_artifact_written_outside_its_allocation_is_refused(
 def test_the_report_measures_every_member_against_its_named_copy(
     fake_run: FakeRun, tmp_path: Path
 ) -> None:
-    members = [member(1), member(0)]
-    for index, value in enumerate(sorted(members, key=lambda value: value["job_id"])):
+    for index in (0, 1):
         data = f"shard {index}".encode()
         (tmp_path / f"shard-{index}.json").write_bytes(data)
-        serve_member(fake_run, value, data)
-    report = artifact_report([entry("7_0"), *members], "101", cluster(), tmp_path)
+        serve_member(fake_run, member(index), data)
+    report = artifact_report([entry("7_0"), member(1), member(0)], "101", cluster(), tmp_path)
     assert (report["array"], report["local_dir"]) == ("101", str(tmp_path))
     measured = [narrow_json_to_dict(item) for item in require_list(report, "members")]
     assert [item["job_id"] for item in measured] == ["101_0", "101_1"]

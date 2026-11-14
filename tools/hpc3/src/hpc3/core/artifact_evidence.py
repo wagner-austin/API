@@ -53,7 +53,10 @@ def array_members(entries: Sequence[LedgerEntry], array: str) -> list[LedgerEntr
     ids = [entry["job_id"] for entry in members]
     if len(set(ids)) != len(ids):
         raise ValueError(f"HPC_EVIDENCE_ARRAY: a member of array {array} is recorded twice")
-    return sorted(members, key=lambda entry: int(entry["job_id"][len(array) + 1 :]))
+    def member_number(entry: LedgerEntry) -> int:
+        return int(entry["job_id"][len(array) + 1 :])
+
+    return sorted(members, key=member_number)
 
 
 def require_artifact(entry: LedgerEntry) -> str:
