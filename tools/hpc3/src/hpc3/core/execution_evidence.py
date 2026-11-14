@@ -88,8 +88,8 @@ def allocation_document(entry: LedgerEntry, cluster: ClusterFacts) -> JSONObject
         ValueError: HPC_EVIDENCE_ACCOUNTING for missing/mismatched accounting.
         AppError: Remote command failure or malformed native fields.
     """
-    if not entry["job_id"].isdecimal():
-        raise ValueError("HPC_EVIDENCE_ACCOUNTING: numeric allocation id required")
+    if re.fullmatch(r"[0-9]+(?:_[0-9]+)?", entry["job_id"]) is None:
+        raise ValueError("HPC_EVIDENCE_ACCOUNTING: numeric allocation id, or array member <id>_<n>, required")
     fields = list(SACCT_FIELDS)
     fields[1] = "JobName%200"
     fields.extend(["ExitCode", "Start", "End"])
