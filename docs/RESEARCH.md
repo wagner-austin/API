@@ -38,6 +38,7 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
 |---|---|---|---|---|---|---|---|---|
 | `cartridge-qa` | free-gpu | `A100` x1 | 8 | 64 | 720 | `890e444560d4` | yes | yes |
 | `cleargbm` | free | cpu | 4 | 16 | 60 | `0a525f532a9e` | yes | no |
+| `coax-drone` | free | cpu | 1 | 2 | 60 | `e30017eaa13d` | yes | no |
 | `code-style` | free-gpu | `A100` x1 | 8 | 32 | 240 | `5dfd78a7eb14` | yes | no |
 | `floor` | free-gpu | `A100` x1 | 8 | 32 | 60 | `df841c661b9e` | yes | no |
 | `mi` | free-gpu | `A100` x1 | 8 | 64 | 240 | `55651342e15d` | yes | no |
@@ -229,6 +230,25 @@ Runs: `code_style_eval.cli.compare` (`code-style-eval-compare`).
 Training, generation and scoring use shared records. Corpus identity and
 matching base quantisation matter. The wider v2 comparison does not
 retroactively give the v1 five-disagreement experiment adequate power.
+
+### `coax-drone` — the lift aircraft's sizing and mission models under input uncertainty
+
+Code: [coax-drone calc/budget](https://github.com/wagner-austin/coax-drone/blob/main/calc/budget/README.md),
+a separate repository. Runs: `coax-uncertainty shard` (`calc.budget.uncertainty_cli`),
+one job-array member per shard of the sweep's cases, then `coax-uncertainty combine`.
+
+- [Project wiki](https://github.com/wagner-austin/coax-drone/blob/main/wiki/index.md)
+- [Committed sweep results](https://github.com/wagner-austin/coax-drone/blob/main/exports/uncertainty/README.md)
+
+Each shard names the sha256 identity of the three study documents it read,
+and the sweep verifies every capture those documents pin before computing, so
+two results of different inputs cannot be combined. The image carries the
+coax-drone wheel at the spec's commit and an mcp-shared-py wheel built from
+MCPs 55e38727; the spec has one commit field, so the second is recorded here.
+The payload is one staged, certified `git archive` of the study documents and
+their captures. It does not emit the shared `RunRecord` yet: coax-drone's
+pinned environment cannot import `platform_core`, and its results are compared
+only with each other.
 
 ## Not registered anywhere
 
