@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-mutation-payload-819f84e.tar",
+      "sha256": "1b4fc1ce48801495d2961b293cc7e6bcbf8540666407db36012833abbfb994c2",
+      "size_bytes": 121006080
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone 819f84e287b733c72e9c90667639228cd891572f, calc/budget tree b8f4bd05bdc0c36533c29c149bf5003a2309b948",
+    "selection": "git archive --format=tar of pyproject.toml, calc/budget, tests/budget, exports/{challenge,mission,sizing,uncertainty}, exports/verification/motor-gearing-mutation and wiki/sources",
+    "why": "The Cosmic Ray campaign over the fourteen calc/budget modules the geared motor model changed; each member unpacks this archive into node-local TMPDIR and mutates its own copy",
+    "note": "board task d0c514e0; run.sh refuses to start unless calc.budget resolves inside the unpacked tree"
+  }
+}

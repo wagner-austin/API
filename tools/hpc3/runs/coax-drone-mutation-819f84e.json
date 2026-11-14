@@ -1,0 +1,86 @@
+{
+  "project": "coax-drone",
+  "name": "mutation-819f84e",
+  "minutes": 240,
+  "experiment": {
+    "board_task": "d0c514e0-dff4-44f0-9859-357d751e0445",
+    "kind": "cosmic-ray-8.7.0",
+    "coax_drone_commit": "819f84e287b733c72e9c90667639228cd891572f",
+    "calc_budget_tree": "b8f4bd05bdc0c36533c29c149bf5003a2309b948",
+    "payload_sha256": "1b4fc1ce48801495d2961b293cc7e6bcbf8540666407db36012833abbfb994c2",
+    "modules": "14"
+  },
+  "members": [
+    {
+      "suffix": "motor_catalog",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-819f84e.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" motor_catalog /pub/wagnera3/coax-drone/mutation/819f84e; test -f /pub/wagnera3/coax-drone/mutation/819f84e/motor_catalog.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/819f84e/motor_catalog.sqlite"
+    },
+    {
+      "suffix": "sizing",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-819f84e.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" sizing /pub/wagnera3/coax-drone/mutation/819f84e; test -f /pub/wagnera3/coax-drone/mutation/819f84e/sizing.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/819f84e/sizing.sqlite"
+    },
+    {
+      "suffix": "sizing_inputs",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-819f84e.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" sizing_inputs /pub/wagnera3/coax-drone/mutation/819f84e; test -f /pub/wagnera3/coax-drone/mutation/819f84e/sizing_inputs.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/819f84e/sizing_inputs.sqlite"
+    },
+    {
+      "suffix": "sizing_limits",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-819f84e.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" sizing_limits /pub/wagnera3/coax-drone/mutation/819f84e; test -f /pub/wagnera3/coax-drone/mutation/819f84e/sizing_limits.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/819f84e/sizing_limits.sqlite"
+    },
+    {
+      "suffix": "screening",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-819f84e.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" screening /pub/wagnera3/coax-drone/mutation/819f84e; test -f /pub/wagnera3/coax-drone/mutation/819f84e/screening.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/819f84e/screening.sqlite"
+    },
+    {
+      "suffix": "study",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-819f84e.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" study /pub/wagnera3/coax-drone/mutation/819f84e; test -f /pub/wagnera3/coax-drone/mutation/819f84e/study.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/819f84e/study.sqlite"
+    },
+    {
+      "suffix": "sweep",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-819f84e.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" sweep /pub/wagnera3/coax-drone/mutation/819f84e; test -f /pub/wagnera3/coax-drone/mutation/819f84e/sweep.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/819f84e/sweep.sqlite"
+    },
+    {
+      "suffix": "mass_ledger",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-819f84e.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" mass_ledger /pub/wagnera3/coax-drone/mutation/819f84e; test -f /pub/wagnera3/coax-drone/mutation/819f84e/mass_ledger.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/819f84e/mass_ledger.sqlite"
+    },
+    {
+      "suffix": "mission_simulation",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-819f84e.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" mission_simulation /pub/wagnera3/coax-drone/mutation/819f84e; test -f /pub/wagnera3/coax-drone/mutation/819f84e/mission_simulation.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/819f84e/mission_simulation.sqlite"
+    },
+    {
+      "suffix": "mission_reports",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-819f84e.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" mission_reports /pub/wagnera3/coax-drone/mutation/819f84e; test -f /pub/wagnera3/coax-drone/mutation/819f84e/mission_reports.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/819f84e/mission_reports.sqlite"
+    },
+    {
+      "suffix": "uncertainty_metrics",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-819f84e.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" uncertainty_metrics /pub/wagnera3/coax-drone/mutation/819f84e; test -f /pub/wagnera3/coax-drone/mutation/819f84e/uncertainty_metrics.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/819f84e/uncertainty_metrics.sqlite"
+    },
+    {
+      "suffix": "uncertainty_report",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-819f84e.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" uncertainty_report /pub/wagnera3/coax-drone/mutation/819f84e; test -f /pub/wagnera3/coax-drone/mutation/819f84e/uncertainty_report.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/819f84e/uncertainty_report.sqlite"
+    },
+    {
+      "suffix": "uncertainty_study",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-819f84e.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" uncertainty_study /pub/wagnera3/coax-drone/mutation/819f84e; test -f /pub/wagnera3/coax-drone/mutation/819f84e/uncertainty_study.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/819f84e/uncertainty_study.sqlite"
+    },
+    {
+      "suffix": "uncertainty_sweep",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-819f84e.tar -C \"$W\"; bash \"$W/exports/verification/motor-gearing-mutation/run.sh\" uncertainty_sweep /pub/wagnera3/coax-drone/mutation/819f84e; test -f /pub/wagnera3/coax-drone/mutation/819f84e/uncertainty_sweep.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/819f84e/uncertainty_sweep.sqlite"
+    }
+  ],
+  "resumes_from_checkpoint": false
+}

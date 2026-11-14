@@ -30,3 +30,13 @@ a66979196c3173c897c329395912cedcc1d1255aceccc822c0fba8aafd4abe0e  coax-drone-mut
 # array 59578801 in uncertainty_metrics.
 
 5b0530e836f96e8e9477b1cfe23a8d830a9b0d412535354ac40e5b757a3cd4bd  coax-drone-mutation-payload-a57b70a.tar
+
+# The geared motor model's campaign for board task d0c514e0, over the fourteen
+# calc/budget modules it changed, with its configurations and runner under
+# exports/verification/motor-gearing-mutation in place of uncertainty-mutation.
+# Recorded 2026-11-14 from a git archive of origin/main at coax-drone
+# 819f84e287b733c72e9c90667639228cd891572f in the main checkout piped straight
+# to sha256sum, independent of the archive staged from the session worktree;
+# both printed the same digest.
+
+1b4fc1ce48801495d2961b293cc7e6bcbf8540666407db36012833abbfb994c2  coax-drone-mutation-payload-819f84e.tar
