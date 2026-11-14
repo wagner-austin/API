@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-mutation-payload-5e8832e.tar",
+      "sha256": "f9a84869cb0dec19f17fca1413310c21b01fbb870c0b5ad8df8297100fc43c1b",
+      "size_bytes": 123484160
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone 5e8832e16beeeea37e5f7c77b2cbed362638b868",
+    "selection": "git archive --format=tar of pyproject.toml, calc/budget, calc/cylindrical, tests/budget, tests/test_attachment_loads.py, exports/{challenge,mission,sizing,uncertainty}, exports/verification/drive-model-mutation and wiki/sources",
+    "why": "Reruns the Cosmic Ray campaign over quoted_literal, drive_model, drive_catalog, study, uncertainty_study, battery_pack and sizing after the commits removing array 59594527's survivors in them",
+    "note": "board task 36c5924a; run.sh refuses to start unless calc.budget resolves inside the unpacked tree"
+  }
+}

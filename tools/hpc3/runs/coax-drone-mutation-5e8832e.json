@@ -1,0 +1,50 @@
+{
+  "project": "coax-drone",
+  "name": "mutation-5e8832e",
+  "minutes": 240,
+  "experiment": {
+    "board_task": "36c5924a-8a41-4deb-8903-5a0ffffe2c53",
+    "kind": "cosmic-ray-8.7.0",
+    "coax_drone_commit": "5e8832e16beeeea37e5f7c77b2cbed362638b868",
+    "payload_sha256": "f9a84869cb0dec19f17fca1413310c21b01fbb870c0b5ad8df8297100fc43c1b",
+    "modules": "7"
+  },
+  "members": [
+    {
+      "suffix": "quoted_literal",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-5e8832e.tar -C \"$W\"; mkdir -p /pub/wagnera3/coax-drone/mutation/5e8832e; bash \"$W/exports/verification/drive-model-mutation/run.sh\" quoted_literal /pub/wagnera3/coax-drone/mutation/5e8832e; test -f /pub/wagnera3/coax-drone/mutation/5e8832e/quoted_literal.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/5e8832e/quoted_literal.sqlite"
+    },
+    {
+      "suffix": "drive_model",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-5e8832e.tar -C \"$W\"; mkdir -p /pub/wagnera3/coax-drone/mutation/5e8832e; bash \"$W/exports/verification/drive-model-mutation/run.sh\" drive_model /pub/wagnera3/coax-drone/mutation/5e8832e; test -f /pub/wagnera3/coax-drone/mutation/5e8832e/drive_model.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/5e8832e/drive_model.sqlite"
+    },
+    {
+      "suffix": "drive_catalog",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-5e8832e.tar -C \"$W\"; mkdir -p /pub/wagnera3/coax-drone/mutation/5e8832e; bash \"$W/exports/verification/drive-model-mutation/run.sh\" drive_catalog /pub/wagnera3/coax-drone/mutation/5e8832e; test -f /pub/wagnera3/coax-drone/mutation/5e8832e/drive_catalog.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/5e8832e/drive_catalog.sqlite"
+    },
+    {
+      "suffix": "study",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-5e8832e.tar -C \"$W\"; mkdir -p /pub/wagnera3/coax-drone/mutation/5e8832e; bash \"$W/exports/verification/drive-model-mutation/run.sh\" study /pub/wagnera3/coax-drone/mutation/5e8832e; test -f /pub/wagnera3/coax-drone/mutation/5e8832e/study.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/5e8832e/study.sqlite"
+    },
+    {
+      "suffix": "uncertainty_study",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-5e8832e.tar -C \"$W\"; mkdir -p /pub/wagnera3/coax-drone/mutation/5e8832e; bash \"$W/exports/verification/drive-model-mutation/run.sh\" uncertainty_study /pub/wagnera3/coax-drone/mutation/5e8832e; test -f /pub/wagnera3/coax-drone/mutation/5e8832e/uncertainty_study.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/5e8832e/uncertainty_study.sqlite"
+    },
+    {
+      "suffix": "battery_pack",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-5e8832e.tar -C \"$W\"; mkdir -p /pub/wagnera3/coax-drone/mutation/5e8832e; bash \"$W/exports/verification/drive-model-mutation/run.sh\" battery_pack /pub/wagnera3/coax-drone/mutation/5e8832e; test -f /pub/wagnera3/coax-drone/mutation/5e8832e/battery_pack.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/5e8832e/battery_pack.sqlite"
+    },
+    {
+      "suffix": "sizing",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-5e8832e.tar -C \"$W\"; mkdir -p /pub/wagnera3/coax-drone/mutation/5e8832e; bash \"$W/exports/verification/drive-model-mutation/run.sh\" sizing /pub/wagnera3/coax-drone/mutation/5e8832e; test -f /pub/wagnera3/coax-drone/mutation/5e8832e/sizing.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/5e8832e/sizing.sqlite"
+    }
+  ],
+  "resumes_from_checkpoint": false
+}

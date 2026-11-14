@@ -55,3 +55,16 @@ fb522e3f08b86b7e1ec95a5856c0d4f85787c1d1f273b3f275485be8a54a2d7e  coax-drone-mut
 # publish with are still being recomputed.
 
 840faeeb76b8b70f7a9c5ffa058998ed004c8e3f9906ff8fe411e1ba87a16bcd  coax-drone-mutation-payload-6376a3e.tar
+
+# The rerun after array 59594527's survivors in quoted_literal, drive_model,
+# drive_catalog, study, uncertainty_study, battery_pack and sizing were
+# removed, recorded the same way from coax-drone
+# 5e8832e16beeeea37e5f7c77b2cbed362638b868 in the session worktree, rebased onto
+# origin main 1c34a42 and not yet pushed.
+
+f9a84869cb0dec19f17fca1413310c21b01fbb870c0b5ad8df8297100fc43c1b  coax-drone-mutation-payload-5e8832e.tar
+
+# The drive_model rerun after the case killing array 59596996's one survivor,
+# recorded the same way from coax-drone c609e95e83d4c51be3e991ae4f512a5045576741.
+
+e4a84d3a090e3d1e07ecc32a2fd86115e3ec96b35b15bc5d9afd02a07d1e05a5  coax-drone-mutation-payload-c609e95.tar
