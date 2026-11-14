@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-mutation-payload-563d84e.tar",
+      "sha256": "3400af5177f5e61cc1fb321084bb39447a9df7a09f17bf77045956f3aac38795",
+      "size_bytes": 51046400
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone 563d84e63741caf5200853ced4e4215c33258dd0",
+    "selection": "git archive --format=tar of pyproject.toml, calc/budget, tests/budget, exports/{challenge,mission,sizing,uncertainty}, exports/verification/uncertainty-mutation and wiki/sources",
+    "why": "The third Cosmic Ray campaign reruns uncertainty_sweep and uncertainty_report after the fixes for array 59580709's survivors; each member unpacks this archive into node-local TMPDIR and mutates its own copy",
+    "note": "board task 0d5be1db; run.sh refuses to start unless calc.budget resolves inside the unpacked tree"
+  }
+}

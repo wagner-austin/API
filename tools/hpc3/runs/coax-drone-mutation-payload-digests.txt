@@ -12,3 +12,21 @@
 # the manifest or the staged file; both runs printed the same digest.
 
 116647876d3641a01a62dba5551475be7081e47c35272a6e04b121541cdbbdc7  coax-drone-mutation-payload-98dfe42.tar
+
+# Recorded 2026-11-14 the same way, from two independent `git archive` runs of
+# coax-drone 3599f7dc8bd6abc20436168bdecc00b823e29cb1, the rewrite that removes
+# the survivors of array 59578801.
+
+a66979196c3173c897c329395912cedcc1d1255aceccc822c0fba8aafd4abe0e  coax-drone-mutation-payload-3599f7d.tar
+
+# Recorded 2026-11-14 the same way from coax-drone
+# 563d84e63741caf5200853ced4e4215c33258dd0, which removes the three survivors
+# of array 59580709 in uncertainty_sweep and uncertainty_report.
+
+3400af5177f5e61cc1fb321084bb39447a9df7a09f17bf77045956f3aac38795  coax-drone-mutation-payload-563d84e.tar
+
+# Recorded 2026-11-14 the same way from coax-drone
+# a57b70abdd82341f18ccd44ca8b48c53cf6472e5, which removes the 17 survivors of
+# array 59578801 in uncertainty_metrics.
+
+5b0530e836f96e8e9477b1cfe23a8d830a9b0d412535354ac40e5b757a3cd4bd  coax-drone-mutation-payload-a57b70a.tar

@@ -1,0 +1,35 @@
+{
+  "project": "coax-drone",
+  "name": "mutation-3599f7d",
+  "minutes": 240,
+  "experiment": {
+    "board_task": "0d5be1db-d79f-485d-97ec-4e6a4055f46b",
+    "kind": "cosmic-ray-8.7.0",
+    "coax_drone_commit": "3599f7dc8bd6abc20436168bdecc00b823e29cb1",
+    "payload_sha256": "a66979196c3173c897c329395912cedcc1d1255aceccc822c0fba8aafd4abe0e",
+    "modules": "4"
+  },
+  "members": [
+    {
+      "suffix": "uncertainty_study",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-3599f7d.tar -C \"$W\"; bash \"$W/exports/verification/uncertainty-mutation/run.sh\" uncertainty_study /pub/wagnera3/coax-drone/mutation/3599f7d; test -f /pub/wagnera3/coax-drone/mutation/3599f7d/uncertainty_study.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/3599f7d/uncertainty_study.sqlite"
+    },
+    {
+      "suffix": "uncertainty_sweep",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-3599f7d.tar -C \"$W\"; bash \"$W/exports/verification/uncertainty-mutation/run.sh\" uncertainty_sweep /pub/wagnera3/coax-drone/mutation/3599f7d; test -f /pub/wagnera3/coax-drone/mutation/3599f7d/uncertainty_sweep.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/3599f7d/uncertainty_sweep.sqlite"
+    },
+    {
+      "suffix": "uncertainty_report",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-3599f7d.tar -C \"$W\"; bash \"$W/exports/verification/uncertainty-mutation/run.sh\" uncertainty_report /pub/wagnera3/coax-drone/mutation/3599f7d; test -f /pub/wagnera3/coax-drone/mutation/3599f7d/uncertainty_report.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/3599f7d/uncertainty_report.sqlite"
+    },
+    {
+      "suffix": "uncertainty_cli",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-mutation-payload-3599f7d.tar -C \"$W\"; bash \"$W/exports/verification/uncertainty-mutation/run.sh\" uncertainty_cli /pub/wagnera3/coax-drone/mutation/3599f7d; test -f /pub/wagnera3/coax-drone/mutation/3599f7d/uncertainty_cli.sqlite'",
+      "artifact": "/pub/wagnera3/coax-drone/mutation/3599f7d/uncertainty_cli.sqlite"
+    }
+  ],
+  "resumes_from_checkpoint": false
+}
