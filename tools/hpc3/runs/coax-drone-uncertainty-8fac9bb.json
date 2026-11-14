@@ -1,0 +1,56 @@
+{
+  "project": "coax-drone",
+  "name": "uncertainty-8fac9bb",
+  "minutes": 60,
+  "experiment": {
+    "board_task": "0d5be1db-d79f-485d-97ec-4e6a4055f46b",
+    "coax_drone_commit": "8fac9bbe6c6f9171e68544bc50307a25493ec957",
+    "payload_sha256": "90a4a3fb7f1f2870c91243f0c798af683ee9083fb1815f67c28299351697bcc1",
+    "documents_identity": "5b1de982e384f35b3a4f14b454c44fcb8c2f22e75137ac7c81151a9bd20bd989",
+    "samples": "4096",
+    "shards": "8"
+  },
+  "members": [
+    {
+      "suffix": "shard0of8",
+      "command": "coax-uncertainty shard --repo-root /pub/wagnera3/coax-drone/payload/8fac9bb --study calc/budget/data/uncertainty-study.json --shard 0 --shards 8 --out /pub/wagnera3/coax-drone/uncertainty/8fac9bb/shard-0-of-8.json",
+      "artifact": "/pub/wagnera3/coax-drone/uncertainty/8fac9bb/shard-0-of-8.json"
+    },
+    {
+      "suffix": "shard1of8",
+      "command": "coax-uncertainty shard --repo-root /pub/wagnera3/coax-drone/payload/8fac9bb --study calc/budget/data/uncertainty-study.json --shard 1 --shards 8 --out /pub/wagnera3/coax-drone/uncertainty/8fac9bb/shard-1-of-8.json",
+      "artifact": "/pub/wagnera3/coax-drone/uncertainty/8fac9bb/shard-1-of-8.json"
+    },
+    {
+      "suffix": "shard2of8",
+      "command": "coax-uncertainty shard --repo-root /pub/wagnera3/coax-drone/payload/8fac9bb --study calc/budget/data/uncertainty-study.json --shard 2 --shards 8 --out /pub/wagnera3/coax-drone/uncertainty/8fac9bb/shard-2-of-8.json",
+      "artifact": "/pub/wagnera3/coax-drone/uncertainty/8fac9bb/shard-2-of-8.json"
+    },
+    {
+      "suffix": "shard3of8",
+      "command": "coax-uncertainty shard --repo-root /pub/wagnera3/coax-drone/payload/8fac9bb --study calc/budget/data/uncertainty-study.json --shard 3 --shards 8 --out /pub/wagnera3/coax-drone/uncertainty/8fac9bb/shard-3-of-8.json",
+      "artifact": "/pub/wagnera3/coax-drone/uncertainty/8fac9bb/shard-3-of-8.json"
+    },
+    {
+      "suffix": "shard4of8",
+      "command": "coax-uncertainty shard --repo-root /pub/wagnera3/coax-drone/payload/8fac9bb --study calc/budget/data/uncertainty-study.json --shard 4 --shards 8 --out /pub/wagnera3/coax-drone/uncertainty/8fac9bb/shard-4-of-8.json",
+      "artifact": "/pub/wagnera3/coax-drone/uncertainty/8fac9bb/shard-4-of-8.json"
+    },
+    {
+      "suffix": "shard5of8",
+      "command": "coax-uncertainty shard --repo-root /pub/wagnera3/coax-drone/payload/8fac9bb --study calc/budget/data/uncertainty-study.json --shard 5 --shards 8 --out /pub/wagnera3/coax-drone/uncertainty/8fac9bb/shard-5-of-8.json",
+      "artifact": "/pub/wagnera3/coax-drone/uncertainty/8fac9bb/shard-5-of-8.json"
+    },
+    {
+      "suffix": "shard6of8",
+      "command": "coax-uncertainty shard --repo-root /pub/wagnera3/coax-drone/payload/8fac9bb --study calc/budget/data/uncertainty-study.json --shard 6 --shards 8 --out /pub/wagnera3/coax-drone/uncertainty/8fac9bb/shard-6-of-8.json",
+      "artifact": "/pub/wagnera3/coax-drone/uncertainty/8fac9bb/shard-6-of-8.json"
+    },
+    {
+      "suffix": "shard7of8",
+      "command": "coax-uncertainty shard --repo-root /pub/wagnera3/coax-drone/payload/8fac9bb --study calc/budget/data/uncertainty-study.json --shard 7 --shards 8 --out /pub/wagnera3/coax-drone/uncertainty/8fac9bb/shard-7-of-8.json",
+      "artifact": "/pub/wagnera3/coax-drone/uncertainty/8fac9bb/shard-7-of-8.json"
+    }
+  ],
+  "resumes_from_checkpoint": false
+}

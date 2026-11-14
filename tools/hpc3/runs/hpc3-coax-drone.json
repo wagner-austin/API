@@ -1,0 +1,38 @@
+{
+  "cluster": "hpc3",
+  "host": "hpc3",
+  "root": "/pub/wagnera3",
+  "ledger": "ledger.jsonl",
+  "quiet_seconds": 1800,
+  "projects": {
+    "coax-drone": {
+      "partition": "free",
+      "gpu": null,
+      "cpus": 1,
+      "mem_gb": 2,
+      "minutes": 60,
+      "requeue": true,
+      "resumes_from_checkpoint": false,
+      "image": {
+        "path": "/pub/wagnera3/coax-drone/images/v1/coax-drone.sif",
+        "sha256": "e30017eaa13d9bb8768a9e2adf76b2bfbbd6962092228dbc706cc40111b2cb05",
+        "binds": [
+          "/pub/wagnera3"
+        ]
+      },
+      "env_path": "/opt/env",
+      "pinned_packages": {
+        "coax-drone-cad": "0.1.0",
+        "mcp-shared-py": "0.1.0"
+      },
+      "deterministic": true,
+      "certified_inputs": false,
+      "budget": {
+        "self_imposed_gpu_hours": 0.0,
+        "max_service_units": 0.0,
+        "charge_account": ""
+      },
+      "repo": "../../../../coax-drone"
+    }
+  }
+}
