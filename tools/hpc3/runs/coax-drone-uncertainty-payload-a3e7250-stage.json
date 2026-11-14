@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-uncertainty-payload-a3e7250.tar",
+      "sha256": "b0806f60abfad14f47b879bf4138bfbca0819bd08dd0c10e5c50f39f2d20149b",
+      "size_bytes": 125552640
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone a3e7250b90a8193528cdcc84524b6dc944b74c2e, calc/budget tree e8af1e437d81817bafe9c0c0d80f48798a319681",
+    "selection": "git archive --format=tar of pyproject.toml, calc/budget, tests/budget, exports/{challenge,mission,sizing,uncertainty}, exports/verification/uncertainty-mutation and wiki/sources",
+    "why": "the uncertainty sweep of the sizing model with each motor's drive modelled as the maker's performance tool models it (moteus-n1 with the 5 V fan upper, ODrive Pro with its heat spreader lower) and one ambient input; each member unpacks this archive into node-local TMPDIR and imports calc.budget from it",
+    "note": "board task 36c5924a; documents identity 1c6edd3ae1c8b1463562ec0fba2f2e1e08b14ecf97cd50889897a7ad997af807, which now digests the drive catalog too, and the commit reaches origin with the shards it produces"
+  }
+}

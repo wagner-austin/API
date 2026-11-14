@@ -46,3 +46,12 @@ a66979196c3173c897c329395912cedcc1d1255aceccc822c0fba8aafd4abe0e  coax-drone-mut
 # origin/main at coax-drone 9cc7eaf045b14cfae2bb7f7689d8f4a5a0ed7228.
 
 fb522e3f08b86b7e1ec95a5856c0d4f85787c1d1f273b3f275485be8a54a2d7e  coax-drone-mutation-payload-9cc7eaf.tar
+
+# The drive-model campaign for board task 36c5924a over sixteen modules, recorded
+# 2026-11-14 from two independent git archives of coax-drone
+# 6376a3ef1b0b3f301617cba5ddde6592893db57c in the session worktree, one written
+# to the staged file and one piped straight to sha256sum; both printed the same
+# digest. The commit is not yet on origin, since the uncertainty tables it would
+# publish with are still being recomputed.
+
+840faeeb76b8b70f7a9c5ffa058998ed004c8e3f9906ff8fe411e1ba87a16bcd  coax-drone-mutation-payload-6376a3e.tar

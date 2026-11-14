@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-mutation-payload-6376a3e.tar",
+      "sha256": "840faeeb76b8b70f7a9c5ffa058998ed004c8e3f9906ff8fe411e1ba87a16bcd",
+      "size_bytes": 125460480
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone 6376a3ef1b0b3f301617cba5ddde6592893db57c",
+    "selection": "git archive --format=tar of pyproject.toml, calc/budget, calc/cylindrical, tests/budget, tests/test_attachment_loads.py, exports/{challenge,mission,sizing,uncertainty}, exports/verification/drive-model-mutation and wiki/sources",
+    "why": "Cosmic Ray over the sixteen modules the drive model added or changed: quoted_literal, drive_model, drive_catalog, the twelve calc/budget modules the drive pair and shared ambient were threaded through, and calc/cylindrical's attachment bridge",
+    "note": "board task 36c5924a; run.sh refuses to start unless calc.budget resolves inside the unpacked tree"
+  }
+}

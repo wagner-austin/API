@@ -52,3 +52,14 @@ b16cdde264101da502cd8cb1aa58ae0541ee6d65127d5a5a8bae4a2d1739d8a3  coax-drone-unc
 # calc/budget tree and documents identity are what the shards and origin share.
 
 932faf16972fd2de32a41fbf9592a098bbb2653e2dfdddcba62b2b0daf882a96  coax-drone-uncertainty-payload-893459e.tar
+
+# The drive-model sweep for board task 36c5924a: each motor's drive is the
+# maker tool's model (moteus-n1 with the 5 V fan upper, ODrive Pro with its heat
+# spreader lower), ambient is one input, and the documents identity now digests
+# the drive catalog beside the motor catalog. Recorded 2026-11-14 the same way
+# from coax-drone a3e7250b90a8193528cdcc84524b6dc944b74c2e (calc/budget tree
+# e8af1e437d81817bafe9c0c0d80f48798a319681, documents identity
+# 1c6edd3ae1c8b1463562ec0fba2f2e1e08b14ecf97cd50889897a7ad997af807). Like
+# 893459e it is not yet on origin and is pushed with the shards it produces.
+
+b0806f60abfad14f47b879bf4138bfbca0819bd08dd0c10e5c50f39f2d20149b  coax-drone-uncertainty-payload-a3e7250.tar
