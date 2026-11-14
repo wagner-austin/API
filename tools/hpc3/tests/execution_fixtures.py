@@ -191,16 +191,16 @@ def serve_member(fake: FakeRun, value: LedgerEntry, data: bytes, **accounting: s
 
 __all__ = [
     "ARRAY_NAME",
-    "array_member",
-    "serve_member",
     "CHECKSUMS",
     "END",
     "IMAGE",
     "INSTANT",
     "START",
     "accounting_row",
+    "array_member",
     "documents",
     "entry",
     "serve",
+    "serve_member",
     "serve_text",
 ]
