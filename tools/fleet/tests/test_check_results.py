@@ -22,8 +22,13 @@ from fleet.core.check_results import (
     RECIPE_RESULTS_NAME,
     RESULTS_DIGEST_MARKER,
     RUN_RESULTS_NAME,
+    TOTALS_FILE_NAME,
+    TOTALS_KEYS,
+    TOTALS_MARKER,
+    ReportTotals,
     read_failed_cases,
     read_results_digest,
+    read_test_totals,
     retained_results_path,
     run_results_path,
     sh_failures_line,
@@ -31,6 +36,7 @@ from fleet.core.check_results import (
     sh_results_digest_line,
     sh_results_lines,
     sh_retire_lines,
+    sh_totals_line,
 )
 from tests._host_bash import host_bash
 
@@ -41,10 +47,17 @@ WRITTEN_FAILURES = (
     '["packages/db/src/a.py:3 [arg-type]", "packages/db/tests/test_a.py::test_bad \\"quoted\\""]\n'
 )
 
+#: What MCPs' maketools ``write_summaries`` wrote for fleet job ea1dd2c0's
+#: run (MCPs board task 000f9302): ``json.dumps`` of the totals, a newline.
+WRITTEN_TOTALS = '{"passed": 5024, "failed": 105, "skipped": 24}\n'
+
 
 def test_the_names_are_one_spelling() -> None:
     assert FAILURES_FILE_NAME == "failures.json"
     assert FAILURES_MARKER == "FLEET_FAILURES"
+    assert TOTALS_FILE_NAME == "totals.json"
+    assert TOTALS_MARKER == "FLEET_TOTALS"
+    assert TOTALS_KEYS == ("failed", "passed", "skipped")
     assert RECIPE_RESULTS_NAME == ".check-results"
     assert RUN_RESULTS_NAME == "check-results"
     assert run_results_path("/s/run-1/run-1") == "/s/run-1/run-1/check-results"
@@ -258,3 +271,67 @@ def test_a_failures_line_that_is_no_array_of_names_is_refused() -> None:
         read_failed_cases(f'{FAILURES_MARKER}: {{"a": 1}}\n')
     with pytest.raises(JSONTypeError):
         read_failed_cases(f'{FAILURES_MARKER}: ["a", 1]\n')
+
+
+def test_the_tail_read_prints_the_totals_maketools_counted(tmp_path: pathlib.Path) -> None:
+    target = tmp_path / "run-1"
+    kept = pathlib.Path(run_results_path(target.as_posix()))
+    kept.mkdir(parents=True)
+    (kept / TOTALS_FILE_NAME).write_text(WRITTEN_TOTALS, encoding="utf-8")
+    unread = tmp_path / "run-2"
+    pathlib.Path(run_results_path(unread.as_posix())).mkdir(parents=True)
+
+    completed = run_lines([sh_totals_line(target.as_posix())], tmp_path)
+    none_read = run_lines([sh_totals_line(unread.as_posix())], tmp_path)
+
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout == f"{TOTALS_MARKER}: {WRITTEN_TOTALS}"
+    assert read_test_totals(completed.stdout) == ReportTotals(passed=5024, failed=105, skipped=24)
+    assert none_read.returncode == 0, none_read.stderr
+    assert none_read.stdout == ""
+    assert read_test_totals(none_read.stdout) is None
+
+
+def test_the_totals_are_the_reports_never_a_printed_summary() -> None:
+    tail = (
+        "FAILED tests/test_a.py::test_wording[ALL CHECKS PASSED, 22 passed in mcp-shared]\n"
+        "105 failed, 5024 passed, 24 skipped in 119.27s\n"
+        f'{TOTALS_MARKER}: {{"passed": 1, "failed": 0, "skipped": 0}}\n'
+        f"{TOTALS_MARKER}: {WRITTEN_TOTALS}"
+        f'x {TOTALS_MARKER}: {{"passed": 9, "failed": 9, "skipped": 9}}\n'
+    )
+
+    assert read_test_totals(tail) == ReportTotals(passed=5024, failed=105, skipped=24)
+    assert read_test_totals("105 failed, 5024 passed, 24 skipped in 119.27s\n") is None
+
+
+@pytest.mark.parametrize(
+    ("line", "refusal"),
+    [
+        ("{", InvalidJsonError),
+        ("[1, 2, 3]", JSONTypeError),
+        ('{"passed": 1, "failed": 0}', JSONTypeError),
+        ('{"passed": 1, "failed": 0, "skipped": 0, "errors": 0}', JSONTypeError),
+        ('{"passed": 1, "failed": "0", "skipped": 0}', JSONTypeError),
+        ('{"passed": true, "failed": 0, "skipped": 0}', JSONTypeError),
+        ('{"passed": 1, "failed": 0, "skipped": -1}', JSONTypeError),
+        ('{"passed": -1, "failed": 0, "skipped": 0}', JSONTypeError),
+        ('{"passed": 0, "failed": -1, "skipped": 0}', JSONTypeError),
+    ],
+    ids=[
+        "no json",
+        "an array",
+        "a key short",
+        "a key more",
+        "a word for a count",
+        "a boolean",
+        "a negative skipped",
+        "a negative passed",
+        "a negative failed",
+    ],
+)
+def test_a_totals_line_that_is_no_object_of_three_counts_is_refused(
+    line: str, refusal: type[Exception]
+) -> None:
+    with pytest.raises(refusal):
+        read_test_totals(f"{TOTALS_MARKER}: {line}\n")

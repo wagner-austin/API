@@ -33,7 +33,7 @@ from typing import Final
 
 from fleet.contracts.check_unit import CHECK_UNIT
 from fleet.core import names
-from fleet.core.check_results import sh_failures_line, sh_results_digest_line
+from fleet.core.check_results import sh_failures_line, sh_results_digest_line, sh_totals_line
 from fleet.core.commit_tree import COMMIT_PATTERN
 from fleet.core.dialect import PROLOGUE
 from fleet.core.linux_unit_end import unit_end_path, unit_end_script
@@ -158,7 +158,9 @@ def log_tail_script(target: str, lines: int) -> str:
         that kept no report prints no digest line
         (:func:`fleet.core.check_results.sh_results_digest_line`), and a
         run whose check named no failures file prints no failures line
-        (:func:`fleet.core.check_results.sh_failures_line`).
+        (:func:`fleet.core.check_results.sh_failures_line`), and one whose
+        check counted no JUnit report prints no totals line
+        (:func:`fleet.core.check_results.sh_totals_line`).
     """
     log = names.log_path(target)
     recorded = registry_commit_path(target)
@@ -170,6 +172,7 @@ def log_tail_script(target: str, lines: int) -> str:
         f"printf '{REGISTRY_MARKER}: %s\\n' \"$commit\"; fi\n"
         f"{sh_results_digest_line(target)}\n"
         f"{sh_failures_line(target)}\n"
+        f"{sh_totals_line(target)}\n"
     )
 
 

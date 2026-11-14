@@ -10,7 +10,13 @@ a person reads; both are read off the same tail by the same readers
 The result carries the run and node the start reported, which the queue
 compares with the claim, so a restarted runner's report of an earlier run is
 refused by its run id. A figure the tail does not print is ``None`` or
-absent, never zero. The failed cases are the names MCPs' maketools wrote
+absent, never zero. The test totals are the counts MCPs' maketools wrote
+beside the kept reports (:func:`fleet.core.check_results.read_test_totals`,
+MCPs board task 000f9302), never the line's ``N passed``, which a case's
+own name can print: fleet job ea1dd2c0 stored 22 passed and 0 failed for a
+run of 5024 passed and 105 failed. A check that kept no JUnit report sends
+them as ``None``, unread, though the line may still render a printed
+count. The failed cases are the names MCPs' maketools wrote
 beside the kept reports, which only its ``check_reports`` parses, read off
 the tail (:func:`fleet.core.check_results.read_failed_cases`, MCPs board
 task d26709c0). A check that wrote no such file, one whose project's check
@@ -25,8 +31,8 @@ import datetime
 
 from platform_core.json_utils import JSONObject, JSONValue
 
-from fleet.core.check_figures import read_budget_reading, read_coverage_reading, read_test_counts
-from fleet.core.check_results import read_failed_cases, read_results_digest
+from fleet.core.check_figures import read_budget_reading, read_coverage_reading
+from fleet.core.check_results import read_failed_cases, read_results_digest, read_test_totals
 from fleet.core.run_summary import phase_seconds, read_run_summary
 from fleet.core.verdict import CHECK_BANNER
 
@@ -74,12 +80,15 @@ def encode_check_result(
     Raises:
         ValueError: From :func:`fleet.core.run_summary.phase_seconds` on a
             summary line no build prints, and from
-            :func:`fleet.core.check_results.read_failed_cases` on a failures
-            line that is not JSON.
+            :func:`fleet.core.check_results.read_failed_cases` and
+            :func:`fleet.core.check_results.read_test_totals` on a failures
+            or totals line that is not JSON.
         TypeError: From :func:`fleet.core.check_results.read_failed_cases`
-            on a failures line that is JSON but not an array of strings.
+            on a failures line that is JSON but not an array of strings, and
+            from :func:`fleet.core.check_results.read_test_totals` on a
+            totals line that is not an object of three counts.
     """
-    counts = read_test_counts(tail)
+    totals = read_test_totals(tail)
     coverage = read_coverage_reading(tail)
     budget = read_budget_reading(tail)
     digest = read_results_digest(tail)
@@ -109,9 +118,9 @@ def encode_check_result(
         "runId": run_id,
         "node": node,
         "banner": CHECK_BANNER in tail,
-        "testsPassed": None if counts is None else counts["passed"],
-        "testsFailed": None if counts is None else counts["failed"],
-        "testsSkipped": None,
+        "testsPassed": None if totals is None else totals["passed"],
+        "testsFailed": None if totals is None else totals["failed"],
+        "testsSkipped": None if totals is None else totals["skipped"],
         "beganAt": _instant(started_unix),
         "endedAt": _instant(ended_unix),
         "budget": budget_value,

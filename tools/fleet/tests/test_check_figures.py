@@ -20,7 +20,7 @@ from fleet.core.check_figures import (
     read_test_counts,
 )
 from fleet.core.check_result import encode_check_result
-from fleet.core.check_results import RESULTS_DIGEST_MARKER
+from fleet.core.check_results import RESULTS_DIGEST_MARKER, TOTALS_MARKER
 from fleet.core.run_summary import PhaseSeconds, RunSummary, phase_seconds
 
 
@@ -151,13 +151,16 @@ class TestThePhases:
 
 
 def test_the_result_carries_every_figure_the_tail_printed() -> None:
+    """The totals are the kept reports' (MCPs board task 000f9302), not the
+    printed summary's, which here a case's own title would have set."""
     tail = (
-        "      Tests  2 failed | 2385 passed (2387)\n"
+        "      Tests  2 failed | 22 passed (2387)\n"
         "All files |     100 |      100 |     100 |     100 |\n"
         "CHECK OVER BUDGET: fleet-mcp took 320s, over the 300s budget by 20s.\n"
         "FLEET_RUN: generation=1793732844 began=no "
         "phases=install:1s,workspace-build:20s,check:30s\n"
         f"{RESULTS_DIGEST_MARKER}: {'e' * 64}\n"
+        f'{TOTALS_MARKER}: {{"passed": 2385, "failed": 2, "skipped": 3}}\n'
     )
 
     assert encode_check_result(
@@ -174,7 +177,7 @@ def test_the_result_carries_every_figure_the_tail_printed() -> None:
         "banner": False,
         "testsPassed": 2385,
         "testsFailed": 2,
-        "testsSkipped": None,
+        "testsSkipped": 3,
         "beganAt": "2025-09-04T15:33:20+00:00",
         "endedAt": "2025-09-04T15:34:20+00:00",
         "budget": {"outcome": "exceeded", "seconds": 320, "bound": 300},
@@ -194,3 +197,23 @@ def test_the_result_carries_every_figure_the_tail_printed() -> None:
         "failedCases": None,
         "transcriptPath": "/home/corvis/fleet/stage/logs/MCPs-fleet-mcp-lavender-1794578820.log",
     }
+
+
+def test_a_check_that_kept_no_report_sends_its_totals_unread() -> None:
+    """A printed ``N passed`` is no total the board stores (MCPs board task 000f9302)."""
+    result = encode_check_result(
+        tail="105 failed, 5024 passed, 24 skipped in 119.27s\n=== ALL CHECKS PASSED ===\n",
+        run_id="coax-drone-lavender-1794578820",
+        node="lavender",
+        started_unix=1757000000,
+        ended_unix=1757000060,
+        results_path="/home/corvis/fleet/stage/logs/coax-drone-lavender-1794578820.results",
+        transcript_path="/home/corvis/fleet/stage/logs/coax-drone-lavender-1794578820.log",
+    )
+
+    assert (result["testsPassed"], result["testsFailed"], result["testsSkipped"]) == (
+        None,
+        None,
+        None,
+    )
+    assert result["banner"] is True

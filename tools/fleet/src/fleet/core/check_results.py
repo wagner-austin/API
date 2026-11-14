@@ -29,7 +29,15 @@ from __future__ import annotations
 import re
 from typing import Final
 
-from platform_core.json_utils import load_json_str, narrow_json_to_list, narrow_json_to_str
+from platform_core.json_utils import (
+    JSONTypeError,
+    load_json_str,
+    narrow_json_to_dict,
+    narrow_json_to_int,
+    narrow_json_to_list,
+    narrow_json_to_str,
+)
+from typing_extensions import TypedDict
 
 from fleet.core.names import LOGS_DIRECTORY
 
@@ -56,6 +64,24 @@ FAILURES_LINE: Final[re.Pattern[str]] = re.compile(rf"^{FAILURES_MARKER}: (.*)",
 #: the name copies ``check_results.FAILURES_FILE_NAME`` for the reason
 #: :data:`RECIPE_RESULTS_NAME` does).
 FAILURES_FILE_NAME: Final = "failures.json"
+
+#: The opening token of the line the tail read prints for the totals the
+#: check's own reports count (:func:`sh_totals_line`).
+TOTALS_MARKER: Final = "FLEET_TOTALS"
+
+#: That line, as :func:`read_test_totals` reads it back.
+TOTALS_LINE: Final[re.Pattern[str]] = re.compile(rf"^{TOTALS_MARKER}: (.*)", re.MULTILINE)
+
+#: The file MCPs' check lock writes into :data:`RECIPE_RESULTS_NAME` beside
+#: :data:`FAILURES_FILE_NAME`: one JSON object of the JUnit reports' passed,
+#: failed and skipped cases, written only when the directory holds a JUnit
+#: report (MCPs ``check_reports.write_summaries``, board task 000f9302; the
+#: name copies ``check_results.TOTALS_FILE_NAME`` for the reason
+#: :data:`RECIPE_RESULTS_NAME` does).
+TOTALS_FILE_NAME: Final = "totals.json"
+
+#: The keys of :data:`TOTALS_FILE_NAME`'s object, every one required.
+TOTALS_KEYS: Final[tuple[str, ...]] = ("failed", "passed", "skipped")
 
 #: The directory a check's runners write their reports to, in the directory
 #: its recipe runs in.
@@ -218,6 +244,79 @@ def read_failed_cases(tail: str) -> list[str] | None:
     return [narrow_json_to_str(name) for name in narrow_json_to_list(load_json_str(last.group(1)))]
 
 
+class ReportTotals(TypedDict):
+    """A suite's totals as its JUnit reports count them.
+
+    Attributes:
+        passed: The cases that passed.
+        failed: The cases that failed or errored.
+        skipped: The cases skipped.
+    """
+
+    passed: int
+    failed: int
+    skipped: int
+
+
+def sh_totals_line(target: str) -> str:
+    """The ``sh`` line that prints the totals a run's kept reports count, before its retire.
+
+    The totals are what MCPs stores as the check's passed, failed and
+    skipped counts (board task 000f9302): a pattern over the printed
+    summary took the last ``N passed`` in the transcript, so a failing
+    case whose name said ``22 passed`` stood for a run of 5024 passed and
+    105 failed (fleet job ea1dd2c0). maketools counts the JUnit reports it
+    kept and writes :data:`TOTALS_FILE_NAME` beside them, and this line
+    sends what that file holds, as :func:`sh_failures_line` sends the
+    names. A run whose check wrote no such file prints no line, and its
+    close sends the totals as unread.
+
+    Args:
+        target: The dispatch's absolute remote directory.
+
+    Returns:
+        One line, run by the tail read (:func:`fleet.core.run_registry.log_tail_script`).
+    """
+    totals = f'"{run_results_path(target)}/{TOTALS_FILE_NAME}"'
+    return (
+        f'if [ -f {totals} ]; then counted="$(cat {totals})"; '
+        f"printf '{TOTALS_MARKER}: %s\\n' \"$counted\"; fi"
+    )
+
+
+def read_test_totals(tail: str) -> ReportTotals | None:
+    """Read the totals the kept reports count off the tail read's answer.
+
+    Args:
+        tail: What the tail read printed.
+
+    Returns:
+        The last totals line's counts, or None when the run kept no
+        :data:`TOTALS_FILE_NAME`, so its totals were never read.
+
+    Raises:
+        platform_core.json_utils.InvalidJsonError: When the line is not JSON.
+        platform_core.json_utils.JSONTypeError: When it is not an object of
+            exactly :data:`TOTALS_KEYS`, each a count of zero or more.
+    """
+    last: re.Match[str] | None = None
+    for match in TOTALS_LINE.finditer(tail):
+        last = match
+    if last is None:
+        return None
+    counted = narrow_json_to_dict(load_json_str(last.group(1)))
+    if tuple(sorted(counted)) != TOTALS_KEYS:
+        raise JSONTypeError(f"{TOTALS_MARKER} holds {sorted(counted)}, not {list(TOTALS_KEYS)}")
+    totals = ReportTotals(
+        passed=narrow_json_to_int(counted["passed"]),
+        failed=narrow_json_to_int(counted["failed"]),
+        skipped=narrow_json_to_int(counted["skipped"]),
+    )
+    if min(totals["passed"], totals["failed"], totals["skipped"]) < 0:
+        raise JSONTypeError(f"{TOTALS_MARKER} holds a negative count: {totals}")
+    return totals
+
+
 def sh_retire_lines(*, target: str, retained: str) -> list[str]:
     """The ``sh`` lines a retire moves the run's results to where they are kept.
 
@@ -242,8 +341,14 @@ __all__ = [
     "RESULTS_DIGEST_LINE",
     "RESULTS_DIGEST_MARKER",
     "RUN_RESULTS_NAME",
+    "TOTALS_FILE_NAME",
+    "TOTALS_KEYS",
+    "TOTALS_LINE",
+    "TOTALS_MARKER",
+    "ReportTotals",
     "read_failed_cases",
     "read_results_digest",
+    "read_test_totals",
     "retained_results_path",
     "run_results_path",
     "sh_failures_line",
@@ -251,4 +356,5 @@ __all__ = [
     "sh_results_digest_line",
     "sh_results_lines",
     "sh_retire_lines",
+    "sh_totals_line",
 ]
