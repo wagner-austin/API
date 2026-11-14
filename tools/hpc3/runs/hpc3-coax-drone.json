@@ -14,8 +14,8 @@
       "requeue": true,
       "resumes_from_checkpoint": false,
       "image": {
-        "path": "/pub/wagnera3/coax-drone/images/v1/coax-drone.sif",
-        "sha256": "e30017eaa13d9bb8768a9e2adf76b2bfbbd6962092228dbc706cc40111b2cb05",
+        "path": "/pub/wagnera3/coax-drone/images/v2/coax-drone.sif",
+        "sha256": "3688a3f4f2543718b80d54b5954c82a19c3822589f951e90282124f2db01a82b",
         "binds": [
           "/pub/wagnera3"
         ]

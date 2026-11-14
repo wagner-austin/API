@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm@sha256:528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84",
   "env_prefix": "/opt/env",
-  "git_commit": "8fac9bbe6c6f9171e68544bc50307a25493ec957",
+  "git_commit": "b942cc86577e97d6672489d51ff459b2f1892240",
   "system_packages": [],
   "extra_index_urls": [],
   "requirements": [
@@ -24,6 +24,10 @@
     {
       "module": "calc.budget.uncertainty_sweep",
       "attribute": "evaluate_shard"
+    },
+    {
+      "module": "calc.budget.uncertainty_report",
+      "attribute": "render_binding_csv"
     }
   ],
   "smoke_commands": [],
