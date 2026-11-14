@@ -12,7 +12,13 @@ from platform_core.run_record import Observation
 
 from hpc3.contracts.execution_evidence import decode_execution_evidence, encode_execution_evidence
 from hpc3.core import _test_hooks
-from hpc3.core.execution_evidence import accounting, measure, parse_checksums, replay_report
+from hpc3.core.execution_evidence import (
+    accounting,
+    measure,
+    parse_checksums,
+    replay_report,
+    scheduled_name,
+)
 from tests.conftest import FakeRun, cluster
 from tests.execution_fixtures import (
     CHECKSUMS,
@@ -21,6 +27,7 @@ from tests.execution_fixtures import (
     INSTANT,
     START,
     accounting_row,
+    array_member,
     documents,
     entry,
     serve,
@@ -61,9 +68,29 @@ def test_missing_partial_or_multiple_accounting_rows_fail(fake_run: FakeRun, row
         accounting(entry(), cluster())
 
 
-def test_job_id_cannot_inject_a_scheduler_option() -> None:
+@pytest.mark.parametrize("job", ["101;true", "101_", "_1", "101_1_2", "101_1;true"])
+def test_job_id_cannot_inject_a_scheduler_option(job: str) -> None:
     with pytest.raises(ValueError, match="numeric allocation"):
-        accounting(entry("101;true"), cluster())
+        accounting(entry(job), cluster())
+
+
+def test_a_single_job_runs_under_its_ledger_name_and_a_member_under_its_arrays() -> None:
+    assert scheduled_name(entry("101")) == "abl.arm-b-42"
+    assert scheduled_name(array_member(3)) == "abl.sweep"
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"experiment": {"arm": "B"}}, "records no member suffix"),
+        ({"name": "abl.sweep-shard4"}, "lacks its member suffix"),
+    ],
+)
+def test_an_array_member_without_its_suffix_is_refused(
+    changes: dict[str, JSONValue], message: str
+) -> None:
+    with pytest.raises(ValueError, match=f"HPC_EVIDENCE_ACCOUNTING: .*{message}"):
+        scheduled_name(array_member(3, **changes))
 
 
 @pytest.mark.parametrize(

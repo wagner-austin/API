@@ -145,7 +145,54 @@ def serve(
     fake.add("sha256sum '/pub/runtime.sif'", stdout=f"{IMAGE}  /pub/runtime.sif\n")
 
 
+#: The one Slurm name every member of the fixture array runs under.
+ARRAY_NAME = "abl.sweep"
+
+
+def array_member(index: int, /, **changes: JSONValue) -> LedgerEntry:
+    """A recorded member of array 101, as array submission records it.
+
+    Its ledger name is the array's plus ``-shard<index>``, its experiment
+    records that suffix as ``member``, and its artifact is
+    ``/pub/out/shard-<index>.json``.
+
+    Args:
+        index: Its member number.
+        **changes: Alternate ledger fields.
+
+    Returns:
+        The decoded entry.
+    """
+    fields: JSONObject = {
+        "name": f"{ARRAY_NAME}-shard{index}",
+        "experiment": {"member": f"shard{index}"},
+        "artifact": f"/pub/out/shard-{index}.json",
+    }
+    fields.update(changes)
+    return entry(f"101_{index}", **fields)
+
+
+def serve_member(fake: FakeRun, value: LedgerEntry, data: bytes, **accounting: str) -> None:
+    """Serve one member's accounting row under the array's name, digest and instant.
+
+    Args:
+        fake: The remote-command seam.
+        value: The member.
+        data: Its artifact's bytes on the cluster.
+        **accounting: Accounting column replacements.
+    """
+    path = value["artifact"]
+    assert path is not None
+    columns = {"name": ARRAY_NAME, **accounting}
+    fake.add(f"-j {value['job_id']} ", stdout=accounting_row(value, **columns))
+    fake.add(f"sha256sum '{path}'", stdout=f"{sha256_hex(data)}  {path}\n")
+    fake.add(f"stat -c %Y -- {path}", stdout=str(INSTANT))
+
+
 __all__ = [
+    "ARRAY_NAME",
+    "array_member",
+    "serve_member",
     "CHECKSUMS",
     "END",
     "IMAGE",

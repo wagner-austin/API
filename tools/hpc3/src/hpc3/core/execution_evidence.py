@@ -103,7 +103,7 @@ def allocation_document(entry: LedgerEntry, cluster: ClusterFacts) -> JSONObject
     job = parse_sacct_row("|".join(values[: len(SACCT_FIELDS)]), cluster)
     if (job["job_id"], job["name"], job["partition"]) != (
         entry["job_id"],
-        entry["name"],
+        scheduled_name(entry),
         entry["partition"],
     ):
         raise ValueError("HPC_EVIDENCE_ACCOUNTING: allocation does not match ledger")
@@ -113,6 +113,35 @@ def allocation_document(entry: LedgerEntry, cluster: ClusterFacts) -> JSONObject
         "started_at": values[-2],
         "ended_at": values[-1],
     }
+
+
+def scheduled_name(entry: LedgerEntry) -> str:
+    """The job name Slurm records for a ledger entry.
+
+    A single job runs under its ledger name. Every member of an array runs
+    under the array's one name (:mod:`hpc3.core.array_sbatch`), which is the
+    member's ledger name without the ``-<member>`` suffix its experiment
+    records.
+
+    Args:
+        entry: A recorded submission or array member.
+
+    Returns:
+        The name its accounting row must carry.
+
+    Raises:
+        ValueError: HPC_EVIDENCE_ACCOUNTING for an array member whose
+            experiment records no member suffix, or whose ledger name does
+            not end with it.
+    """
+    if "_" not in entry["job_id"]:
+        return entry["name"]
+    if "member" not in entry["experiment"]:
+        raise ValueError("HPC_EVIDENCE_ACCOUNTING: array member records no member suffix")
+    suffix = "-" + entry["experiment"]["member"]
+    if not entry["name"].endswith(suffix):
+        raise ValueError("HPC_EVIDENCE_ACCOUNTING: array member's name lacks its member suffix")
+    return entry["name"].removesuffix(suffix)
 
 
 def accounting(entry: LedgerEntry, cluster: ClusterFacts) -> ExecutionEvidence:
@@ -300,4 +329,5 @@ __all__ = [
     "measure_inputs",
     "parse_checksums",
     "replay_report",
+    "scheduled_name",
 ]

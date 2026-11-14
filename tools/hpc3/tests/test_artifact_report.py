@@ -12,7 +12,7 @@ from hpc3.cli import artifact_report
 from hpc3.core import ledger
 from hpc3.core.digest import sha256_hex
 from tests.conftest import FakeRun, write_workspace
-from tests.execution_fixtures import INSTANT, accounting_row, entry
+from tests.execution_fixtures import array_member, serve_member
 from tests.wrds_board import TASK, accepting_board
 
 
@@ -31,12 +31,10 @@ def arguments(root: Path, fake: FakeRun, cluster_bytes: tuple[bytes, bytes]) -> 
     local = root / "local"
     local.mkdir()
     for index, data in enumerate(cluster_bytes):
-        value = entry(f"101_{index}", artifact=f"/pub/out/shard-{index}.json")
+        value = array_member(index)
         ledger.append(root / "ledger.jsonl", value)
         (local / f"shard-{index}.json").write_bytes(f"shard {index}".encode())
-        fake.add(f"-j {value['job_id']} ", stdout=accounting_row(value))
-        fake.add(f"sha256sum '/pub/out/shard-{index}.json'", stdout=f"{sha256_hex(data)}  x\n")
-        fake.add(f"stat -c %Y -- /pub/out/shard-{index}.json", stdout=str(INSTANT))
+        serve_member(fake, value, data)
     return [
         "--config",
         workspace,
