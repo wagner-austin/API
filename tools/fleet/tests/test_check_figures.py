@@ -21,7 +21,11 @@ from fleet.core.check_figures import (
 )
 from fleet.core.check_result import encode_check_result
 from fleet.core.check_results import RESULTS_DIGEST_MARKER, TOTALS_MARKER
+from fleet.core.run_registry import REGISTRY_MARKER, WORKING_TREE
 from fleet.core.run_summary import PhaseSeconds, RunSummary, phase_seconds
+
+#: The registry commit job fd836883's run recorded, newer than the one it was admitted under.
+EXECUTED = "e597ab7596641eb491d5b5042afb79cc87293e37"
 
 
 class TestTheCounts:
@@ -161,6 +165,7 @@ def test_the_result_carries_every_figure_the_tail_printed() -> None:
         "phases=install:1s,workspace-build:20s,check:30s\n"
         f"{RESULTS_DIGEST_MARKER}: {'e' * 64}\n"
         f'{TOTALS_MARKER}: {{"passed": 2385, "failed": 2, "skipped": 3}}\n'
+        f"{REGISTRY_MARKER}: {EXECUTED}\n"
     )
 
     assert encode_check_result(
@@ -196,7 +201,28 @@ def test_the_result_carries_every_figure_the_tail_printed() -> None:
         ],
         "failedCases": None,
         "transcriptPath": "/home/corvis/fleet/stage/logs/MCPs-fleet-mcp-lavender-1794578820.log",
+        "registryCommit": EXECUTED,
     }
+
+
+@pytest.mark.parametrize(
+    "registry_line",
+    [f"{REGISTRY_MARKER}: {WORKING_TREE}\n", ""],
+    ids=["a run from a working tree", "a run launched before the record"],
+)
+def test_a_run_naming_no_registry_commit_sends_none(registry_line: str) -> None:
+    """MCPs reuses no verdict whose recipe it cannot name (migration 975)."""
+    result = encode_check_result(
+        tail=f"=== ALL CHECKS PASSED ===\n{registry_line}",
+        run_id="MCPs-fleet-mcp-lavender-1794578820",
+        node="lavender",
+        started_unix=1757000000,
+        ended_unix=1757000060,
+        results_path="/home/corvis/fleet/stage/logs/MCPs-fleet-mcp-lavender-1794578820.results",
+        transcript_path="/home/corvis/fleet/stage/logs/MCPs-fleet-mcp-lavender-1794578820.log",
+    )
+
+    assert result["registryCommit"] is None
 
 
 def test_a_check_that_kept_no_report_sends_its_totals_unread() -> None:

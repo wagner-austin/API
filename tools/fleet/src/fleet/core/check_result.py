@@ -23,6 +23,13 @@ task d26709c0). A check that wrote no such file, one whose project's check
 runs no maketools lock or one stopped before its runners returned, sends
 them as ``None``, unread (MCPs migration 959), and the kept reports' path
 and digest let a reader find and verify them.
+
+The registry commit is the one the launch recorded beside the run
+(:func:`fleet.core.run_registry.read_registry`, MCPs board task 1fd01f09),
+which can be newer than the one the queue admitted the job under: MCPs
+matches check reuse on it (migration 975, board task 2b1e55de), so a run
+from a working tree or one launched before the record sends ``None`` and is
+never reused.
 """
 
 from __future__ import annotations
@@ -33,7 +40,8 @@ from platform_core.json_utils import JSONObject, JSONValue
 
 from fleet.core.check_figures import read_budget_reading, read_coverage_reading
 from fleet.core.check_results import read_failed_cases, read_results_digest, read_test_totals
-from fleet.core.run_summary import phase_seconds, read_run_summary
+from fleet.core.run_registry import WORKING_TREE, read_registry
+from fleet.core.run_summary import UNREAD, phase_seconds, read_run_summary
 from fleet.core.verdict import CHECK_BANNER
 
 
@@ -93,6 +101,7 @@ def encode_check_result(
     budget = read_budget_reading(tail)
     digest = read_results_digest(tail)
     failed_cases = read_failed_cases(tail)
+    registry = read_registry(tail)
     budget_value: JSONObject = (
         {"outcome": "unavailable"}
         if budget is None
@@ -129,6 +138,7 @@ def encode_check_result(
         "phases": phases_value,
         "failedCases": None if failed_cases is None else list[JSONValue](failed_cases),
         "transcriptPath": transcript_path,
+        "registryCommit": None if registry in (WORKING_TREE, UNREAD) else registry,
     }
 
 

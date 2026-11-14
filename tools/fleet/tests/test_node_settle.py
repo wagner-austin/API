@@ -246,6 +246,9 @@ class TestTheCloseCarriesTheTypedResult:
             "failedCases": failed_cases,
             # The path the verdict line names as log= (MCPs board task d9872e99).
             "transcriptPath": f"/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log",
+            # This tail prints no FLEET_REGISTRY line, so the run names no
+            # registry commit and MCPs never reuses its verdict (migration 975).
+            "registryCommit": None,
         }
 
 
