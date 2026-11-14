@@ -37,28 +37,44 @@ def arguments(root: Path, fake: FakeRun, cluster_bytes: tuple[bytes, bytes]) -> 
         fake.add(f"-j {value['job_id']} ", stdout=accounting_row(value))
         fake.add(f"sha256sum '/pub/out/shard-{index}.json'", stdout=f"{sha256_hex(data)}  x\n")
         fake.add(f"stat -c %Y -- /pub/out/shard-{index}.json", stdout=str(INSTANT))
-    return ["--config", workspace, "--array", "101", "--local-dir", str(local), "--report-task", TASK]
+    return [
+        "--config",
+        workspace,
+        "--array",
+        "101",
+        "--local-dir",
+        str(local),
+        "--report-task",
+        TASK,
+    ]
 
 
-def test_the_posted_report_is_the_measured_array(tmp_path: Path, fake_run: FakeRun, emitted: list[str]) -> None:
+def test_the_posted_report_is_the_measured_array(
+    tmp_path: Path, fake_run: FakeRun, emitted: list[str]
+) -> None:
     board = accepting_board(2)
     assert artifact_report.main(arguments(tmp_path, fake_run, (b"shard 0", b"shard 1"))) == 0
     report = narrow_json_to_dict(load_json_str(emitted[0]))
     assert (report["array"], report["local_dir"]) == ("101", str(tmp_path / "local"))
     members = [narrow_json_to_dict(item) for item in require_list(report, "members")]
     assert [member["job_id"] for member in members] == ["101_0", "101_1"]
-    assert [member["artifact_sha256"] for member in members] == [sha256_hex(b"shard 0"), sha256_hex(b"shard 1")]
+    assert [member["artifact_sha256"] for member in members] == [
+        sha256_hex(b"shard 0"),
+        sha256_hex(b"shard 1"),
+    ]
     assert sent_arguments(board.bodies[-1])["body"] == "HPC3 ARTIFACT LOAD-REPORT\n" + emitted[0]
 
 
 def test_a_differing_copy_posts_nothing(tmp_path: Path, fake_run: FakeRun) -> None:
     board = accepting_board(2)
-    with pytest.raises(AppError, match="shard-1.json"):
+    with pytest.raises(AppError, match=r"shard-1\.json"):
         artifact_report.main(arguments(tmp_path, fake_run, (b"shard 0", b"edited")))
     assert board.bodies == []
 
 
-def test_entrypoint_reads_process_arguments(tmp_path: Path, fake_run: FakeRun, argv: list[str]) -> None:
+def test_entrypoint_reads_process_arguments(
+    tmp_path: Path, fake_run: FakeRun, argv: list[str]
+) -> None:
     argv[:] = ["report", *arguments(tmp_path, fake_run, (b"shard 0", b"shard 1"))]
     accepting_board(2)
     with pytest.raises(SystemExit) as caught:

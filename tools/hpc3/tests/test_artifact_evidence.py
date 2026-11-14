@@ -1,4 +1,4 @@
-"""An array's artifacts are bound to completed allocations and to the local copies claimed for them."""
+"""An array's artifacts are bound to completed allocations and to the local copies claimed."""
 
 from __future__ import annotations
 
@@ -9,7 +9,12 @@ from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue, narrow_json_to_dict, require_dict, require_list
 
 from hpc3.contracts.ledger import LedgerEntry
-from hpc3.core.artifact_evidence import array_members, artifact_report, measure_member, require_artifact
+from hpc3.core.artifact_evidence import (
+    array_members,
+    artifact_report,
+    measure_member,
+    require_artifact,
+)
 from hpc3.core.digest import sha256_hex
 from tests.conftest import FakeRun, cluster
 from tests.execution_fixtures import END, IMAGE, INSTANT, START, accounting_row, entry
@@ -95,7 +100,8 @@ def test_a_member_is_its_accounting_digest_and_instant(fake_run: FakeRun, tmp_pa
     assert measured["artifact_mtime"] == INSTANT
     assert measured["local_path"] == str(local)
     accounting = require_dict(measured, "accounting")
-    assert (accounting["exit_code"], accounting["started_at"], accounting["ended_at"]) == ("0:0", START, END)
+    assert accounting["exit_code"] == "0:0"
+    assert (accounting["started_at"], accounting["ended_at"]) == (START, END)
 
 
 def test_a_local_copy_that_differs_is_refused(fake_run: FakeRun, tmp_path: Path) -> None:
@@ -103,13 +109,16 @@ def test_a_local_copy_that_differs_is_refused(fake_run: FakeRun, tmp_path: Path)
     local = tmp_path / "shard-0.json"
     local.write_bytes(b"edited")
     serve_member(fake_run, value, b"shard zero")
-    with pytest.raises(AppError, match="shard-0.json"):
+    with pytest.raises(AppError, match=r"shard-0\.json"):
         measure_member(value, "/pub/out/shard-0.json", cluster(), local)
 
 
 @pytest.mark.parametrize(
     ("changes", "code"),
-    [({"state": "FAILED"}, "HPC_EVIDENCE_ACCOUNTING"), ({"exit": "1:0"}, "HPC_EVIDENCE_ACCOUNTING")],
+    [
+        ({"state": "FAILED"}, "HPC_EVIDENCE_ACCOUNTING"),
+        ({"exit": "1:0"}, "HPC_EVIDENCE_ACCOUNTING"),
+    ],
 )
 def test_a_member_that_did_not_complete_cleanly_is_refused(
     fake_run: FakeRun, tmp_path: Path, changes: dict[str, str], code: str
@@ -121,7 +130,9 @@ def test_a_member_that_did_not_complete_cleanly_is_refused(
         measure_member(value, "/pub/out/shard-0.json", cluster(), tmp_path / "shard-0.json")
 
 
-def test_an_artifact_written_outside_its_allocation_is_refused(fake_run: FakeRun, tmp_path: Path) -> None:
+def test_an_artifact_written_outside_its_allocation_is_refused(
+    fake_run: FakeRun, tmp_path: Path
+) -> None:
     value = member(0)
     (tmp_path / "shard-0.json").write_bytes(b"shard zero")
     fake_run.add("stat -c %Y -- /pub/out/shard-0.json", stdout=str(INSTANT + 600), once=True)
@@ -130,7 +141,9 @@ def test_an_artifact_written_outside_its_allocation_is_refused(fake_run: FakeRun
         measure_member(value, "/pub/out/shard-0.json", cluster(), tmp_path / "shard-0.json")
 
 
-def test_the_report_measures_every_member_against_its_named_copy(fake_run: FakeRun, tmp_path: Path) -> None:
+def test_the_report_measures_every_member_against_its_named_copy(
+    fake_run: FakeRun, tmp_path: Path
+) -> None:
     members = [member(1), member(0)]
     for index, value in enumerate(sorted(members, key=lambda value: value["job_id"])):
         data = f"shard {index}".encode()

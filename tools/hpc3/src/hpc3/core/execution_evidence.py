@@ -89,7 +89,9 @@ def allocation_document(entry: LedgerEntry, cluster: ClusterFacts) -> JSONObject
         AppError: Remote command failure or malformed native fields.
     """
     if re.fullmatch(r"[0-9]+(?:_[0-9]+)?", entry["job_id"]) is None:
-        raise ValueError("HPC_EVIDENCE_ACCOUNTING: numeric allocation id, or array member <id>_<n>, required")
+        raise ValueError(
+            "HPC_EVIDENCE_ACCOUNTING: numeric allocation id, or array member <id>_<n>, required"
+        )
     fields = list(SACCT_FIELDS)
     fields[1] = "JobName%200"
     fields.extend(["ExitCode", "Start", "End"])
