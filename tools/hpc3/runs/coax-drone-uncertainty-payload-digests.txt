@@ -40,3 +40,15 @@ b16cdde264101da502cd8cb1aa58ae0541ee6d65127d5a5a8bae4a2d1739d8a3  coax-drone-unc
 # every runtime input, 2.4 kg dry mass included, does not.
 
 935042084af3439b826955355ae96e73a48c774e72f1c73e8f5967c8bf297e7b  coax-drone-uncertainty-payload-5d3a2c9.tar
+
+# The geared sweep for board task d0c514e0: two upper and two lower catalog
+# motors, gear ratios 1, 2 and 3, 4320 design points and 17288 cases. Recorded
+# 2026-11-14 the same way from coax-drone 893459e8c4e5708d6f81ad856d45f234760ec3a4
+# (calc/budget tree b8f4bd05bdc0c36533c29c149bf5003a2309b948, documents identity
+# 47b2a6b96652ecd4ade4974a276704107599363ae6c60b55a127ffd9c12758ef). Unlike the
+# earlier payloads this commit is not yet on origin: its committed uncertainty
+# tables are the previous model's, which only this sweep replaces, so it is
+# pushed with the shards; a rebase on the way may give it another sha, and the
+# calc/budget tree and documents identity are what the shards and origin share.
+
+932faf16972fd2de32a41fbf9592a098bbb2653e2dfdddcba62b2b0daf882a96  coax-drone-uncertainty-payload-893459e.tar
