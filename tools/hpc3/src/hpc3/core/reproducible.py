@@ -19,7 +19,7 @@ separate from two artifacts agreeing because the bytes are right.
 
 MEASURED BEFORE IT WAS WRITTEN. Across every ``*stage.json`` in
 ``tools/hpc3/runs`` on 2026-09-09 -- 363 files -- three violate this, all in
-one project, all with Windows-checkout digests against LF blobs. They are the
+one project, all with CRLF-checkout digests against LF blobs. They are the
 v2 training payload and both generation specs of ``code-style``. This check
 therefore lands REFUSING three files that are already on the cluster, which
 is the correct state: the digests are honest about a staging that happened,

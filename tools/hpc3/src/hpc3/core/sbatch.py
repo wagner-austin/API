@@ -358,8 +358,8 @@ def render_sbatch(spec: JobSpec, *, log_dir: str, charge_account: str) -> str:
             directive is correct.
 
     Returns:
-        The complete script text, LF-terminated. Written with LF regardless of
-        the authoring platform: a CRLF shebang makes the cluster's kernel
+        The complete script text, LF-terminated: a CRLF shebang makes the
+        cluster's kernel
         report the interpreter as missing, which reads as a broken image
         rather than a line-ending problem.
     """
