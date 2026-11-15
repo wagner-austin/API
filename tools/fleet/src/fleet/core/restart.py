@@ -5,7 +5,7 @@ task ccec3417). The Claude Code sessions live on the hub, in tmux panes
 reached over a loopback ssh hop, and ending one and resuming it on the
 installed build needs three things no container has: the session
 process's own environment (its ssh client port, which is how the pane is
-found), the WSL tmux server (which types the keystrokes), and the Windows
+found), the tmux server (which types the keystrokes), and the host's
 process table (which says when the old process is gone). So the job is
 enqueued from a container -- ``pc_session_restart`` -- and executed here,
 by the runner that already runs as the operator.

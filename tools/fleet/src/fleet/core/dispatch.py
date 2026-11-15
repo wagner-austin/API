@@ -22,10 +22,8 @@ WHY THE SUITE IS DETACHED FROM THE CONNECTION AND NOT RUN AS AN SSH CHILD.
 sshd sends the session's process group SIGHUP when the connection ends, so a
 suite started as a child of the dispatching ssh call dies when that call
 returns -- which is immediately, since the whole point is not to hold the
-connection for the duration of a build. The Windows nodes taught it first,
-whose OpenSSH put the session's tree in a job object for the same effect
-(``memory/reference_long_runs_need_task_scheduler.md``). So the build is a
-transient systemd unit.
+connection for the duration of a build. So the build is a transient
+systemd unit.
 
 The scripts that do the launching live in :mod:`fleet.core.dialect`, split
 out of here by role when this file crossed the 600-line ceiling. This module

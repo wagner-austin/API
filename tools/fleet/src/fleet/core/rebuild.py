@@ -19,8 +19,7 @@ reclaimable, and the next tick simply runs the idempotent make again.
 THE SUBMITTER'S LABEL TRAVELS AS A MAKE COMMAND-LINE VARIABLE, measured
 before it was trusted: ``make BOARD_AGENT_LABEL=<label> <target>`` exports
 the variable into recipe environments (probed 2026-09-11 with the parent
-environment explicitly unset, under the ``SHELL := powershell.exe`` the
-real Makefile uses). That is what stamps the fleet journal's ``agent``
+environment explicitly unset). That is what stamps the fleet journal's ``agent``
 field with the SUBMITTING session -- the ledger convention: rows name who
 asked for the work, and since MCPs e3b1baa3 the lock REFUSES an anonymous
 acquire, so an unlabelled invocation would not merely be untraceable, it

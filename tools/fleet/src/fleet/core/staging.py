@@ -1,9 +1,8 @@
 """Getting a project's working tree onto a node, verified before it is used.
 
 WHY TAR AND NOT rsync, OR git. Measured 2026-09-04: none of the three
-reachable nodes has ``rsync``, and all three have ``tar`` (Windows ships
-bsdtar). So the transport is a tar archive, which removes a dependency rather
-than adding one.
+reachable nodes has ``rsync``, and all three have ``tar``. So the transport
+is a tar archive, which removes a dependency rather than adding one.
 
 Git is the tempting alternative and is wrong here. Uncommitted work is the
 normal state in this repo -- the standing rule is to stay on main with no
