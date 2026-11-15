@@ -15,7 +15,7 @@ include = ["src/transcript_api/py.typed"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-fastapi = "^0.124"
+fastapi = "^0.163"
 hypercorn = "^0.18"
 typing-extensions = "^4.12.2"
 platform-core = { path = "../../libs/platform_core", develop = true }
