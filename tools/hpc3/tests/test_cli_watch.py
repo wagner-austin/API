@@ -384,13 +384,11 @@ class TestFollowMode:
     def test_the_default_sleep_hook_really_waits(self) -> None:
         """The production binding is a real wait, executed here against the
         clock -- everywhere else the suite swaps it, so without this the one
-        line production runs would be the one line nothing ever ran. The
-        floor sits under the request because Windows' timer granularity can
-        return a few milliseconds early."""
+        line production runs would be the one line nothing ever ran."""
         _test_hooks.reset_hooks()
         started = time.monotonic()
         _test_hooks.sleep(0.05)
-        assert time.monotonic() - started >= 0.03
+        assert time.monotonic() - started >= 0.05
 
     def test_the_wait_holds_while_a_requested_id_is_still_absent(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]

@@ -24,7 +24,6 @@ from hpc3.core.code_claim import (
     parse_probe,
     probe_command,
 )
-from tests.bash_discovery import posix_bash
 from tests.conftest import FakeRun
 
 _WALL_SECONDS = 60
@@ -96,7 +95,7 @@ class _History:
         """
         claim = CodeClaim(tree=self.repo.as_posix(), commit=commit)
         result = subprocess.run(
-            [posix_bash(), "-c", probe_command(claim)],
+            ["bash", "-c", probe_command(claim)],
             capture_output=True,
             text=True,
             check=True,
@@ -145,7 +144,7 @@ class TestTheProbeAgainstARealCheckout:
     def test_a_missing_checkout_makes_the_probe_itself_fail(self, tmp_path: pathlib.Path) -> None:
         claim = CodeClaim(tree=(tmp_path / "absent").as_posix(), commit="80221ea")
         result = subprocess.run(
-            [posix_bash(), "-c", probe_command(claim)],
+            ["bash", "-c", probe_command(claim)],
             capture_output=True,
             text=True,
             check=False,

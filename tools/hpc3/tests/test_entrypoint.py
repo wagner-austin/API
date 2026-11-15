@@ -39,7 +39,6 @@ from hpc3.core.entrypoint import (
 )
 from hpc3.core.preflight import preflight
 from tests.against_hpc3 import decode_job_spec, decode_sweep_spec
-from tests.bash_discovery import posix_bash
 from tests.conftest import FakeRun, cluster, gpus, image_reference
 from tests.healthy_cluster import (
     HEAD_COMMIT,
@@ -202,7 +201,7 @@ class TestTheProbeRunsForReal:
             The finished process.
         """
         return subprocess.run(
-            [posix_bash(), "-c", line],
+            ["bash", "-c", line],
             capture_output=True,
             text=True,
             check=False,

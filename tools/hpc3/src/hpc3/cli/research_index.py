@@ -25,7 +25,7 @@ from platform_core.cli_boundary import run_cli
 from hpc3.cli import _test_hooks
 from hpc3.cli._paths import index_path, runs_directory
 from hpc3.core import _test_hooks as core_hooks
-from hpc3.core.registry import declared_projects, read_document
+from hpc3.core.registry import declared_projects
 from hpc3.core.research_index import (
     REGENERATE_HINT,
     extract_projects_block,
@@ -123,7 +123,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     projects = declared_projects(runs_directory())
     block = render_projects_block(projects)
     path = index_path()
-    text = read_document(path)
+    text = core_hooks.read_bytes(path).decode("utf-8")
 
     markers = parse_review_markers(text)
     claims = (

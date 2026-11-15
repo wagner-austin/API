@@ -56,24 +56,6 @@ def workspace_filename(project: str) -> str:
     return f"{WORKSPACE_PREFIX}{project}{WORKSPACE_SUFFIX}"
 
 
-def read_document(path: pathlib.Path) -> str:
-    """Read a text document with its line endings normalised.
-
-    ``read_bytes`` is the package's file seam and does no newline
-    translation, unlike ``pathlib.read_text``. Git checks this repository out
-    with CRLF on Windows while the renderers emit LF, so a byte comparison
-    reported a document as stale whose every line was already correct -- a
-    false verdict that would have had someone rewrite a correct file.
-
-    Args:
-        path: The document.
-
-    Returns:
-        Its text, with CRLF collapsed to LF.
-    """
-    return _test_hooks.read_bytes(path).decode("utf-8").replace("\r\n", "\n")
-
-
 def workspace_documents(runs: pathlib.Path) -> dict[str, dict[str, JSONValue]]:
     """Load every workspace document in a directory.
 
@@ -88,7 +70,7 @@ def workspace_documents(runs: pathlib.Path) -> dict[str, dict[str, JSONValue]]:
     """
     loaded: dict[str, dict[str, JSONValue]] = {}
     for path in sorted(runs.glob(f"*{WORKSPACE_SUFFIX}")):
-        document = narrow_json_to_dict(load_json_str(read_document(path)))
+        document = narrow_json_to_dict(load_json_str(_test_hooks.read_bytes(path).decode("utf-8")))
         if "projects" in document:
             loaded[path.name] = document
     return loaded
@@ -162,7 +144,6 @@ __all__ = [
     "WORKSPACE_PREFIX",
     "WORKSPACE_SUFFIX",
     "declared_projects",
-    "read_document",
     "shared_connection",
     "workspace_documents",
     "workspace_filename",

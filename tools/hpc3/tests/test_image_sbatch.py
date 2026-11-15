@@ -8,7 +8,7 @@ message naming a cause the job never established.
 
 from __future__ import annotations
 
-import pathlib
+import shutil
 import subprocess
 
 import pytest
@@ -21,7 +21,6 @@ from hpc3.core.image_sbatch import (
     TMP_DIR,
     render_build_sbatch,
 )
-from tests.bash_discovery import bash_beside_git, is_wsl_launcher, posix_bash
 
 _SMOKE = "/opt/env/bin/python -m pkg.probe --device cpu --out /tmp/probe.json"
 
@@ -49,6 +48,19 @@ def _render(smoke_commands: list[str] | None = None) -> str:
         env_prefix="/opt/env",
         smoke_commands=[] if smoke_commands is None else smoke_commands,
     )
+
+
+def _bash() -> str:
+    """bash's absolute path, resolved from this process's PATH.
+
+    The scratch cases hand the child an environment holding only TMPDIR, and
+    an exec of a bare ``bash`` with no PATH searches ``/bin`` and ``/usr/bin``
+    alone, which on a NixOS node hold no bash: fleet job 8c02da6c on lacrymal
+    failed all three with ``No such file or directory: 'bash'``.
+    """
+    found = shutil.which("bash")
+    assert found is not None, "bash is required to execute the rendered scratch setup"
+    return found
 
 
 def _scratch_script() -> str:
@@ -126,7 +138,7 @@ class TestTheEnvironment:
 
     def test_scratch_paths_expand_on_the_node_and_preserve_spaces(self) -> None:
         result = subprocess.run(
-            [posix_bash(), "-c", _scratch_script()],
+            [_bash(), "-c", _scratch_script()],
             env={"TMPDIR": "/tmp/slurm job/123"},
             capture_output=True,
             check=True,
@@ -139,7 +151,7 @@ class TestTheEnvironment:
     @pytest.mark.parametrize("environment", [{}, {"TMPDIR": ""}])
     def test_missing_node_scratch_stops_before_exporting(self, environment: dict[str, str]) -> None:
         result = subprocess.run(
-            [posix_bash(), "-c", _scratch_script()],
+            [_bash(), "-c", _scratch_script()],
             env=environment,
             capture_output=True,
             check=False,
@@ -231,7 +243,7 @@ class TestSmokeCommands:
         announce = next(line for line in rendered.splitlines() if line.startswith("    echo '"))
 
         printed = subprocess.run(
-            [posix_bash(), "-c", announce.strip()],
+            ["bash", "-c", announce.strip()],
             capture_output=True,
             check=True,
         ).stdout.decode("utf-8")
@@ -245,7 +257,7 @@ class TestSmokeCommands:
         )
 
         printed = subprocess.run(
-            [posix_bash(), "-c", failure.strip().removesuffix(" >&2")],
+            ["bash", "-c", failure.strip().removesuffix(" >&2")],
             capture_output=True,
             check=True,
         ).stdout.decode("utf-8")
@@ -261,54 +273,6 @@ class TestSmokeCommands:
         assert "apptainer exec abl.sif /opt/env/bin/python -m" not in rendered
 
 
-class TestTheInterpreterIsChosenNotInherited:
-    """The six failures in this file that were being called flaky.
-
-    They resolved ``bash`` through an ambient PATH, so which program answered
-    depended on the shell that launched pytest: MSYS bash from Git Bash, and
-    ``C:\\Windows\\System32\\bash.exe`` -- the WSL launcher, not a shell --
-    from the PowerShell the Makefile uses. When the WSL service was down the
-    launcher exited 1 and six tests failed in a ``make check`` about something
-    else entirely.
-    """
-
-    def test_the_launcher_is_recognised(self) -> None:
-        assert is_wsl_launcher(r"C:\Windows\System32\bash.exe") is True
-
-    def test_a_difference_in_case_does_not_hide_it(self) -> None:
-        """Windows spells this directory both ways and means the same one."""
-        assert is_wsl_launcher(r"C:\WINDOWS\system32\bash.exe") is True
-
-    def test_the_32_bit_spelling_is_recognised_too(self) -> None:
-        """`make` recipes run in 32-bit PowerShell, which sees SysWOW64."""
-        assert is_wsl_launcher(r"C:\Windows\SysWOW64\bash.exe") is True
-
-    def test_a_real_shell_is_not_mistaken_for_it(self) -> None:
-        assert is_wsl_launcher(r"C:\Program Files\Git\usr\bin\bash.exe") is False
-        assert is_wsl_launcher("/usr/bin/bash") is False
-
-    def test_it_finds_the_bash_git_ships_two_directories_up(self, tmp_path: pathlib.Path) -> None:
-        """The step that matters from PowerShell, where excluding the launcher
-        leaves no bash on PATH at all."""
-        (tmp_path / "usr" / "bin").mkdir(parents=True)
-        (tmp_path / "usr" / "bin" / "bash.exe").write_bytes(b"")
-        found = bash_beside_git(str(tmp_path / "cmd" / "git.exe"))
-        assert found == str(tmp_path / "usr" / "bin" / "bash.exe")
-
-    def test_it_reports_none_when_no_bash_ships_beside_git(self, tmp_path: pathlib.Path) -> None:
-        """Which is the normal case off Windows, where the PATH search already
-        succeeded and this is never reached."""
-        assert bash_beside_git(str(tmp_path / "cmd" / "git.exe")) is None
-
-    def test_the_resolved_interpreter_is_not_the_launcher(self) -> None:
-        assert "system32" not in posix_bash().lower()
-
-    def test_the_resolved_interpreter_runs_a_script(self) -> None:
-        """The property every test below depends on, asserted once directly."""
-        result = subprocess.run([posix_bash(), "-c", "echo ok"], capture_output=True, check=True)
-        assert result.stdout.decode("utf-8").strip() == "ok"
-
-
 class TestItIsRunnableShell:
     """Asserting on rendered text cannot see a syntax error in it.
 
@@ -319,28 +283,9 @@ class TestItIsRunnableShell:
     """
 
     def _parse(self, rendered: str) -> subprocess.CompletedProcess[bytes]:
-        """Run the rendered script through bash's syntax checker.
-
-        Three details that each produced a wrong answer before being fixed:
-
-        The interpreter is RESOLVED, not looked up on PATH -- see
-        :func:`posix_bash`. This paragraph used to assert that "on Windows the
-        bash on PATH is MSYS", which is true of a Git Bash session and false
-        of the PowerShell one the Makefile runs pytest in, where the first
-        match is the WSL launcher.
-
-        The script is fed on stdin rather than written to a file and named on
-        the command line. MSYS bash rewrites a native path argument into
-        something it cannot open, so a path-based check returns 127 for every
-        input -- failing everything while looking like a working test.
-
-        The input is BYTES. With ``text=True`` Python translates ``\\n`` to
-        ``\\r\\n`` on the way in, bash reads ``then\\r`` instead of ``then``,
-        and every script is reported as a syntax error at its last line. The
-        script really is LF-only; the harness was corrupting it.
-        """
+        """Run the rendered script through bash's syntax checker, fed on stdin."""
         return subprocess.run(
-            [posix_bash(), "-n"],
+            ["bash", "-n"],
             input=rendered.encode("utf-8"),
             capture_output=True,
             check=False,

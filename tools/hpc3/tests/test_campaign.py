@@ -117,9 +117,7 @@ class TestAskingWhichArtifactsExist:
         assert _AZ in commands[0]
 
     def test_a_wide_campaign_chunks_below_the_argument_limit(self) -> None:
-        """A 136-member search round packed one ~10 KB command, past
-        cmd.exe's 8191-character limit on the Windows submitter -- the
-        command reached bash truncated and died mid-loop (vhsearch2-r0).
+        """A 136-member search round is split into commands under the cap.
         Order is preserved across chunks, and every path appears once."""
         artifacts = [f"/pub/wagnera3/rusted/runs/sweeps/wide/arm-s{i}.txt" for i in range(136)]
         commands = existence_commands(artifacts)

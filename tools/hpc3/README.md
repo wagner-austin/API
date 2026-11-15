@@ -443,11 +443,6 @@ inside it, writes `runs/hpc3-newcomer.json` and regenerates the research
 index's table from the workspace documents. Every unmet precondition is named
 in one refusal; nothing is written until every check has passed.
 
-From Git Bash, run it with `MSYS_NO_PATHCONV=1`: MSYS rewrites an argument
-that begins with `/` into a Windows path, so `--image /pub/wagnera3/…` reaches
-the cluster as `C:/Program Files/Git/pub/wagnera3/…` and the digest read
-fails (measured registering `cartridge-qa`, 2026-10-05).
-
 ---
 
 ## The workspace

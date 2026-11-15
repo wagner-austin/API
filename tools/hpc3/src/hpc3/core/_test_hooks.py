@@ -103,20 +103,12 @@ def _awaited(argv: Sequence[str], *, stdin_source: int | IO[bytes]) -> CommandRe
 def _default_run(argv: Sequence[str], *, stdin_bytes: bytes | None = None) -> CommandResult:
     """Real implementation running a command via subprocess.
 
-    THE PAYLOAD IS A FILE, NOT A PIPE, AND THE DEADLINE IS WHY. This used to
-    pass ``input=stdin_bytes``, which hands the payload over by WRITING IT
-    FROM THE CALLING THREAD before any ``timeout`` governs anything, so the
-    call reads as bounded and is not. Measured on Windows CPython 2026-09-24
-    against a child that never drains its pipe: 60 MB with ``timeout=5`` was
-    still blocked at 100 seconds (board task 1e57ebe5). Handing the child a
-    file it reads itself costs this thread nothing, so
-    :data:`CLUSTER_COMMAND_WALL_SECONDS` governs the whole call. Do not
-    reintroduce ``input=``: it restores the defect silently, and a suite whose
-    children all drain their pipes stays green through it.
+    THE PAYLOAD IS A FILE, NOT A PIPE. The child reads it itself, so this
+    thread writes nothing and :data:`CLUSTER_COMMAND_WALL_SECONDS` governs the
+    whole call (board task 1e57ebe5).
 
     A command with no payload gets a CLOSED stdin rather than this process's
-    own. Under a scheduled task an inherited stdin is a handle a remote shell
-    can wait on forever, which is the same stall by another route.
+    own, so a remote shell has no inherited handle to wait on.
 
     Args:
         argv: Executable and arguments.
@@ -198,10 +190,10 @@ def _default_file_exists(path: pathlib.Path) -> bool:
 def _default_write_text(path: pathlib.Path, text: str) -> None:
     """Write text to a file, replacing any existing contents.
 
-    Written with an explicit LF newline. A rendered definition or shell
-    script authored on Windows and translated to CRLF makes the cluster's
-    kernel report the interpreter as missing, which reads as a broken image
-    rather than a line-ending problem.
+    Written with an explicit LF newline: a rendered definition or shell
+    script with CRLF endings makes the cluster's kernel report the
+    interpreter as missing, which reads as a broken image rather than a
+    line-ending problem.
 
     Args:
         path: File to write. Its parent must already exist; creating it

@@ -39,7 +39,6 @@ def test_real_tree_records_readability_sizes_aliases_and_dangling_links(
     assert sum(record[0] == "file" for record in records) == 1
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="POSIX FIFO and effective permissions")
 def test_real_denied_directory_file_and_special_entry(tmp_path: pathlib.Path) -> None:
     denied = tmp_path / "denied"
     denied.mkdir()

@@ -129,17 +129,12 @@ def existence_commands(artifacts: Sequence[str]) -> tuple[str, ...]:
     Few commands rather than one per member: a campaign of thirty members
     over SSH is thirty round trips, each with its own chance to fail halfway
     and leave the plan built from a mixture of two moments. But not ONE
-    command either -- a 136-member search round packed one ~10 KB line, past
-    cmd.exe's 8191-character argument limit on the Windows submitter, so the
-    command reached bash TRUNCATED mid-loop and died on "unexpected end of
-    file" (vhsearch2-r0, 2026-09-02).
+    command either: a campaign's paths grow without bound, and the command is
+    one argument to ssh, held under :data:`~hpc3.core.remote.MAX_COMMAND_CHARS`.
 
     The split is :func:`~hpc3.core.remote.token_batches`, the same one every
-    id-list query here uses. It used to be a private count of sixty paths,
-    which was a guess about path length rather than a measurement of the line
-    -- and the identical guess, made separately for job ids, is what let
-    ``hpc3-triage`` build a 70 KB argv three days later. The QUOTED paths are
-    batched, because the quoted path is what the command carries.
+    id-list query here uses. The QUOTED paths are batched, because the quoted
+    path is what the command carries.
 
     Args:
         artifacts: Absolute cluster paths. Never empty -- an empty campaign

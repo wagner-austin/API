@@ -25,24 +25,13 @@ from platform_core.errors import AppError, Hpc3ErrorCode
 
 from hpc3.core import _test_hooks
 
-#: Longest remote command line this package will build out of a list. Not a
-#: Slurm limit and not an ssh limit: the cap is LOCAL, on the submitter, and it
-#: fires before anything reaches the cluster. Two have now been met here, at
-#: different sizes and wearing different disguises:
-#:
-#: * A 136-member campaign packed every artifact into one shell line, ~10 KB,
-#:   past cmd.exe's 8191-character argument limit. The command arrived at the
-#:   remote bash TRUNCATED and died on "unexpected end of file"
-#:   (vhsearch2-r0, 2026-09-02).
-#: * ``hpc3-triage`` asked accounting about every open ledger entry -- 6645
-#:   rows -- building a ~70 KB argv, past CreateProcess's 32767-character
-#:   limit. Python raised ``FileNotFoundError: [WinError 206] The filename or
-#:   extension is too long``, which names no command and so reads as a missing
-#:   executable rather than as an argument that outgrew its call (2026-09-05).
-#:
-#: 4000 sits under the lower of the two with room for the ssh argv around it,
-#: and is deliberately far from both: a query worth splitting at all is worth
-#: splitting well inside every limit it can meet.
+#: Longest remote command line this package will build out of a list. The cap
+#: is LOCAL, on the submitter: ssh is handed the whole remote command as one
+#: argument, and Linux refuses an argument past MAX_ARG_STRLEN (131072 bytes)
+#: before anything reaches the cluster, as ``hpc3-triage`` would have with
+#: every open ledger entry, 6645 rows, in one query. A list is therefore split
+#: into commands of at most this many characters, far inside that limit, so a
+#: query worth splitting at all is split well inside every limit it can meet.
 MAX_COMMAND_CHARS = 4000
 
 #: The ssh options every remote call carries. ``BatchMode`` turns a prompt

@@ -13,7 +13,6 @@ from hpc3.contracts.image import ImageReference, encode_image_reference
 from hpc3.core.image_exec import run_inside_image
 from hpc3.core.sbatch import payload_lines
 from tests._sbatch_support import spec
-from tests.bash_discovery import posix_bash
 
 
 @pytest.mark.parametrize("exit_code", [0, 7])
@@ -55,7 +54,7 @@ def test_shell_preserves_paths_removes_ambient_mounts_and_propagates_exit(
         rendered = "module() { return 0; }\n" + run_inside_image(image, "true")
         command = ["sh", "-c", "true"]
     result = subprocess.run(
-        [posix_bash(), "-c", rendered],
+        ["bash", "-c", rendered],
         cwd=tmp_path,
         env=environment,
         capture_output=True,

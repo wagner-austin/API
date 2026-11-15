@@ -48,7 +48,7 @@ from hpc3.contracts.workspace import (
 from hpc3.core import _test_hooks, remote
 from hpc3.core.digest import parse_remote_digest
 from hpc3.core.index_sections import REGISTERED_HEADING, projects_without_section, section_heading
-from hpc3.core.registry import declared_projects, read_document, workspace_filename
+from hpc3.core.registry import declared_projects, workspace_filename
 from hpc3.core.research_index import render_projects_block, replace_projects_block
 
 
@@ -73,7 +73,7 @@ def registration_problems(
     document = runs / workspace_filename(project)
     if _test_hooks.file_exists(document):
         problems.append(f"{document} already exists")
-    if projects_without_section(read_document(index), [project]) != []:
+    if projects_without_section(_test_hooks.read_bytes(index).decode("utf-8"), [project]) != []:
         problems.append(
             f"{index} has no section headed {section_heading(project)!r} under "
             f"{REGISTERED_HEADING!r}; write what {project!r} measures and what its "
@@ -207,9 +207,8 @@ def write_registration(
         runs / workspace_filename(project), dump_json_str(payload, indent=2) + "\n"
     )
     registry = declared_projects(runs)
-    _test_hooks.write_text(
-        index, replace_projects_block(read_document(index), render_projects_block(registry))
-    )
+    current = _test_hooks.read_bytes(index).decode("utf-8")
+    _test_hooks.write_text(index, replace_projects_block(current, render_projects_block(registry)))
     return registry
 
 
