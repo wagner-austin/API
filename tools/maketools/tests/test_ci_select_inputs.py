@@ -66,7 +66,7 @@ def test_a_package_reads_itself_its_dependencies_transitively_and_the_global_pat
     tmp_path: Path,
 ) -> None:
     assert _inputs(ci_repository(tmp_path, DECLARATION, PACKAGES)) == {
-        "apps/web":["apps/web/", "libs/base/", "libs/core/", *GLOBALS],
+        "apps/web": ["apps/web/", "libs/base/", "libs/core/", *GLOBALS],
         "clients/probe": ["clients/probe/", *GLOBALS],
         "libs/base": ["libs/base/", *GLOBALS],
         "libs/core": ["libs/base/", "libs/core/", *GLOBALS],

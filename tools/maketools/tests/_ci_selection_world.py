@@ -19,9 +19,7 @@ from typing import Final
 ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 
 
-def ci_repository(
-    repo: Path, declaration: str, packages: Mapping[str, Sequence[str]]
-) -> Path:
+def ci_repository(repo: Path, declaration: str, packages: Mapping[str, Sequence[str]]) -> Path:
     """Lay out a repository holding CI's selection and gated packages.
 
     Args:
