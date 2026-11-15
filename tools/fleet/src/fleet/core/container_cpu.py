@@ -87,14 +87,18 @@ def read_container_cpus(tail: str) -> str:
         :func:`container_cpus_none_line`; else ``unread`` (a build that runs
         no container lane, or one stopped before the line).
     """
-    last: str | None = None
-    for printed in re.finditer(rf"^{CONTAINER_CPUS_MARKER}: .+$", tail, re.MULTILINE):
-        last = printed.group(0)
+    pattern = (
+        f"^(?:{re.escape(container_cpus_none_line())}"
+        f"|{re.escape(container_cpus_line(''))}(?P<stated>.+))$"
+    )
+    last: re.Match[str] | None = None
+    for printed in re.finditer(pattern, tail, re.MULTILINE):
+        last = printed
     if last is None:
         return "unread"
-    if last == container_cpus_none_line():
+    stated = last.group("stated")
+    if stated is None:
         return "none"
-    stated = last.removeprefix(container_cpus_line(""))
     return ",".join(value.replace(" ", "/") for value in stated.split(","))
 
 

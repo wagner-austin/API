@@ -432,14 +432,14 @@ def read_run_pressure(tail: str, cgroups: tuple[PressureCgroup, ...]) -> str:
     printed = [line for line in tail.splitlines() if line.startswith(f"{PRESSURE_MARKER}: ")]
     if not printed:
         return "unread"
-    last = printed[-1]
     for measured in cgroups:
-        if last == pressure_none_line(measured):
-            return f"{measured['field']}:none"
         parts = pressure_line(measured, ("\n", "\n", "\n"), "\n").split("\n")
-        stalled = re.fullmatch(r"(\d+)".join(re.escape(part) for part in parts), last)
-        if stalled is not None:
-            cpu, io, memory, _ = stalled.groups()
+        stalled = r"(\d+)".join(re.escape(part) for part in parts)
+        read = re.fullmatch(f"{re.escape(pressure_none_line(measured))}|{stalled}", printed[-1])
+        if read is not None:
+            cpu, io, memory, _ = read.groups()
+            if cpu is None:
+                return f"{measured['field']}:none"
             return f"{measured['field']}:{cpu}s-cpu/{io}s-io/{memory}s-memory"
     return "unread"
 
