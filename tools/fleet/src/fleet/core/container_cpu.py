@@ -96,7 +96,7 @@ def read_container_cpus(tail: str) -> str:
     if last is None:
         return "unread"
     (stated,) = last.groups()
-    if stated is None:
+    if not isinstance(stated, str):
         return "none"
     return ",".join(value.replace(" ", "/") for value in stated.split(","))
 
