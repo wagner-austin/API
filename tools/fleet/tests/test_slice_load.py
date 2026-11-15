@@ -10,7 +10,6 @@ lavender's own: MCPs/execution-deploy's per-file lines from its 308 s run
 
 from __future__ import annotations
 
-import os
 import pathlib
 import subprocess
 import time
@@ -140,14 +139,12 @@ def _run(
             MeasuredSlice(name=measured["name"], cpu_stat=str(stat), field=measured["field"])
         )
     root = tmp_path / "cgroup"
-    environment = dict(os.environ)
+    tools = tmp_path / "bin"
+    tools.mkdir()
+    (tools / "systemctl").write_text(SYSTEMCTL, encoding="utf-8")
+    (tools / "systemctl").chmod(0o755)
     if lane:
         measured, directory = EXEC_LANE_CGROUP, LANE_MANAGER.removeprefix("/")
-        tools = tmp_path / "bin"
-        tools.mkdir()
-        (tools / "systemctl").write_text(SYSTEMCTL, encoding="utf-8")
-        (tools / "systemctl").chmod(0o755)
-        environment["PATH"] = f"{tools}:{environment['PATH']}"
     else:
         measured, directory = _check_cgroup(tmp_path, root)
     cgroup = root / directory
@@ -163,6 +160,7 @@ def _run(
         )
     script = "\n".join(
         [
+            f"PATH='{tools}':\"$PATH\"",
             "exec_uid=1001",
             *sh_slice_load_start_lines(tuple(slices), str(root), measured),
             *changes,
@@ -170,7 +168,7 @@ def _run(
         ]
     )
     started = int(time.time())
-    subprocess.run(["sh", "-eu", "-c", script], check=True, timeout=30, env=environment)
+    subprocess.run(["sh", "-eu", "-c", script], check=True, timeout=30)
     return log.read_text(encoding="utf-8"), range(int(time.time()) - started + 1)
 
 
