@@ -443,12 +443,7 @@ class TestCodeProvenance:
         assignment succeeds -- the generated script runs under ``set -u`` and
         an unset expansion downstream would abort it.
 
-        This asserts the emitted text, not a shell's behaviour on it. An
-        execution test was written and removed: on this host, ``bash``
-        resolves through a WSL interop shim in which command substitution
-        returns empty for a file the same shell can ``cat`` and ``wc -c``
-        successfully. Such a test could only be red forever or green for a
-        reason unrelated to the artifact.
+        This asserts the emitted text, not a shell's behaviour on it.
         """
         line = code_provenance_export(spec())
         assert "2>/dev/null" in line

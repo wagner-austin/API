@@ -55,7 +55,7 @@ def _repo_with_crlf_mismatch(tmp_path: pathlib.Path) -> pathlib.Path:
     """Build a repository whose working file differs from its committed blob.
 
     The file is COMMITTED with LF and then rewritten on disk with CRLF, which
-    is exactly the state a Windows checkout of an LF blob produces and exactly
+    is exactly the state a CRLF checkout of an LF blob produces and exactly
     the state that made three of this repository's staged digests
     unreproducible.
 
