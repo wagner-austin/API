@@ -256,8 +256,8 @@ def raise_if_deadline_passed(
     """Stop the watchdog, and raise when the exchange ran past its deadline.
 
     Called whether the exchange raised or returned: a shutdown ends a blocked
-    read with an error on Windows but as an ordinary end of stream on Linux,
-    where a body read to its close returns normally, cut short. Either way an
+    read as an end of stream, which the reader may report as an error or, for
+    a body read to its close, as a normal return, cut short. Either way an
     exchange the deadline ended never returns an answer.
 
     A :class:`TimeoutError` because callers already read every ``OSError``

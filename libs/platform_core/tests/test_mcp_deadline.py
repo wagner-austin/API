@@ -37,9 +37,9 @@ PEER_SECONDS: Final = 6
 #: Slack for thread scheduling between the deadline and the raise.
 SLACK_SECONDS: Final = 1.0
 
-#: What a peer's send meets once the client shut the connection: Windows
-#: reports an abort or a reset, Linux a broken pipe or a reset.
-HUNG_UP: Final = frozenset({"ConnectionAbortedError", "ConnectionResetError", "BrokenPipeError"})
+#: What a peer's send meets once the client shut the connection: a broken
+#: pipe, or a reset when the client's close found data it had not read.
+HUNG_UP: Final = frozenset({"ConnectionResetError", "BrokenPipeError"})
 
 
 def cut_short(url: str) -> str:
@@ -113,8 +113,8 @@ def broken_off(conn: socket.socket) -> None:
     """Promise a body, send a part of it, and end the stream cleanly at once.
 
     A half-close rather than a close, then waiting for the client to hang up,
-    so the client sees an end of stream on every platform; closing with the
-    request still buffered resets the connection on Windows instead.
+    so the client sees an end of stream; closing with the request still
+    unread in this socket's receive buffer resets the connection instead.
 
     Args:
         conn: The accepted connection.

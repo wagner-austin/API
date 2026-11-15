@@ -104,8 +104,8 @@ class Hpc3ErrorCode(ErrorCodeBase):
     # from the repository's copy of the same tracked path, the record is
     # accurate about what was staged and cannot be reproduced by anyone on
     # another checkout. Measured 2026-09-09 across every staging manifest in
-    # tools/hpc3/runs: three files, all with Windows CRLF digests against LF
-    # blobs. --expect-from cannot see it, because the manifest and the
+    # tools/hpc3/runs: three files, all with CRLF digests against LF blobs.
+    # --expect-from cannot see it, because the manifest and the
     # expected-digest record are both written from the same working tree and
     # agree with each other by construction.
     STAGE_SOURCE_NOT_REPRODUCIBLE = "STAGE_SOURCE_NOT_REPRODUCIBLE"
@@ -456,9 +456,8 @@ class MaketoolsErrorCode(ErrorCodeBase):
     USAGE = "MAKETOOLS_USAGE"
 
     # The process snapshot could not be taken or did not have the shape the
-    # reaper reads (PowerShell's CIM query exited non-zero, or ``/proc/stat``
-    # carried no ``btime``). The sweep that needed it does not run rather
-    # than running over an empty table and reporting nothing stale.
+    # reaper reads (``/proc/stat`` carried no ``btime``). The sweep that
+    # needed it does not run rather than running over an empty table and reporting nothing stale.
     PROCESS_TABLE = "MAKETOOLS_PROCESS_TABLE"
 
     # A recipe's prerequisite executable (``poetry``, ``uv``) is not on the

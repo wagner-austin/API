@@ -68,8 +68,9 @@ def test_open_in_browser_says_so_when_the_browser_did_not_open(tmp_path: Path) -
     The check review of audit ac5813df measured that an opener answering
     True whatever webbrowser.open said passed every case above (MCPs board
     task 41c0a997). webbrowser.open tries each registered browser in turn,
-    and on Windows the platform's own default is always among them, so a
-    failing browser registered here would fall through to a real one. So the
+    and the desktop's own openers (xdg-open, a browser on PATH) are among them
+    wherever one exists, so a failing browser registered here would fall
+    through to a real one. So the
     case runs in a child interpreter whose try order holds only a program
     that exits 1, and this process's webbrowser is left as it was.
     """

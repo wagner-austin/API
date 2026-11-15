@@ -25,7 +25,7 @@ bump on any other machine. Separating them keeps each measurement reusable.
 WHAT THE STDLIB PROBE CAN AND CANNOT DISTINGUISH, stated because an axis whose
 resolution is unstated will be trusted past it. :class:`HostRecord` carries the
 operating system and build, the instruction-set architecture, and the logical
-core count. It separates Windows from Linux, x86_64 from arm64, and an 8-core
+core count. It separates one kernel from another, x86_64 from arm64, and an 8-core
 box from a 24-core one. **It does not separate two x86_64 Linux machines of
 different CPU model**, because no stdlib call reports the model portably and
 this module will not grow a per-OS chain of readers to guess at one. A caller
@@ -59,9 +59,9 @@ class HostRecord(TypedDict):
     Attributes:
         platform: The operating system, release and build, as
             ``platform.platform()`` reports it, e.g.
-            ``"Windows-10-10.0.26200-SP0"``. Non-empty by construction.
+            ``"Linux-6.12.60-x86_64-with-glibc2.40"``. Non-empty by construction.
         machine: The instruction-set architecture, as ``platform.machine()``
-            reports it, e.g. ``"AMD64"`` or ``"x86_64"``. Recorded separately
+            reports it, e.g. ``"x86_64"`` or ``"aarch64"``. Recorded separately
             from the platform string because a numeric wheel is built per
             architecture, and that is the axis that decides which kernels the
             run had available. Non-empty by construction.

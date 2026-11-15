@@ -172,10 +172,8 @@ class FleetErrorCode(ErrorCodeBase):
     # Dispatch and its record.
     DISPATCH_FAILED = "DISPATCH_FAILED"
     # Distinct from DISPATCH_FAILED, which is work that ran and exited
-    # non-zero. This is work that never started: on 2026-09-04 a scheduled
-    # task registered cleanly, `Start-ScheduledTask` failed with a
-    # non-terminating error, PowerShell exited 0, and the ledger recorded a
-    # run that did not exist.
+    # non-zero. This is work that never started: a launch reported success
+    # while nothing ran, and the ledger recorded a run that did not exist.
     DISPATCH_NOT_LAUNCHED = "DISPATCH_NOT_LAUNCHED"
     # An unstarted claim two live runs could be; refused, never guessed (MCPs task 5a4f9b3e).
     DISPATCH_CLAIM_AMBIGUOUS = "DISPATCH_CLAIM_AMBIGUOUS"

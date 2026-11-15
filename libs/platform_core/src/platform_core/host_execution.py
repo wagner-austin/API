@@ -1,9 +1,9 @@
 """Host-execution runs: cases that execute on a real host, and a run that proves they did.
 
 Board task 465689f5, rule R3 of b6eb30c8. Some cases in a package run what
-the package ships against the real thing it touches: rendered PowerShell on
-a Windows node, sh on a Linux node, a docker build under a node's rootless
-daemon, or an ssh session to a cluster. Each is bound by a marker to the
+the package ships against the real thing it touches: rendered sh on a
+node, a docker build under a node's rootless daemon, or an ssh session to a
+cluster. Each is bound by a marker to the
 CAPABILITY it needs, and a package's suite runs in one of two ways:
 
 - The ORDINARY run (``make check``) skips a case whose capability this run
