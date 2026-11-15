@@ -2,8 +2,9 @@
 
 The review pass gathers a PASSED check for every repository a closure
 touches, and a repository whose check can run only on a workstation shows as
-FAILED there. hardware-wiki's, metabolomics-dashboard's, chat's and
-corvis-stick's checks run MCPs' published maketools, which reads ``../MCPs``
+FAILED there. hardware-wiki's, tech-wiki's (MCPs board task 4558ee91),
+metabolomics-dashboard's, chat's and corvis-stick's checks run MCPs'
+published maketools, which reads ``../MCPs``
 at ``origin/main``, so each
 carries MCPs as a companion at ``main``: the fleet clones it beside the export
 with ``origin/main`` at its real commit (fleet.core.stage_repository,
@@ -58,6 +59,7 @@ MCPS_COMPANION = ProjectCompanion(
         ),
         ("chat", (), (NPM_CI,), (MCPS_COMPANION,)),
         ("hardware-wiki", (), (), (MCPS_COMPANION,)),
+        ("tech-wiki", (), (), (MCPS_COMPANION,)),
         ("metabolomics-dashboard", (), (), (MCPS_COMPANION,)),
         ("corvis-stick", (NodeTag.LINUX,), (NPM_CI,), (MCPS_COMPANION,)),
         ("tree-bot", (), (), ()),
