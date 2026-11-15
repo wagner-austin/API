@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from monorepo_guards.httpx_rules import HttpxRule
+from monorepo_guards.httpx_rules import HTTP_CLIENT_MODULES, HttpxRule
 
 
 def _write(path: Path, text: str) -> None:
@@ -12,9 +12,14 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def test_httpx_rule_flags_direct_import(tmp_path: Path) -> None:
+def test_the_guarded_clients_are_httpx2_and_the_httpx_it_replaced() -> None:
+    assert frozenset({"httpx2", "httpx"}) == HTTP_CLIENT_MODULES
+
+
+@pytest.mark.parametrize("module", ["httpx2", "httpx", "httpx2._client"])
+def test_httpx_rule_flags_direct_import(tmp_path: Path, module: str) -> None:
     bad = tmp_path / "services" / "demo" / "api.py"
-    _write(bad, "import httpx\n\ndef fetch(): pass\n")
+    _write(bad, f"import {module}\n\ndef fetch(): pass\n")
 
     rule = HttpxRule()
     violations = rule.run([bad])
@@ -22,11 +27,13 @@ def test_httpx_rule_flags_direct_import(tmp_path: Path) -> None:
     v = violations[0]
     assert v.kind == "httpx-direct-import"
     assert v.file == bad
+    assert v.line == f"import {module}"
 
 
-def test_httpx_rule_flags_from_import(tmp_path: Path) -> None:
+@pytest.mark.parametrize("module", ["httpx2", "httpx", "httpx2._models"])
+def test_httpx_rule_flags_from_import(tmp_path: Path, module: str) -> None:
     bad = tmp_path / "services" / "demo" / "client.py"
-    _write(bad, "from httpx import Client\n\ndef fetch(): pass\n")
+    _write(bad, f"from {module} import Client\n\ndef fetch(): pass\n")
 
     rule = HttpxRule()
     violations = rule.run([bad])
@@ -34,12 +41,13 @@ def test_httpx_rule_flags_from_import(tmp_path: Path) -> None:
     v = violations[0]
     assert v.kind == "httpx-direct-import"
     assert v.file == bad
+    assert v.line == f"from {module} import ..."
 
 
 def test_httpx_rule_flags_the_retired_canonical_path(tmp_path: Path) -> None:
     """The data-bank client's old path earns no exemption now it is gone."""
     retired = tmp_path / "libs" / "platform_core" / "src" / "platform_core" / "data_bank_client.py"
-    _write(retired, "import httpx\n\nclass DataBankClient: pass\n")
+    _write(retired, "import httpx2\n\nclass DataBankClient: pass\n")
 
     rule = HttpxRule()
     violations = rule.run([retired])
@@ -48,7 +56,7 @@ def test_httpx_rule_flags_the_retired_canonical_path(tmp_path: Path) -> None:
 
 def test_httpx_rule_allows_test_files(tmp_path: Path) -> None:
     test_file = tmp_path / "services" / "demo" / "tests" / "test_api.py"
-    _write(test_file, "import httpx\n\ndef test_something(): pass\n")
+    _write(test_file, "import httpx2\n\ndef test_something(): pass\n")
 
     rule = HttpxRule()
     violations = rule.run([test_file])
@@ -57,7 +65,7 @@ def test_httpx_rule_allows_test_files(tmp_path: Path) -> None:
 
 def test_httpx_rule_allows_scripts(tmp_path: Path) -> None:
     script_file = tmp_path / "services" / "demo" / "scripts" / "run.py"
-    _write(script_file, "import httpx\n\ndef main(): pass\n")
+    _write(script_file, "import httpx2\n\ndef main(): pass\n")
 
     rule = HttpxRule()
     violations = rule.run([script_file])
@@ -65,8 +73,13 @@ def test_httpx_rule_allows_scripts(tmp_path: Path) -> None:
 
 
 def test_httpx_rule_allows_non_httpx_imports(tmp_path: Path) -> None:
+    """A module whose name only starts with a client's name is another package."""
     ok = tmp_path / "services" / "demo" / "api.py"
-    _write(ok, "import json\nfrom platform_core.http_client import HttpxClient\n")
+    _write(
+        ok,
+        "import json\nimport httpx2_extras\nfrom httpxlike import Client\n"
+        "from platform_core.http_client import HttpxClient\n",
+    )
 
     rule = HttpxRule()
     violations = rule.run([ok])
@@ -86,12 +99,12 @@ def test_httpx_rule_ignores_relative_imports(tmp_path: Path) -> None:
 def test_httpx_rule_allows_every_hook_module(tmp_path: Path, filename: str) -> None:
     """A hook module may name the transport types it injects.
 
-    A Protocol that cannot mention ``httpx.Response`` cannot match the real
+    A Protocol that cannot mention ``httpx2.Response`` cannot match the real
     signature, so the exemption covers the hook module however it is divided —
     contracts and production implementations included.
     """
     hooks_file = tmp_path / "services" / "demo" / "src" / "demo" / filename
-    _write(hooks_file, "import httpx\n\ndef make_client(): pass\n")
+    _write(hooks_file, "import httpx2\n\ndef make_client(): pass\n")
 
     rule = HttpxRule()
     violations = rule.run([hooks_file])
@@ -101,7 +114,7 @@ def test_httpx_rule_allows_every_hook_module(tmp_path: Path, filename: str) -> N
 def test_httpx_rule_still_refuses_an_ordinary_module(tmp_path: Path) -> None:
     """The exemption is by module, not by proximity to one."""
     ordinary = tmp_path / "services" / "demo" / "src" / "demo" / "hooks_helper.py"
-    _write(ordinary, "import httpx\n\ndef make_client(): pass\n")
+    _write(ordinary, "import httpx2\n\ndef make_client(): pass\n")
 
     rule = HttpxRule()
     violations = rule.run([ordinary])

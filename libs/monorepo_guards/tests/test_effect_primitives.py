@@ -76,7 +76,7 @@ class TestPrimitiveTable:
             "subprocess.CompletedProcess",
             "subprocess.CalledProcessError",
             "aiohttp.web.Response",
-            "httpx.Timeout",
+            "httpx2.Timeout",
             "socket.gethostname",
             "subprocess",
         ):

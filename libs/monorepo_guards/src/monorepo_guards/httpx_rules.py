@@ -2,14 +2,24 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, Final
 
 from monorepo_guards import Violation
 from monorepo_guards.util import module_nodes, parse_source
 
+#: The HTTP client packages a module may import only in a hook module:
+#: httpx2, the client this workspace builds on, and httpx, the package it
+#: replaced on 2026-11-15, which no package may bring back beside it.
+HTTP_CLIENT_MODULES: Final[frozenset[str]] = frozenset({"httpx2", "httpx"})
+
+
+def _names_http_client(module: str) -> bool:
+    """Whether a dotted module path is an HTTP client package or inside one."""
+    return module.partition(".")[0] in HTTP_CLIENT_MODULES
+
 
 class HttpxRule:
-    """Prevent direct httpx imports outside a dependency-injection hook module.
+    """Prevent direct HTTP client imports outside a dependency-injection hook module.
 
     A module that talks HTTP takes its transport through its package's hooks,
     so a test can drive the real code against a fake transport and every
@@ -42,7 +52,7 @@ class HttpxRule:
     def _check_import_node(self, path: Path, node: ast.Import) -> list[Violation]:
         violations: list[Violation] = []
         for alias in node.names:
-            if alias.name == "httpx" or alias.name.startswith("httpx."):
+            if _names_http_client(alias.name):
                 violations.append(
                     Violation(
                         file=path,
@@ -56,7 +66,7 @@ class HttpxRule:
     def _check_import_from_node(self, path: Path, node: ast.ImportFrom) -> list[Violation]:
         if node.module is None:
             return []
-        if node.module == "httpx" or node.module.startswith("httpx."):
+        if _names_http_client(node.module):
             return [
                 Violation(
                     file=path,
