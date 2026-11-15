@@ -17,7 +17,7 @@ include = ["src/platform_devpost/py.typed"]
 python = "^3.11"
 platform-core = { path = "../platform_core", develop = true }
 platform-codebase = { path = "../platform_codebase", develop = true }
-httpx = "^0.28.0"
+httpx2 = "^2.16"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.1.1"

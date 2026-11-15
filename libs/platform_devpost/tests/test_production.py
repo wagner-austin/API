@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import httpx
+import httpx2
 from platform_core.http_client import HttpxClient, SyncTransport, build_client
 
 from platform_devpost._production import (
@@ -15,10 +15,10 @@ from platform_devpost._production import (
 from platform_devpost.testing import FakeDevpostApi, hooks, make_fake_hackathon
 
 
-class FakeHttpTransport(httpx.BaseTransport):
+class FakeHttpTransport(httpx2.BaseTransport):
     """Fake HTTP transport for testing.
 
-    Extends httpx.BaseTransport to properly implement the transport interface.
+    Extends httpx2.BaseTransport to properly implement the transport interface.
     """
 
     def __init__(self, response_text: str, status_code: int = 200) -> None:
@@ -30,19 +30,19 @@ class FakeHttpTransport(httpx.BaseTransport):
         """
         self._response_text = response_text
         self._status_code = status_code
-        self._requests: list[httpx.Request] = []
+        self._requests: list[httpx2.Request] = []
 
-    def handle_request(self, request: httpx.Request) -> httpx.Response:
+    def handle_request(self, request: httpx2.Request) -> httpx2.Response:
         """Handle HTTP request.
 
         Args:
-            request: The httpx request object.
+            request: The httpx2 request object.
 
         Returns:
-            httpx.Response with configured response.
+            httpx2.Response with configured response.
         """
         self._requests.append(request)
-        return httpx.Response(
+        return httpx2.Response(
             status_code=self._status_code,
             content=self._response_text.encode(),
             request=request,

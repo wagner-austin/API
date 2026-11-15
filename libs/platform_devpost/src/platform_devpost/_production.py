@@ -53,7 +53,7 @@ DEFAULT_TIMEOUT_SECONDS = 30.0
 class _HttpDevpostApi:
     """Production HTTP-based Devpost API.
 
-    This class fetches hackathon data from the Devpost API using httpx.
+    This class fetches hackathon data from the Devpost API using httpx2.
     """
 
     __slots__ = ("_client",)
@@ -78,7 +78,7 @@ class _HttpDevpostApi:
             HackathonListResponse with hackathons and metadata.
 
         Raises:
-            httpx.HTTPStatusError: If the request fails.
+            httpx2.HTTPStatusError: If the request fails.
         """
         params: dict[str, str | int] = {"page": page}
         if search is not None:
