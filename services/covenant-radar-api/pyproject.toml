@@ -38,6 +38,13 @@ confluent-kafka = "^2.16.1"
 
 google-genai = "^3.3"
 
+# torch comes from the pytorch-cuda index, as covenant_nn and platform_ml
+# declare it. Poetry reads only the root project's sources, so without this
+# line a relock may take PyPI's build instead, which CI's runner could not
+# load (libnccl.so.2 missing, run 43700695596 at 1a7d87bd5). Its triton
+# installs below Python 3.15, the same bound ddtrace carries above.
+torch = { version = "^2.11.0", source = "pytorch-cuda", python = "^3.11,<3.15" }
+
 platform-core = { path = "../../libs/platform_core", develop = true }
 platform-workers = { path = "../../libs/platform_workers", develop = true }
 covenant-domain = { path = "../../libs/covenant_domain", develop = true }
