@@ -2,7 +2,7 @@
 
 This module provides ddtrace configuration for:
 - FastAPI request lifecycle tracing
-- Outbound HTTP call tracing (httpx)
+- Outbound HTTP call tracing (httpx2)
 - Redis operation tracing
 - Log correlation with trace IDs
 
@@ -83,7 +83,7 @@ def setup_datadog_tracing(
 
     The tracing setup:
     1. Sets service, env, version tags for all traces
-    2. Patches common libraries (FastAPI, httpx, redis, logging)
+    2. Patches common libraries (FastAPI, httpx2, redis, logging)
     3. Enables trace ID correlation in logs
 
     Args:

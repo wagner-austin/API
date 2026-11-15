@@ -61,7 +61,7 @@ APM tracing setup and state management:
 | Library | What's Traced |
 |---------|---------------|
 | FastAPI | Request lifecycle, route handlers |
-| httpx | Outbound HTTP calls |
+| httpx2 | Outbound HTTP calls |
 | redis | Redis operations |
 | logging | Log correlation with trace IDs |
 

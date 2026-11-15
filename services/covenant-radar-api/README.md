@@ -381,7 +381,7 @@ RQ heartbeats for the worker.
 ## Dependencies
 
 Direct runtime dependencies, as declared in `pyproject.toml`: `fastapi`,
-`hypercorn`, `redis`, `rq`, `psycopg[binary,pool]`, `httpx`, `xgboost`,
+`hypercorn`, `redis`, `rq`, `psycopg[binary,pool]`, `httpx2`, `xgboost`,
 `scikit-learn`, `numpy`, `rich`, `confluent-kafka`, `ddtrace`, `datadog`,
 `google-genai`, `openpyxl`, `xlrd`, plus the workspace libs `platform-core`,
 `platform-workers`, `covenant-domain`, `covenant-persistence`, `covenant-ml`

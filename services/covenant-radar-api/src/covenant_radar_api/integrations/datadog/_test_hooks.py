@@ -250,7 +250,7 @@ def _real_tracing_setup(
     # Using patch() instead of deprecated patch_all()
     patch(
         fastapi=True,
-        httpx=True,
+        httpx2=True,
         redis=True,
         logging=True,
     )
