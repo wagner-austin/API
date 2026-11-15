@@ -88,15 +88,14 @@ def read_container_cpus(tail: str) -> str:
         no container lane, or one stopped before the line).
     """
     pattern = (
-        f"^(?:{re.escape(container_cpus_none_line())}"
-        f"|{re.escape(container_cpus_line(''))}(?P<stated>.+))$"
+        f"^(?:{re.escape(container_cpus_none_line())}|{re.escape(container_cpus_line(''))}(.+))$"
     )
     last: re.Match[str] | None = None
     for printed in re.finditer(pattern, tail, re.MULTILINE):
         last = printed
     if last is None:
         return "unread"
-    stated = last.group("stated")
+    (stated,) = last.groups()
     if stated is None:
         return "none"
     return ",".join(value.replace(" ", "/") for value in stated.split(","))
