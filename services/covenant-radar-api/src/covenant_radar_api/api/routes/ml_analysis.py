@@ -137,7 +137,7 @@ def _register_optimize(router: APIRouter, get_container: ContainerProtocol) -> N
             description=f"{parsed['backend']} hyperparameter optimization with Optuna TPE",
         )
 
-        response = OptimizeResponse(job_id=job.get_id(), status="queued")
+        response = OptimizeResponse(job_id=job.id, status="queued")
         body: dict[str, JSONValue] = {"job_id": response["job_id"], "status": response["status"]}
         return Response(
             content=dump_json_str(body),
@@ -211,7 +211,7 @@ def _register_optimize_regression(router: APIRouter, get_container: ContainerPro
             description=f"{parsed['backend']} regression HPO with Optuna TPE",
         )
 
-        response = OptimizeResponse(job_id=job.get_id(), status="queued")
+        response = OptimizeResponse(job_id=job.id, status="queued")
         body: dict[str, JSONValue] = {"job_id": response["job_id"], "status": response["status"]}
         return Response(
             content=dump_json_str(body),
@@ -275,7 +275,7 @@ def _register_explain(router: APIRouter, get_container: ContainerProtocol) -> No
             description=f"Feature importance explanation ({parsed['explainer']})",
         )
 
-        response = ExplainResponse(job_id=job.get_id(), status="queued")
+        response = ExplainResponse(job_id=job.id, status="queued")
         body: dict[str, JSONValue] = {"job_id": response["job_id"], "status": response["status"]}
         return Response(
             content=dump_json_str(body),
@@ -531,7 +531,7 @@ def _register_explain_regression(
         )
 
         response = RegressionExplainResponse(
-            job_id=job.get_id(),
+            job_id=job.id,
             status="queued",
         )
         body: dict[str, JSONValue] = {

@@ -147,8 +147,7 @@ def test_container_rq_queue_returns_queue(
 
     # Test that we can enqueue a job
     job = queue.enqueue("test_func", "arg1", "arg2")
-    # FakeQueue returns a job-like object with get_id method
-    assert job.get_id() == "test-job-id"
+    assert job.id == "test-job-id"
 
 
 def test_container_get_model_info_returns_info(

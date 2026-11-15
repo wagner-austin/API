@@ -222,7 +222,7 @@ def _register_train(router: APIRouter, get_container: ContainerProtocol) -> None
             description="Covenant ML model training",
         )
 
-        response = TrainResponse(job_id=job.get_id(), status="queued")
+        response = TrainResponse(job_id=job.id, status="queued")
         body: dict[str, JSONValue] = {"job_id": response["job_id"], "status": response["status"]}
         return Response(
             content=dump_json_str(body),
@@ -275,7 +275,7 @@ def _register_train_external(router: APIRouter, get_container: ContainerProtocol
             description="External data ML training with automatic feature selection",
         )
 
-        body: dict[str, JSONValue] = {"job_id": job.get_id(), "status": "queued"}
+        body: dict[str, JSONValue] = {"job_id": job.id, "status": "queued"}
         return Response(
             content=dump_json_str(body),
             media_type="application/json",
@@ -356,7 +356,7 @@ def _register_train_external_regression(
         )
 
         body: dict[str, JSONValue] = {
-            "job_id": job.get_id(),
+            "job_id": job.id,
             "status": "queued",
         }
         return Response(
