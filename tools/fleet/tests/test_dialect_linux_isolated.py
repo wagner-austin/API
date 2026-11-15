@@ -28,6 +28,7 @@ from fleet.contracts.source import InstallStep
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.toolchain import REQUIRED_PYTHON
 from fleet.core import dialect, names, recipe, tool_caches
+from fleet.core.container_cpu import sh_container_cpu_lines
 from fleet.core.dialect import PROLOGUE
 from fleet.core.linux_isolated_build import (
     EXEC_HOME_LINE,
@@ -206,6 +207,7 @@ class TestIsolatedText:
         lines = _isolated().splitlines()
         slice_load = [
             *sh_slice_load_end_lines(MEASURED_SLICES, names.log_path(TARGET), EXEC_LANE_CGROUP),
+            *sh_container_cpu_lines(names.log_path(TARGET)),
             *sh_vm_test_lines(names.log_path(TARGET)),
             *sh_artifact_lines(
                 log=names.log_path(TARGET),
