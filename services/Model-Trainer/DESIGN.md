@@ -290,7 +290,7 @@ Benefits:
 
 **Output:**
 - Stdout (JSON or text format based on config).
-- Third-party libs silenced (urllib3, httpx at WARNING level).
+- Third-party libs silenced at WARNING level (platform_core.logging.QUIETED_LOGGERS: urllib3, httpx2, httpcore2, optuna).
 
 **Logging Policy:**
 - No prints in code; only logger calls.

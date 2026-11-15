@@ -20,7 +20,7 @@ priority = "explicit"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-fastapi = "^0.124"
+fastapi = "^0.163"
 hypercorn = "^0.18"
 redis = "^7.1"
 rq = "^2.3"
@@ -29,7 +29,7 @@ typing-extensions = "^4.12.2"
 transformers = "^4.45.0"
 datasets = "^3.0.1"
 tokenizers = "^0.20.0"
-httpx = "^0.28"
+httpx2 = "^2.16"
 sentencepiece = "^0.2.1"
 torch = {version = "^2.5", source = "pytorch-cu124"}
 peft = "^0.14.0"
