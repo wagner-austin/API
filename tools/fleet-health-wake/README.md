@@ -82,7 +82,7 @@ One cycle, then exit. The interval belongs to the pump
 (`tools/hpc-wake/scripts/run_cycle.py`, PUBLISHERS table); this package
 registers no scheduled task of its own, per the pump's rule.
 
-Environment, exported where the pump runs (`tools/hpc-wake/runs/env.ps1`):
+Environment, read where the pump runs (`tools/hpc-wake/runs/credentials.env`):
 
 ```
 TASKBOARD_MCP_API_KEY       taskboard-mcp's own x-api-key
