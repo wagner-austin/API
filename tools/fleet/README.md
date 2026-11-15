@@ -539,8 +539,7 @@ when a job naming this node or no node has arrived since its last fill, or
 the watch has settled a run since then: the same fill pass, so a claim still
 goes through the probe, the tags, the leases and the owner reservation. At
 each fire boundary, a multiple of 180 s since the epoch
-because the MCPs hub runner fires each tick there, as the scheduled tasks it
-replaced did from local midnight every 3 minutes, it runs the collect pass again, which renews every running
+because the MCPs hub runner fires each tick there, it runs the collect pass again, which renews every running
 job's queue lease as each start did. It hands over only 10 s before a
 boundary and only while no settle is under way, once it has served
 `node_serve_seconds` (1200 in `registry/settings.json`, at most 1800 so a drain ends
@@ -1214,8 +1213,8 @@ said once, in its file, and decides both what the audit expects and whether
 work may be sent there. Then re-run the host-side `fleet-audit` on the hub:
 the corvis `fleet_*` tools serve a stored snapshot and probe nothing (a
 container on the compose network has no route to a 100.x address), so until
-the audit re-runs they keep reporting the old state and are not wrong to. A
-scheduled task also runs it every twenty minutes.
+the audit re-runs they keep reporting the old state and are not wrong to. The
+MCPs hub runner's `fleet-audit` row also runs it every twenty minutes.
 
 **A time-bound disable goes in `disabledUntil`, never in `notes`.** A date in
 prose has no reader: loki's note said "re-enable on 2026-09-08", and on
@@ -1248,8 +1247,8 @@ field with the Windows platform; MCPs `fleet-mcp` still decodes `guest`.
 **`boot` is what a machine must bring back after a reboot** beyond sshd and
 Tailscale, which the audit holds every owned machine to without a
 declaration (MCPs `fleet-mcp/src/standard-boot.ts`, board task ebc80a03).
-Each unit is a windows-service, scheduled-task, systemd, wsl-systemd or
-listener, and says in `purpose` what breaks without it, because that is what
+Each unit is a systemd unit or a listener (MCPs `fleet-mcp/src/boot-registry.ts`
+accepts no other kind), and says in `purpose` what breaks without it, because that is what
 the alert has to say. Declared from a measurement of the machine, never from
 memory; `units: []` says it carries nothing else.
 
@@ -1875,8 +1874,8 @@ is digested (`sha256sum`), how capacity is read (`/proc/meminfo` and `df`),
 and how the suite is detached from the connection. Until that task it was
 one of two dialects behind a protocol, the other PowerShell. The detach is a
 **transient systemd user unit**
-(`systemd-run --user --unit=fleet-<run>`), the user manager's equivalent of a
-scheduled task: owned by the machine rather than the connection, stoppable by
+(`systemd-run --user --unit=fleet-<run>`): owned by the machine rather than
+the connection, stoppable by
 name, started or refused synchronously. It needs the account to **linger**
 (`sudo loginctl enable-linger <user>`), because a user manager stops with the
 user's last session otherwise and the unit would die with the ssh that started

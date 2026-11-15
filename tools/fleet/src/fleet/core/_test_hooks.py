@@ -23,8 +23,8 @@ exactly as it reads ``returncode``.
 EVERY COMMAND CARRIES A DEADLINE, AND THE PARAMETER HAS NO DEFAULT. Measured
 2026-09-17 11:15Z (board tasks 35940277 and 41ac6ed2): one ssh whose peer
 went away mid-command sat in ESTABLISHED for three days, the tick around it
-never exited, the scheduled task's IgnoreNew refused every later tick, and
-the dispatch queue drained nothing until the task's 72-hour execution limit
+never exited, the scheduler started no later tick while it ran, and the
+dispatch queue drained nothing until the tick's 72-hour execution limit
 ended the parent. A default would be the value a caller reaches for without
 deciding, which is how that ssh had none.
 

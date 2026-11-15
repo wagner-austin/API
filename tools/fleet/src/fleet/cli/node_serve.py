@@ -72,9 +72,7 @@ a poll of the queue answering again.
 
 THE BOUNDARIES ARE THE SCHEDULE'S. The MCPs hub runner fires each fleet
 tick on the whole multiples of its ``everySeconds``, 180, since the epoch
-(``session_audit.hub_runner.loop.boundary``), where the scheduled tasks it
-replaced fired: registered at local midnight, repeating every 3 minutes, and
-every UTC offset in use is a whole number of 3-minute steps. So a fire
+(``session_audit.hub_runner.loop.boundary``). So a fire
 boundary is a multiple of :data:`TICK_SECONDS` since the epoch; the hub's
 logs of 2026-10-05 show each start 2 to 4 s after one, and the runner polls
 every 5 s.

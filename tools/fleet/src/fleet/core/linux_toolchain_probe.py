@@ -29,12 +29,12 @@ from fleet.contracts.tagged_tools import (
 
 #: The toolchain probe's body, verbatim.
 #:
-#: THE INTERPRETER IS ``python3`` AND IS REPORTED AS ``python``. The required
-#: tool is named ``python`` because that is what a Windows PATH calls it; on
-#: Linux the Makefile prologue (``scripts/make/shell.mk``) calls ``python3``,
-#: so that is what the probe asks for, and it reports the answer under the
-#: name the contract requires so :func:`fleet.contracts.toolchain.python_is_right`
-#: reads one report on every platform. The managers asked about are the two
+#: THE INTERPRETER IS ``python3`` AND IS REPORTED AS ``python``. The Makefile
+#: prologue (``scripts/make/shell.mk``) calls ``python3``, so that is what the
+#: probe asks for; the contract this API package shares with MCPs fleet-mcp
+#: still names the tool ``python`` (MCPs board task 4d1931ef renames it on both
+#: sides at once), so the probe reports the answer under that name and
+#: :func:`fleet.contracts.toolchain.python_is_right` reads it. The managers asked about are the two
 #: that exist here: ``apt-get`` for git and make, ``pipx`` for poetry. ``node``
 #: is asked and never installed here: Ubuntu 24.04's archive carries Node
 #: 18.19.1 where the fleet runs 24, and diphtheria's 24.21.0 came from the

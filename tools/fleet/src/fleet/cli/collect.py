@@ -5,7 +5,7 @@ Usage:
     fleet-collect --config registry --run tools-fleet-1788556688
 
 THE COMMAND THAT MAKES A RESULT ARRIVE. ``fleet-run`` returns as soon as the
-suite is running, by design -- it launches through the node's task scheduler
+suite is running, by design -- it launches as a transient systemd unit
 precisely so the build outlives the ssh call. Something therefore has to go
 back and ask, and this is it: for every dispatch the ledger still calls
 running, it reads the node's recorded exit status, and for each that has one

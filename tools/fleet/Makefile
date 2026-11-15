@@ -20,7 +20,7 @@ lint:
 # coverage writes one SQLite file at a fixed path, and two overlapping runs
 # corrupt it, which surfaces as a spurious failure on a run whose tests all
 # passed; several sessions work this repo at once, so overlap is normal. It
-# adds a pre-run sweep and, on Windows, a kill-on-close job object so a run
+# adds a pre-run sweep and runs the suite in a new session it reaps, so a run
 # that dies cannot strand its xdist workers; its module header carries the
 # 2026-08-19 incident that motivated both.
 #

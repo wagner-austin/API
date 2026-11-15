@@ -4,8 +4,8 @@ Usage:
     fleet-cancel --config registry --run services-Model-Trainer-1757000000
 
 WHAT IT ACTUALLY DOES, in the order that matters. It ends the build on the
-node, its whole process tree and not only the scheduled task (or, on a Linux
-node, the transient user unit), closes the ledger row as ``cancelled``, emits
+node, its whole process tree by stopping its transient user unit, closes the
+ledger row as ``cancelled``, emits
 that on the feed, and releases the lease last -- so a failure part-way leaves
 the lease HELD, which expires on its own. Releasing first and failing after
 would free the environment while the record still said ``running``, and the

@@ -20,8 +20,8 @@ on the hub, where the keys are, claims a job and executes it. No inbound route
 to the fleet is ever opened, and no fleet credential ever lives on an
 internet-facing multi-tenant server.
 
-ONE TICK, NO LOOP. The interval belongs to whatever schedules this -- a shell
-loop, Task Scheduler, a Monitor -- where it is visible and changeable without
+ONE TICK, NO LOOP. The interval belongs to whatever schedules this -- the
+MCPs hub runner, a shell loop, a Monitor -- where it is visible and changeable without
 editing code. Same decision ``tools/board-watch`` made next door.
 
 THE HUB, SESSIONS AND NETBOOT LANES ONLY (MCPs board tasks fd5cabfa, A5,
