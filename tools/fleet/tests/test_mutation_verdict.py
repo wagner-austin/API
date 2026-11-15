@@ -155,6 +155,6 @@ def test_the_verdict_line_carries_the_field_before_the_results_path() -> None:
     )
     assert judged["mutation"] == "failed:8/453,801s/900s"
     assert verdict.render_verdict(judged).endswith(
-        " artifact=unread mutation=failed:8/453,801s/900s "
+        " artifact=unread mutation=failed:8/453,801s/900s stalls=unread containers=unread "
         "results=pendragon:/home/corvis/fleet/stage/logs/MCPs-packages-db-pendragon-1794104941.results"
     )

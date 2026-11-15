@@ -17,6 +17,7 @@ import time
 from fleet.contracts.check_unit import DISPATCH_SLICE_NAME
 from fleet.contracts.runner_slice import CI_SLICE_NAME
 from fleet.core import verdict
+from fleet.core.container_cpu import container_cpus_line
 from fleet.core.linux_isolated_build import EXEC_LANE_CGROUP
 from fleet.core.slice_load import (
     CGROUP_ROOT,
@@ -27,11 +28,11 @@ from fleet.core.slice_load import (
     OWN_CGROUP,
     PRESSURE_MARKER,
     PRESSURES,
-    SLICE_LOAD_MARKER,
     MeasuredSlice,
     PressureCgroup,
     pressure_line,
     pressure_none_line,
+    read_run_pressure,
     read_slice_load,
     sh_slice_load_end_lines,
     sh_slice_load_start_lines,
@@ -90,7 +91,7 @@ def _check_cgroup(tmp_path: pathlib.Path, root: pathlib.Path) -> tuple[PressureC
     own_cgroup.write_text("0::/system.slice/fleet-check.service\n", encoding="utf-8")
     locate = CHECK_CGROUP["locate"].replace(OWN_CGROUP, str(own_cgroup))
     return (
-        PressureCgroup(subject=CHECK_CGROUP["subject"], locate=locate),
+        PressureCgroup(field=CHECK_CGROUP["field"], subject=CHECK_CGROUP["subject"], locate=locate),
         "system.slice/fleet-check.service",
     )
 
@@ -172,18 +173,26 @@ def _run(
     return log.read_text(encoding="utf-8"), range(int(time.time()) - started + 1)
 
 
-def _used(name: str, cpu: int, wall: int) -> str:
+def _used(name: str, cpu: int, throttled: int, wall: int) -> str:
     """One slice's line as the end lines print it.
 
     Args:
         name: The slice's unit name.
         cpu: Its CPU-seconds.
+        throttled: The seconds its quota held it back.
         wall: The check's wall seconds.
 
     Returns:
         The line, with its newline.
     """
-    return f"FLEET_SLICE_LOAD: {name} used {cpu} CPU-seconds in the {wall} s the check ran\n"
+    return (
+        f"FLEET_SLICE_LOAD: {name} used {cpu} CPU-seconds and was throttled for {throttled} s "
+        f"in the {wall} s the check ran\n"
+    )
+
+
+#: A slice's ``cpu.stat`` that counted nothing over the check, at its start and its end.
+IDLE: tuple[str, str] = ("usage_usec 0\nthrottled_usec 0\n", "usage_usec 0\nthrottled_usec 0\n")
 
 
 class TestTheLinesOnTheNode:
@@ -193,8 +202,14 @@ class TestTheLinesOnTheNode:
         printed, walls = _run(
             tmp_path,
             {
-                "ci": ("usage_usec 1000000000\nuser_usec 7\n", "usage_usec 1412500000\n"),
-                "dispatch": ("usage_usec 5000000\n", "usage_usec 1468800000\nuser_usec 1\n"),
+                "ci": (
+                    "usage_usec 1000000000\nthrottled_usec 0\nuser_usec 7\n",
+                    "usage_usec 1412500000\nthrottled_usec 0\n",
+                ),
+                "dispatch": (
+                    "usage_usec 5000000\nthrottled_usec 1000000\n",
+                    "usage_usec 1468800000\nthrottled_usec 79600000\nuser_usec 1\n",
+                ),
             },
             {},
             False,
@@ -207,21 +222,21 @@ class TestTheLinesOnTheNode:
             for dispatch in walls
             if ci <= dispatch
             and printed
-            == _used(CI_SLICE_NAME, 412, ci)
-            + _used(DISPATCH_SLICE_NAME, 1463, dispatch)
+            == _used(CI_SLICE_NAME, 412, 0, ci)
+            + _used(DISPATCH_SLICE_NAME, 1463, 78, dispatch)
             + f"{pressure_none_line(CHECK_CGROUP)}\n"
         ]
         assert len(read) == 1
         ci, dispatch = read[0]
-        assert read_slice_load(printed, CI_SLICE) == f"412s/{ci}s"
-        assert read_slice_load(printed, DISPATCH_SLICE) == f"1463s/{dispatch}s"
+        assert read_slice_load(printed, CI_SLICE) == f"412s/{ci}s/throttled:0s"
+        assert read_slice_load(printed, DISPATCH_SLICE) == f"1463s/{dispatch}s/throttled:78s"
 
     def test_a_node_without_a_slice_says_so_for_that_slice_alone(
         self, tmp_path: pathlib.Path
     ) -> None:
         printed, walls = _run(
             tmp_path,
-            {"ci": (None, None), "dispatch": ("usage_usec 0\n", "usage_usec 0\n")},
+            {"ci": (None, None), "dispatch": IDLE},
             {},
             False,
         )
@@ -231,18 +246,21 @@ class TestTheLinesOnTheNode:
             for wall in walls
             if printed
             == f"{slice_none_line(CI_SLICE)}\n"
-            + _used(DISPATCH_SLICE_NAME, 0, wall)
+            + _used(DISPATCH_SLICE_NAME, 0, 0, wall)
             + f"{pressure_none_line(CHECK_CGROUP)}\n"
         ]
         assert len(read) == 1
         assert read_slice_load(printed, CI_SLICE) == "none"
-        assert read_slice_load(printed, DISPATCH_SLICE) == f"0s/{read[0]}s"
+        assert read_slice_load(printed, DISPATCH_SLICE) == f"0s/{read[0]}s/throttled:0s"
 
     def test_a_slice_gone_by_the_end_says_so_and_the_build_goes_on(
         self, tmp_path: pathlib.Path
     ) -> None:
         printed, _ = _run(
-            tmp_path, {"ci": (None, None), "dispatch": ("usage_usec 5\n", None)}, {}, False
+            tmp_path,
+            {"ci": (None, None), "dispatch": ("usage_usec 5\nthrottled_usec 0\n", None)},
+            {},
+            False,
         )
 
         assert printed == (
@@ -257,10 +275,9 @@ class TestTheLinesOnTheNode:
     ) -> None:
         """The figure 86f3aa91 lacked (MCPs board task 2e2df92a): whether a
         check beside a docker-lane build waited on CPU, disk or memory."""
-        idle = ("usage_usec 0\n", "usage_usec 0\n")
         printed, walls = _run(
             tmp_path,
-            {"ci": idle, "dispatch": idle},
+            {"ci": IDLE, "dispatch": IDLE},
             {"cpu": (1_000_000, 4_900_000), "io": (0, 212_400_000), "memory": (5, 5)},
             False,
         )
@@ -279,10 +296,9 @@ class TestTheLinesOnTheNode:
         """Measured on lavender (MCPs board task 2e2df92a): osrs-lab/observer's
         unit used 1 CPU-s while execdocker's manager used 8 cores, so the
         check's own cgroup says nothing of what a lane build waited on."""
-        idle = ("usage_usec 0\n", "usage_usec 0\n")
         printed, walls = _run(
             tmp_path,
-            {"ci": idle, "dispatch": idle},
+            {"ci": IDLE, "dispatch": IDLE},
             {"cpu": (0, 80_000_000), "io": (7, 2_000_007), "memory": (0, 0)},
             True,
         )
@@ -300,10 +316,9 @@ class TestTheLinesOnTheNode:
     def test_a_pressure_file_gone_by_the_end_says_so_and_the_build_goes_on(
         self, tmp_path: pathlib.Path
     ) -> None:
-        idle = ("usage_usec 0\n", "usage_usec 0\n")
         printed, _ = _run(
             tmp_path,
-            {"ci": idle, "dispatch": idle},
+            {"ci": IDLE, "dispatch": IDLE},
             {"cpu": (1, 2), "io": (1, None), "memory": (1, 2)},
             True,
         )
@@ -316,7 +331,8 @@ class TestTheLinesOnTheNode:
             "/proc/self/cgroup",
             ("cpu", "io", "memory"),
         )
-        assert (CHECK_CGROUP["subject"], CHECK_CGROUP["locate"]) == (
+        assert (CHECK_CGROUP["field"], CHECK_CGROUP["subject"], CHECK_CGROUP["locate"]) == (
+            "check",
             "the cgroup of the check",
             "sed -n 's/^0:://p' '/proc/self/cgroup'",
         )
@@ -332,12 +348,26 @@ class TestTheLinesOnTheNode:
 class TestTheReading:
     def test_a_tail_without_the_line_is_unread_and_the_last_line_counts(self) -> None:
         assert read_slice_load("make: *** [check] Error 2\n", CI_SLICE) == "unread"
-        two = (
-            f"FLEET_SLICE_LOAD: {CI_SLICE_NAME} used 1 CPU-seconds in the 2 s the check ran\n"
-            f"FLEET_SLICE_LOAD: {CI_SLICE_NAME} used 30 CPU-seconds in the 40 s the check ran\n"
-        )
-        assert read_slice_load(two, CI_SLICE) == "30s/40s"
+        two = _used(CI_SLICE_NAME, 1, 0, 2) + _used(CI_SLICE_NAME, 30, 5, 40)
+        assert read_slice_load(two, CI_SLICE) == "30s/40s/throttled:5s"
         assert read_slice_load(two, DISPATCH_SLICE) == "unread"
+
+    def test_the_last_pressure_line_names_its_cgroup_and_each_stall(self) -> None:
+        cgroups = (CHECK_CGROUP, EXEC_LANE_CGROUP)
+        assert read_run_pressure("make: *** [check] Error 2\n", cgroups) == "unread"
+        both = (
+            f"{pressure_line(CHECK_CGROUP, ('1', '2', '3'), '9')}\n"
+            f"{pressure_line(EXEC_LANE_CGROUP, ('80', '2', '0'), '412')}\n"
+        )
+        assert read_run_pressure(both, cgroups) == "lane:80s-cpu/2s-io/0s-memory"
+        assert read_run_pressure(both, (CHECK_CGROUP,)) == "unread"
+        assert (
+            read_run_pressure(f"{pressure_line(CHECK_CGROUP, ('13', '2', '0'), '237')}\n", cgroups)
+            == "check:13s-cpu/2s-io/0s-memory"
+        )
+        assert read_run_pressure(f"{pressure_none_line(EXEC_LANE_CGROUP)}\n", cgroups) == (
+            "lane:none"
+        )
 
     def test_the_slowest_files_are_read_through_the_colours_slowest_first(self) -> None:
         assert verdict.read_slowest(LAVENDER_TAIL) == (
@@ -377,10 +407,10 @@ class TestTheReading:
     def test_every_reading_reaches_the_line_a_closure_cites(self) -> None:
         tail = (
             LAVENDER_TAIL
-            + f"{SLICE_LOAD_MARKER}: {CI_SLICE_NAME} used 2111 CPU-seconds in the 664 s the "
-            + "check ran\n"
-            + f"{SLICE_LOAD_MARKER}: {DISPATCH_SLICE_NAME} used 940 CPU-seconds in the 664 s the "
-            + "check ran\n"
+            + _used(CI_SLICE_NAME, 2111, 0, 664)
+            + _used(DISPATCH_SLICE_NAME, 940, 212, 664)
+            + f"{pressure_line(EXEC_LANE_CGROUP, ('80', '2', '0'), '664')}\n"
+            + f"{container_cpus_line('400000 100000,max 100000')}\n"
             + "CHECK OVER BUDGET: execution took 308s, over the 300s budget by 8s.\n"
         )
         judged = verdict.judge(
@@ -400,8 +430,10 @@ class TestTheReading:
             "budget=over:308s/300s ended=2026-10-30T02:40:00Z "
             f"log=lavender:/home/corvis/fleet/stage/logs/{RUN}.log run={RUN} workers=3 "
             "slowest=tests/passkey-twin.test.ts:139s,tests/cascade-dependencies.test.ts:56s,"
-            "tests/served/proxy.test.ts:7s ci=2111s/664s dispatch=940s/664s vmtests=unread "
+            "tests/served/proxy.test.ts:7s ci=2111s/664s/throttled:0s "
+            "dispatch=940s/664s/throttled:212s vmtests=unread "
             "generation=unread began=unread phases=unread steps=unread registry=unread "
-            "artifact=unread mutation=unread "
+            "artifact=unread mutation=unread stalls=lane:80s-cpu/2s-io/0s-memory "
+            "containers=400000/100000,max/100000 "
             f"results=lavender:/home/corvis/fleet/stage/logs/{RUN}.results"
         )

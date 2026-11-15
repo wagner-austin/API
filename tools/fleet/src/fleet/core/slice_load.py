@@ -117,18 +117,22 @@ class PressureCgroup(TypedDict):
     """The cgroup whose pressure stalls a build reads.
 
     Attributes:
+        field: Its one-word name on the verdict's ``stalls`` field.
         subject: What the transcript line calls it. The line is printed inside
             single quotes in ``sh``, so it holds no apostrophe.
         locate: The ``sh`` that prints its path below :data:`CGROUP_ROOT`.
     """
 
+    field: str
     subject: str
     locate: str
 
 
 #: The build's own cgroup: the check's unit, read off cgroup v2's one ``0::<path>`` line.
 CHECK_CGROUP: Final = PressureCgroup(
-    subject="the cgroup of the check", locate=f"sed -n 's/^0:://p' '{OWN_CGROUP}'"
+    field="check",
+    subject="the cgroup of the check",
+    locate=f"sed -n 's/^0:://p' '{OWN_CGROUP}'",
 )
 
 
@@ -237,20 +241,22 @@ def _pressure_end_lines(log: str, measured: PressureCgroup) -> list[str]:
     return lines
 
 
-def slice_used_line(measured: MeasuredSlice, cpu: str, wall: str) -> str:
+def slice_used_line(measured: MeasuredSlice, cpu: str, throttled: str, wall: str) -> str:
     """The line on a host whose slice ran through the whole check.
 
     Args:
         measured: The slice.
         cpu: Its CPU-seconds over the check, or a ``printf`` placeholder.
+        throttled: The seconds its CPU quota held it back over the check,
+            ``cpu.stat``'s ``throttled_usec``, or a ``printf`` placeholder.
         wall: The check's seconds, or a ``printf`` placeholder.
 
     Returns:
         The line, without its newline.
     """
     return (
-        f"{SLICE_LOAD_MARKER}: {measured['name']} used {cpu} CPU-seconds "
-        f"in the {wall} s the check ran"
+        f"{SLICE_LOAD_MARKER}: {measured['name']} used {cpu} CPU-seconds and was throttled "
+        f"for {throttled} s in the {wall} s the check ran"
     )
 
 
@@ -278,16 +284,28 @@ def slice_gone_line(measured: MeasuredSlice) -> str:
     return f"{SLICE_LOAD_MARKER}: {measured['name']} ended before the check did"
 
 
-def _usage(cpu_stat: str) -> str:
-    """The ``sh`` that prints a slice's ``usage_usec``.
+#: The two ``cpu.stat`` counters each slice's lines read, as the ``sh``
+#: variables they are kept in name them: its CPU time and the time its quota
+#: held it back. A slice systemd gives a CPU weight or quota has the cpu
+#: controller, so its ``cpu.stat`` carries both (read on lavender, sedona and
+#: serendipity on 2026-11-15).
+SLICE_COUNTERS: Final[tuple[tuple[str, str], ...]] = (
+    ("usage", "usage_usec"),
+    ("throttled", "throttled_usec"),
+)
+
+
+def _counter(cpu_stat: str, key: str) -> str:
+    """The ``sh`` that prints one of a slice's ``cpu.stat`` counters.
 
     Args:
         cpu_stat: The slice's ``cpu.stat``.
+        key: The counter, one of :data:`SLICE_COUNTERS`' keys.
 
     Returns:
         The command.
     """
-    return f"awk '$1 == \"usage_usec\" {{ print $2 }}' '{cpu_stat}'"
+    return f"awk '$1 == \"{key}\" {{ print $2 }}' '{cpu_stat}'"
 
 
 def sh_slice_load_start_lines(
@@ -305,15 +323,17 @@ def sh_slice_load_start_lines(
             for a build whose work runs in its own unit.
 
     Returns:
-        The lines; ``<field>_usage_started`` is empty on a host without the slice.
+        The lines; ``<field>_<counter>_started`` is empty on a host without the slice.
     """
     lines = _pressure_start_lines(cgroup_root, pressure_of)
     for measured in slices:
-        started = f"{measured['field']}_usage_started"
         stat = measured["cpu_stat"]
-        lines.append(
-            f"if [ -r '{stat}' ] && {started}=\"$({_usage(stat)})\"; then :; else {started}=''; fi"
-        )
+        for name, key in SLICE_COUNTERS:
+            started = f"{measured['field']}_{name}_started"
+            lines.append(
+                f"if [ -r '{stat}' ] && {started}=\"$({_counter(stat, key)})\"; then :; "
+                f"else {started}=''; fi"
+            )
     lines.append(f'{CLOCK_STARTED}="$(date +%s)"')
     return lines
 
@@ -337,14 +357,24 @@ def sh_slice_load_end_lines(
     """
     lines: list[str] = []
     for measured in slices:
+        stat = measured["cpu_stat"]
+        reads = " && ".join(
+            f'[ -n "${measured["field"]}_{name}_started" ] && '
+            f'{measured["field"]}_{name}_ended="$({_counter(stat, key)})" && '
+            f'[ -n "${measured["field"]}_{name}_ended" ]'
+            for name, key in SLICE_COUNTERS
+        )
+        seconds = " ".join(
+            f'"$(( ({measured["field"]}_{name}_ended - {measured["field"]}_{name}_started) '
+            f'/ 1000000 ))"'
+            for name, _ in SLICE_COUNTERS
+        )
+        used = slice_used_line(measured, "%s", "%s", "%s")
         started = f"{measured['field']}_usage_started"
-        ended = f"{measured['field']}_usage_ended"
-        used = slice_used_line(measured, "%s", "%s")
         lines.extend(
             [
-                f'if [ -n "${started}" ] && {ended}="$({_usage(measured["cpu_stat"])})" '
-                f'&& [ -n "${ended}" ]; then',
-                f"  printf '{used}\\n' \"$(( ({ended} - {started}) / 1000000 ))\" "
+                f"if {reads}; then",
+                f"  printf '{used}\\n' {seconds} "
                 f"\"$(( $(date +%s) - {CLOCK_STARTED} ))\" >> '{log}'",
                 f'elif [ -n "${started}" ]; then',
                 f"  printf '%s\\n' '{slice_gone_line(measured)}' >> '{log}'",
@@ -364,24 +394,53 @@ def read_slice_load(tail: str, measured: MeasuredSlice) -> str:
         measured: The slice.
 
     Returns:
-        ``<cpu>s/<wall>s`` from the slice's last :func:`slice_used_line`,
-        ``gone`` from :func:`slice_gone_line`, ``none`` from
-        :func:`slice_none_line`, else ``unread`` (a build from before the
-        line, or one stopped before it).
+        ``<cpu>s/<wall>s/throttled:<seconds>s`` from the slice's last
+        :func:`slice_used_line`, ``gone`` from :func:`slice_gone_line`,
+        ``none`` from :func:`slice_none_line`, else ``unread`` (a build from
+        before the line, or one stopped before it).
     """
-    before, between, after = slice_used_line(measured, "\n", "\n").split("\n")
-    pattern = re.compile(
-        rf"^{re.escape(before)}(\d+){re.escape(between)}(\d+){re.escape(after)}$", re.MULTILINE
-    )
+    parts = slice_used_line(measured, "\n", "\n", "\n").split("\n")
+    pattern = re.compile("^" + r"(\d+)".join(re.escape(part) for part in parts) + "$", re.MULTILINE)
     used: re.Match[str] | None = None
     for match in pattern.finditer(tail):
         used = match
     if used is not None:
-        return f"{used.group(1)}s/{used.group(2)}s"
+        cpu, throttled, wall = used.groups()
+        return f"{cpu}s/{wall}s/throttled:{throttled}s"
     if slice_gone_line(measured) in tail:
         return "gone"
     if slice_none_line(measured) in tail:
         return "none"
+    return "unread"
+
+
+def read_run_pressure(tail: str, cgroups: tuple[PressureCgroup, ...]) -> str:
+    """Read the measured cgroup's stalls over a check off its transcript tail.
+
+    Args:
+        tail: The transcript's last lines.
+        cgroups: Every cgroup a build may measure, so the line's subject
+            names which one it read.
+
+    Returns:
+        ``<field>:<cpu>s-cpu/<io>s-io/<memory>s-memory`` from the tail's last
+        :data:`PRESSURE_MARKER` line when it is a :func:`pressure_line`,
+        ``<field>:none`` when it is a :func:`pressure_none_line`, else
+        ``unread`` (no such line: a build from before it, or one stopped
+        before it; or a subject none of ``cgroups`` writes).
+    """
+    printed = [line for line in tail.splitlines() if line.startswith(f"{PRESSURE_MARKER}: ")]
+    if not printed:
+        return "unread"
+    last = printed[-1]
+    for measured in cgroups:
+        if last == pressure_none_line(measured):
+            return f"{measured['field']}:none"
+        parts = pressure_line(measured, ("\n", "\n", "\n"), "\n").split("\n")
+        stalled = re.fullmatch(r"(\d+)".join(re.escape(part) for part in parts), last)
+        if stalled is not None:
+            cpu, io, memory, _ = stalled.groups()
+            return f"{measured['field']}:{cpu}s-cpu/{io}s-io/{memory}s-memory"
     return "unread"
 
 
@@ -396,11 +455,13 @@ __all__ = [
     "PRESSURES",
     "PRESSURE_CGROUP",
     "PRESSURE_MARKER",
+    "SLICE_COUNTERS",
     "SLICE_LOAD_MARKER",
     "MeasuredSlice",
     "PressureCgroup",
     "pressure_line",
     "pressure_none_line",
+    "read_run_pressure",
     "read_slice_load",
     "sh_slice_load_end_lines",
     "sh_slice_load_start_lines",

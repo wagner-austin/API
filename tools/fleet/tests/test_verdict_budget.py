@@ -79,5 +79,6 @@ class TestTheBudgetOnTheLine:
             "run=services-grandma-api-loki-1791168143 workers=2 slowest=unread ci=unread "
             "dispatch=unread vmtests=unread generation=unread began=unread phases=unread "
             "steps=unread registry=unread artifact=unread mutation=unread "
+            "stalls=unread containers=unread "
             "results=loki:C:/fleet/stage/logs/services-grandma-api-loki-1791168143.results"
         )

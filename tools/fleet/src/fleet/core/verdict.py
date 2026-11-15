@@ -35,12 +35,20 @@ from fleet.core.check_figures import (
     read_coverage_reading,
     read_test_counts,
 )
+from fleet.core.container_cpu import read_container_cpus
+from fleet.core.linux_isolated_build import EXEC_LANE_CGROUP
 from fleet.core.linux_unit_end import UNIT_ENDED_LINE
 from fleet.core.mutation_verdict import read_mutation
 from fleet.core.release_artifact import read_artifact
 from fleet.core.run_registry import read_registry
 from fleet.core.run_summary import read_run_summary
-from fleet.core.slice_load import CI_SLICE, DISPATCH_SLICE, read_slice_load
+from fleet.core.slice_load import (
+    CHECK_CGROUP,
+    CI_SLICE,
+    DISPATCH_SLICE,
+    read_run_pressure,
+    read_slice_load,
+)
 from fleet.core.vm_tests import read_vm_tests
 
 #: The line every package's ``make check`` prints last when it passed.
@@ -163,6 +171,15 @@ class Verdict(TypedDict):
             example ``failed:8/453,801s/900s``: a check whose suite passed
             and whose step found surviving mutants otherwise read like any
             other red check (MCPs board task 637f648f).
+        stalls: The seconds the measured cgroup's tasks stalled on cpu, io
+            and memory (:func:`fleet.core.slice_load.read_run_pressure`),
+            ``check:`` for the build's own unit and ``lane:`` for the docker
+            lane's manager: whether a slow check waited on a neighbour, which
+            its slices' totals alone do not say (MCPs board task 2e2df92a).
+        containers: The CPU bound each container of a docker project's
+            recipe stated (:func:`fleet.core.container_cpu.read_container_cpus`),
+            as ``<quota>/<period>``: whether it held its grant beside the
+            other checks of the slice (MCPs board task 2e2df92a).
         results_path: Where the node keeps the check's structured results,
             its runners' JUnit XML and mypy JSON
             (:func:`fleet.core.check_results.retained_results_path`), which
@@ -195,6 +212,8 @@ class Verdict(TypedDict):
     registry: str
     artifact: str
     mutation: str
+    stalls: str
+    containers: str
     results_path: str
 
 
@@ -349,6 +368,8 @@ def judge(
         registry=read_registry(tail),
         artifact=read_artifact(tail),
         mutation=read_mutation(ANSI.sub("", tail)),
+        stalls=read_run_pressure(tail, (CHECK_CGROUP, EXEC_LANE_CGROUP)),
+        containers=read_container_cpus(tail),
         results_path=results_path,
     )
 
@@ -366,7 +387,7 @@ def render_verdict(verdict: Verdict) -> str:
         slowest=<...> ci=<...> dispatch=<...> vmtests=<...> generation=<...> began=<...>
         phases=<...>
         steps=<...> registry=<commit> artifact=<...> mutation=<...>
-        results=<node>:<path>``,
+        stalls=<...> containers=<...> results=<node>:<path>``,
         one line, so a closure can quote it and a reader can grep a thread
         for the prefix. ``workers`` and every field after it come after every
         field the readers in MCPs' maketools and session-audit match, each
@@ -384,7 +405,8 @@ def render_verdict(verdict: Verdict) -> str:
         f"generation={verdict['generation']} began={verdict['began']} "
         f"phases={verdict['phases']} steps={verdict['steps']} "
         f"registry={verdict['registry']} artifact={verdict['artifact']} "
-        f"mutation={verdict['mutation']} "
+        f"mutation={verdict['mutation']} stalls={verdict['stalls']} "
+        f"containers={verdict['containers']} "
         f"results={verdict['node']}:{verdict['results_path']}"
     )
 

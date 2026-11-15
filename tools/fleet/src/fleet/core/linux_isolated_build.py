@@ -65,6 +65,7 @@ from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE
 from fleet.core.check_results import sh_isolated_results_lines
+from fleet.core.container_cpu import sh_container_cpu_lines
 from fleet.core.names import (
     CACHE_VARIABLE,
     POETRY_IN_PROJECT,
@@ -127,6 +128,7 @@ EXEC_LANE_LOCK = "/run/user/$exec_uid/fleet-exec-docker.lock"
 #: CPU-s of its run while the manager used 8 cores (MCPs board task 2e2df92a).
 #: Every check on the lane shares the manager, so the line says so.
 EXEC_LANE_CGROUP = PressureCgroup(
+    field="lane",
     subject="the docker lane cgroup, which every check on the lane shares,",
     locate='systemctl show --property=ControlGroup --value "user@$exec_uid.service"',
 )
@@ -247,6 +249,7 @@ def isolated_build_lines(
         )
     )
     lines.extend(sh_slice_load_end_lines(MEASURED_SLICES, log, EXEC_LANE_CGROUP))
+    lines.extend(sh_container_cpu_lines(log))
     lines.extend(sh_vm_test_lines(log))
     lines.extend(
         sh_artifact_lines(

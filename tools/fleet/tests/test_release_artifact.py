@@ -200,6 +200,7 @@ class TestTheReading:
         assert judged["artifact"] == f"{JAR['path']}:2:{DIGEST}"
         assert verdict.render_verdict(judged).endswith(
             f" registry=unread artifact={JAR['path']}:2:{DIGEST} mutation=unread"
+            " stalls=unread containers=unread"
             f" results=colossus:/home/corvis/fleet/stage/logs/{run}.results"
         )
 
