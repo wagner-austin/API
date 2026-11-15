@@ -17,15 +17,15 @@ include = ["src/transcript_api/py.typed"]
 python = "^3.11"
 fastapi = "^0.163"
 hypercorn = "^0.18"
-typing-extensions = "^4.12.2"
+typing-extensions = "^4.16.0"
 platform-core = { path = "../../libs/platform_core", develop = true }
 platform-workers = { path = "../../libs/platform_workers", develop = true }
 platform-stt = { path = "../../libs/platform_stt", develop = true }
-redis = "^7.1"
-rq = "^2.3"
+redis = "^8.1"
+rq = "^3.0"
 openai = "^3.51.0"
-youtube-transcript-api = { version = "^1.2.4", python = ">=3.11,<3.14" }
-yt-dlp = "^2025.11.12"
+youtube-transcript-api = { version = "^1.2.5", python = ">=3.11,<3.16" }
+yt-dlp = "^2026.10.26"
 
 [tool.poetry.scripts]
 transcript-rq-worker = "transcript_api.worker_entry:main"
