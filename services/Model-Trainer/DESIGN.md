@@ -123,7 +123,7 @@ scripts/
   - Strict typing: mypy (strict mode), no `typing.Any`, no `typing.cast`.
   - Pydantic v2 for all data models (configs, DTOs, results). Prefer `BaseModel` with `extra="forbid"` and `validate_assignment=True`. Avoid `@dataclass` for these shapes.
 - FastAPI + Hypercorn for API with typed routes and models.
-  - Hugging Face: Transformers, Datasets, Tokenizers.
+  - Hugging Face: Transformers, Tokenizers, PEFT.
   - PyTorch (CPU) for training; CPU threading configured explicitly.
   - Ruff + mypy in pre-commit; black/ruff format if adopted by repo.
 - Language (UI): planned; not yet implemented.
@@ -316,7 +316,7 @@ Policy (enforced by guard):
   - `AppConfig`, `LoggingConfig`, `TokenizerConfig`, `ModelConfig`, `TrainerConfig`, `DataConfig`, `ComputeConfig`.
 - Config sources: `TOML` files + env var overrides.
 - Every run writes a `manifest.json` including config, library versions, seed, CPU info, durations, artifacts.
-- Seed all random sources (Python, NumPy, PyTorch, HF datasets where applicable).
+- Seed all random sources (Python, NumPy, PyTorch).
 
 
 ## 11. Data Pipeline & Tokenizer Training
@@ -334,7 +334,7 @@ Policy (enforced by guard):
 ## 12. Model Training
 
 - Backend: Hugging Face Transformers + PyTorch (CPU or CUDA).
-- Data: HF `datasets` with streaming or on-disk arrow, tokenized with selected tokenizer.
+- Data: tokenized with the selected tokenizer.
 - Collation: causal LM collator with static or dynamic padding to `max_seq_len`.
 - Trainer: Custom `BaseTrainer` with AMP (Automatic Mixed Precision) support.
 
@@ -481,7 +481,7 @@ The user interface is implemented as a Discord bot (`clients/DiscordBot`):
 
 - Tokenization: use library-native parallelism (threads) for training and encoding.
 - Data pipeline: DataLoader `num_workers` tuned to CPU cores; chunked line reading.
-- Avoid Python GIL hotspots by relying on native code paths (tokenizers, PyTorch, datasets).
+- Avoid Python GIL hotspots by relying on native code paths (tokenizers, PyTorch).
 - Limit memory footprint: streamed datasets, small batch sizes; gradient accumulation only if needed.
 
 

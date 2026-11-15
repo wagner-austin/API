@@ -40,7 +40,7 @@ def test_gather_versions_handles_missing() -> None:
     _test_hooks.pkg_version = _always_unknown
 
     vers: TrainingManifestVersions = bt_core._gather_lib_versions("char-lstm-train")
-    assert set(vers.keys()) == {"torch", "transformers", "tokenizers", "datasets"}
+    assert set(vers.keys()) == {"torch", "transformers", "tokenizers"}
     assert all(v == "unknown" for v in vers.values())
 
 

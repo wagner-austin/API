@@ -163,11 +163,11 @@ def _default_load_hf_model(
     happen: the QLoRA strategy adapts an ALREADY-quantized model and does
     not quantize one itself.
 
-    ``torch_dtype`` is passed in both cases rather than left to default. The
-    4-bit quantizer overrides a None with ``torch.float16`` and reports it
-    only through a log line, so accepting the default means the dtype of
-    every layer quantization did not replace is decided somewhere the run
-    never records.
+    ``dtype`` is passed in both cases rather than left to default. A missing
+    dtype is "auto" in transformers 5, the precision the checkpoint was saved
+    in, so accepting the default means the dtype of every layer quantization
+    did not replace is decided by the checkpoint's author and never recorded
+    by the run.
 
     Args:
         model_id_or_path: HuggingFace model ID or local path.
@@ -180,9 +180,7 @@ def _default_load_hf_model(
     config, dtype = load_arguments(quantization)
     transformers = __import__("transformers", fromlist=["AutoModelForCausalLM"])
     model_cls: _HFModelClassProto = transformers.AutoModelForCausalLM
-    return model_cls.from_pretrained(
-        model_id_or_path, quantization_config=config, torch_dtype=dtype
-    )
+    return model_cls.from_pretrained(model_id_or_path, quantization_config=config, dtype=dtype)
 
 
 def _default_load_hf_tokenizer(model_id_or_path: str) -> HFTokenizerProto:

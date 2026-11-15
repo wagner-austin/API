@@ -122,7 +122,7 @@ def _create_eval_manifest(
         "finetune_lr_cap": 5e-5,
         "loss_mask_prefix_separator": None,
         "early_stopped": False,
-        "versions": {"torch": "0", "transformers": "0", "tokenizers": "0", "datasets": "0"},
+        "versions": {"torch": "0", "transformers": "0", "tokenizers": "0"},
         "system": {"cpu_count": 1, "platform": "x", "platform_release": "y", "machine": "z"},
         "seed": 0,
         "pretrained_run_id": None,

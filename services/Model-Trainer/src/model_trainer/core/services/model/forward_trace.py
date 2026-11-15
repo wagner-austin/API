@@ -13,8 +13,8 @@ LEAF module's INPUT. The pairing matters: an operation that is not a module
 between one module's output and the next module's input, and a leaf's input is
 where such a tensor is caught. Concretely, ``attn.c_proj``'s input IS the
 attention operation's output, which is not otherwise observable, because
-attention in transformers 4.46 is a function call inside ``GPT2SdpaAttention``
-rather than a submodule of it.
+attention in transformers 5 is a function call (``sdpa_attention_forward``)
+inside ``GPT2Attention`` rather than a submodule of it.
 
 The root module is deliberately NOT hooked. A forward hook fires from
 ``__call__``, and the probe calls ``forward`` directly, so a hook there could

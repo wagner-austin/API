@@ -18,7 +18,6 @@ class TrainingManifestVersions(TypedDict):
     torch: str
     transformers: str
     tokenizers: str
-    datasets: str
 
 
 class TrainingManifestSystem(TypedDict):

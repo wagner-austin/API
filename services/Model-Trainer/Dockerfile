@@ -2,11 +2,13 @@
 
 ARG PYTHON_VERSION=3.11.9-slim-bookworm
 ARG APP_DIR=services/Model-Trainer
-# Must match the default docker-compose.yml passes. It previously defaulted to
-# the CPU wheel index while compose always overrode it to cu124, so a plain
-# `docker build` produced a silently CPU-only image that looked identical to
-# the one the stack runs and would have trained without the GPU.
-ARG TORCH_INDEX=https://download.pytorch.org/whl/cu124
+# Must match the default docker-compose.yml passes and the pytorch-cu132 source
+# pyproject.toml locks torch from: the exported requirements pin a +cu132
+# build, which no other index serves. It once defaulted to the CPU wheel index
+# while compose overrode it, so a plain `docker build` produced a silently
+# CPU-only image that looked identical to the one the stack runs and would
+# have trained without the GPU.
+ARG TORCH_INDEX=https://download.pytorch.org/whl/cu132
 
 # ---------- Builder: resolve deps and build wheel ----------
 FROM python:${PYTHON_VERSION} AS builder
@@ -59,8 +61,8 @@ FROM python:${PYTHON_VERSION} AS runtime-base
 
 # Redeclared because a stage does not inherit a global ARG's value. This is
 # the declaration the install below actually reads, so it carries the same
-# cu124 default as the global one and as docker-compose.yml.
-ARG TORCH_INDEX=https://download.pytorch.org/whl/cu124
+# cu132 default as the global one and as docker-compose.yml.
+ARG TORCH_INDEX=https://download.pytorch.org/whl/cu132
 
 # The service commit, baked at build time so every TrainingManifest can name
 # the code that trained the run; the image carries no .git for rev-parse.

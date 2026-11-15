@@ -147,8 +147,8 @@ class _HFModelClassProto(Protocol):
 
     Upstream, ``PreTrainedModel.from_pretrained`` declares neither of the two
     keywords below in its signature; both are taken out of ``**kwargs``
-    (``torch_dtype`` and ``quantization_config``, transformers v4.46.3
-    ``modeling_utils.py`` L 3453 and L 3462). Naming them here is deliberate:
+    (``dtype`` and ``quantization_config``, transformers v5.23.0
+    ``modeling_utils.py`` L 4146 and L 4152). Naming them here is deliberate:
     a protocol that spelled the real signature as ``**kwargs`` would accept
     any misspelling, and a misspelled quantization keyword loads an
     unquantized model without complaint.
@@ -159,18 +159,19 @@ class _HFModelClassProto(Protocol):
         model_id_or_path: str,
         *,
         quantization_config: BitsAndBytesConfigProto | None,
-        torch_dtype: torch.dtype | None,
+        dtype: torch.dtype,
     ) -> LMModelProto:
         """Load a model, optionally quantizing its linear layers on the way in.
 
         Args:
             model_id_or_path: HuggingFace model ID or local path.
             quantization_config: Quantization to apply, or None to load the
-                weights at their stored precision.
-            torch_dtype: Dtype for the layers quantization does not replace.
-                Passed explicitly even when quantizing, because the 4-bit
-                quantizer forces float16 on a None and says so only in a log
-                line.
+                weights unquantized.
+            dtype: Dtype for the layers quantization does not replace, or
+                for every layer unquantized. Never left out: transformers 5
+                turns a missing dtype into "auto", the checkpoint's stored
+                precision, so the run's arithmetic would follow whatever the
+                checkpoint author saved.
 
         Returns:
             Loaded language model.

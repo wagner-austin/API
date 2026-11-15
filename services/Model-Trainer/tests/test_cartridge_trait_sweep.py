@@ -48,9 +48,10 @@ from tests._trait_sweep_support import (
 #: run on one xdist worker (tests/test_xdist_grouping.py says why).
 pytestmark = pytest.mark.xdist_group("test_cartridge_trait_sweep.py")
 
-#: A block, whose output is a tuple. Used only to make the steering cell fail
-#: on purpose, so the checkpoint's contents can be asserted.
-_TUPLE_SITE = "transformer.h.0"
+#: An attention module, whose output is a tuple (its output and its attention
+#: weights). Used only to make the steering cell fail on purpose, so the
+#: checkpoint's contents can be asserted.
+_TUPLE_SITE = "transformer.h.0.attn"
 
 #: The committed trait corpus, for the one test that reads the real reader.
 _CORPUS_ROOT = pathlib.Path(__file__).resolve().parent.parent / "corpus" / "traits"
@@ -295,8 +296,8 @@ class TestTheWholeGrid:
     def test_an_interrupted_run_keeps_the_cells_it_finished(self, tmp_path: pathlib.Path) -> None:
         """The hours an eviction cannot take are the ones already written.
 
-        The steering site is pointed at a block here, whose output is a tuple
-        and cannot be perturbed, so the solo cell completes and the run dies
+        The steering site is pointed at an attention module here, whose output
+        is a tuple and cannot be perturbed, so the solo cell completes and the run dies
         in the anchor phase's steering family. That is a real failure of this
         measurement, not a simulated one.
 

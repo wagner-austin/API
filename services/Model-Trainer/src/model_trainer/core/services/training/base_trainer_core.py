@@ -58,7 +58,9 @@ def _gather_lib_versions(service_name: str) -> TrainingManifestVersions:
         service_name: Name of the service for logging (e.g. "gpt2-train").
 
     Returns:
-        Dictionary with version strings for torch, transformers, tokenizers, datasets.
+        Dictionary with version strings for torch, transformers and tokenizers,
+        the libraries the trainers import. Hugging Face datasets is not one of
+        them, so it is neither recorded nor installed.
     """
 
     def _v(name: str) -> str:
@@ -80,7 +82,6 @@ def _gather_lib_versions(service_name: str) -> TrainingManifestVersions:
         "torch": _v("torch"),
         "transformers": _v("transformers"),
         "tokenizers": _v("tokenizers"),
-        "datasets": _v("datasets"),
     }
 
 

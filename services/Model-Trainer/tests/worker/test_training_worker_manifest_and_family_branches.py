@@ -52,7 +52,6 @@ def _base_manifest() -> dict[str, JSONValue]:
             "torch": "0",
             "transformers": "0",
             "tokenizers": "0",
-            "datasets": "0",
         },
         "system": {
             "cpu_count": 1,
@@ -125,13 +124,12 @@ def test_load_manifest_from_text_expect_int_and_num_errors() -> None:
         ("torch", 123),
         ("transformers", 456),
         ("tokenizers", 789),
-        ("datasets", 999),
     ],
 )
 def test_load_manifest_versions_require_strings(field: str, value: int) -> None:
     base = _manifest_unknown()
     versions_raw = base["versions"]
-    assert isinstance(versions_raw, dict) and len(versions_raw) == 4
+    assert isinstance(versions_raw, dict) and len(versions_raw) == 3
     versions = dict(versions_raw)
     versions[field] = value
     bad_manifest: dict[str, JSONValue] = {

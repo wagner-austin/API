@@ -209,7 +209,7 @@ class _FakeStore:
             "holdout_fraction": 0.1,
             "pretrained_run_id": None,
             "seed": 42,
-            "versions": {"torch": "0", "transformers": "0", "tokenizers": "0", "datasets": "0"},
+            "versions": {"torch": "0", "transformers": "0", "tokenizers": "0"},
             "system": {"cpu_count": 1, "platform": "X", "platform_release": "Y", "machine": "Z"},
             "git_commit": "g",
             "timing": {

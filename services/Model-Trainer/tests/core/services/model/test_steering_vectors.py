@@ -41,9 +41,10 @@ from model_trainer.core.types import SteerableLMProto
 #: literature already keys its interventions.
 _SITE = "transformer.h.0.mlp.c_proj"
 
-#: A site whose output is a TUPLE -- the whole block -- used to prove the
-#: refusal rather than to steer.
-_TUPLE_SITE = "transformer.h.0"
+#: A site whose output is a TUPLE -- the attention module, which returns its
+#: output with its attention weights -- used to prove the refusal rather than
+#: to steer.
+_TUPLE_SITE = "transformer.h.0.attn"
 
 
 def _model() -> SteerableLMProto:
@@ -259,7 +260,7 @@ class TestApplyingTheDirection:
         assert after == before
 
     def test_a_tuple_valued_site_is_refused_when_it_runs(self) -> None:
-        """A block returns its hidden state and its cache together.
+        """An attention module returns its output and its weights together.
 
         Reaching in and perturbing element zero would be easy and wrong: the
         same site has to be READABLE by the capture that extracts the

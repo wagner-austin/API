@@ -57,7 +57,7 @@ Build and run with GPU support:
 
 ```bash
 # From services/Model-Trainer
-# Build images with CUDA wheels (compose passes TORCH_INDEX=cu124)
+# Build images with CUDA wheels (compose passes TORCH_INDEX=cu132)
 docker compose build --no-cache
 
 # Start API + Worker with GPU access
@@ -800,8 +800,9 @@ services:
 | `rq` | Redis Queue |
 | `transformers` | GPT-2 model |
 | `tokenizers` | BPE tokenizer |
-| `datasets` | Data loading |
-| `torch` | Training framework |
+| `torch` | Training framework, from the CUDA 13.2 wheel index |
+| `peft` | LoRA and QLoRA adapters |
+| `bitsandbytes` | 4-bit quantization for QLoRA |
 | `platform-core` | Logging, errors, config |
 | `platform-ml` | Device selection, artifact storage |
 | `platform-workers` | RQ worker harness |

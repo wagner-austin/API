@@ -355,7 +355,6 @@ class TestManifestGgufExportDecoding:
                 "torch": "2.0.0",
                 "transformers": "4.30.0",
                 "tokenizers": "0.13.0",
-                "datasets": "2.14.0",
             },
             "system": {
                 "cpu_count": 8,
@@ -437,7 +436,6 @@ class TestManifestGgufExportDecoding:
                 "torch": "2.0.0",
                 "transformers": "4.30.0",
                 "tokenizers": "0.13.0",
-                "datasets": "2.14.0",
             },
             # Nested system section
             "system": {

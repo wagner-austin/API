@@ -53,7 +53,6 @@ def _decode_manifest_versions(obj: JSONObject) -> TrainingManifestVersions:
         "torch": require_str(vers, "torch"),
         "transformers": require_str(vers, "transformers"),
         "tokenizers": require_str(vers, "tokenizers"),
-        "datasets": require_str(vers, "datasets"),
     }
 
 

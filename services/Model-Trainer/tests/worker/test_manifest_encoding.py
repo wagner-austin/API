@@ -97,10 +97,9 @@ def _full(
         "seed": 0,
         "pretrained_run_id": None,
         "versions": {
-            "torch": "2.6.0+cu124",
-            "transformers": "4.46.3",
-            "tokenizers": "0.20.3",
-            "datasets": "3.6.0",
+            "torch": "2.15.0+cu132",
+            "transformers": "5.23.0",
+            "tokenizers": "0.23.3",
         },
         "system": {
             "cpu_count": 8,
@@ -227,7 +226,6 @@ class TestTheOtherBlocksSurviveToo:
         encoded = encode_training_manifest_full(_full(fingerprint=_FINGERPRINT, gguf_export=None))
 
         assert sorted(narrow_json_to_dict(encoded["versions"])) == [
-            "datasets",
             "tokenizers",
             "torch",
             "transformers",

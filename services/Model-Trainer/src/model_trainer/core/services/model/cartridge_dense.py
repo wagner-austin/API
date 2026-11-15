@@ -281,8 +281,8 @@ class _EncoderProto(Protocol):
 class _EncoderClassProto(Protocol):
     """The ``AutoModel`` class object."""
 
-    def from_pretrained(self, model_id: str) -> _EncoderProto:
-        """Load the encoder for a model id."""
+    def from_pretrained(self, model_id: str, *, dtype: torch.dtype) -> _EncoderProto:
+        """Load the encoder for a model id at a stated dtype."""
         ...
 
 
@@ -310,6 +310,11 @@ def _default_embedder_factory(device: str, /) -> EmbedderProto:
     train-mode forward pass would embed the same text differently on every
     call, which makes the ranking a function of nothing.
 
+    THE DTYPE IS STATED, float32, because transformers 5 loads a checkpoint
+    at its saved precision when none is given, and gte's is float16: the
+    batch-independence tolerance this arm is held to was then exceeded by
+    half-precision rounding alone.
+
     Args:
         device: Where the encoder and its inputs live, matching the arm the
             embeddings are compared against.
@@ -323,7 +328,7 @@ def _default_embedder_factory(device: str, /) -> EmbedderProto:
     model_cls: _EncoderClassProto = transformers.AutoModel
 
     tokenizer = tokenizer_cls.from_pretrained(DENSE_MODEL_ID)
-    model = model_cls.from_pretrained(DENSE_MODEL_ID).eval().to(device)
+    model = model_cls.from_pretrained(DENSE_MODEL_ID, dtype=torch.float32).eval().to(device)
 
     def embed(texts: Sequence[str], /) -> torch.Tensor:
         """Embed a batch against the encoder loaded once above.

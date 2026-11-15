@@ -26,6 +26,7 @@ the hardware.
 
 from __future__ import annotations
 
+import math
 from contextlib import AbstractContextManager
 from typing import Final
 
@@ -134,9 +135,11 @@ def sdpa_operands(shape: SdpaShape, device: str) -> tuple[torch.Tensor, torch.Te
 def sdpa_output(query: torch.Tensor, key: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
     """Run the attention call exactly as GPT-2's sdpa path runs it.
 
-    ``is_causal=True`` with no mask and zero dropout is what
-    ``GPT2SdpaAttention.forward`` passes in eval with no cache, read at
-    source rather than assumed.
+    ``is_causal=True`` with no mask, zero dropout and ``scale`` set to
+    ``head_dim ** -0.5`` is what ``GPT2Attention.forward`` passes through
+    ``sdpa_attention_forward`` in eval with no cache and no padding,
+    transformers v5.23.0 ``integrations/sdpa_attention.py`` L 193-202, read
+    at source rather than assumed. 4.46 left ``scale`` to SDPA's default.
 
     Args:
         query: Query tensor.
@@ -147,7 +150,13 @@ def sdpa_output(query: torch.Tensor, key: torch.Tensor, value: torch.Tensor) -> 
         The attention output.
     """
     return torch.nn.functional.scaled_dot_product_attention(
-        query, key, value, attn_mask=None, dropout_p=0.0, is_causal=True
+        query,
+        key,
+        value,
+        attn_mask=None,
+        dropout_p=0.0,
+        is_causal=True,
+        scale=math.pow(query.shape[-1], -0.5),
     )
 
 

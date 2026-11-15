@@ -52,7 +52,6 @@ def _encode_versions(versions: TrainingManifestVersions) -> JSONObject:
         "torch": versions["torch"],
         "transformers": versions["transformers"],
         "tokenizers": versions["tokenizers"],
-        "datasets": versions["datasets"],
     }
 
 

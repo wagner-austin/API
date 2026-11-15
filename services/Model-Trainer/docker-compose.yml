@@ -9,7 +9,7 @@ services:
       dockerfile: services/Model-Trainer/Dockerfile
       target: api
       args:
-        TORCH_INDEX: ${TORCH_INDEX:-https://download.pytorch.org/whl/cu124}
+        TORCH_INDEX: ${TORCH_INDEX:-https://download.pytorch.org/whl/cu132}
         GIT_COMMIT: ${GIT_COMMIT:-}
     container_name: model-trainer-api
     logging:
@@ -64,7 +64,7 @@ services:
       dockerfile: services/Model-Trainer/Dockerfile
       target: worker
       args:
-        TORCH_INDEX: ${TORCH_INDEX:-https://download.pytorch.org/whl/cu124}
+        TORCH_INDEX: ${TORCH_INDEX:-https://download.pytorch.org/whl/cu132}
         GIT_COMMIT: ${GIT_COMMIT:-}
     container_name: model-trainer-worker
     # The worker logs one JSON line per training step (tens of thousands per

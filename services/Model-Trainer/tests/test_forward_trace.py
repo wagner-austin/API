@@ -15,6 +15,7 @@ from __future__ import annotations
 import pytest
 import torch
 
+from model_trainer.core.services.model.backends.gpt2.hf_gpt2 import create_gpt2_config
 from model_trainer.core.services.model.deterministic_gemm import CUBLAS_ARM
 from model_trainer.core.services.model.forward_trace import (
     ForwardTrace,
@@ -55,8 +56,8 @@ class TestFindingTensorsInAHookArgument:
         assert tensors_in((first, second)) == (first, second)
 
     def test_a_tuple_drops_its_non_tensors(self) -> None:
-        # GPT2Block returns (hidden_states, present) and present is None when
-        # the cache is off, which is the case the probe runs in.
+        # GPT2Attention returns (attn_output, attn_weights) and the weights
+        # are None under sdpa, which is the path the probe runs.
         tensor = one(1.0)
 
         assert tensors_in((tensor, None)) == (tensor,)
@@ -149,14 +150,19 @@ class TestWhatOneTinyForwardTraces:
 
         assert [t["module_class"] for t in matching] == ["Conv1D"]
 
-    def test_the_attention_module_is_the_sdpa_implementation(self) -> None:
-        # Recorded rather than assumed: transformers 4.46 chooses the
-        # attention class at construction, and which one ran is part of what
-        # a difference between two cards would have to be explained by.
+    def test_the_attention_module_runs_the_sdpa_implementation(self) -> None:
+        # Which attention path ran is part of what a difference between two
+        # cards would have to be explained by. transformers 5 serves every
+        # path with one GPT2Attention class, so the traced class cannot say
+        # it; the config the probe model was built from does, because
+        # create_gpt2_config names sdpa and a build that cannot run it is
+        # refused rather than moved to eager.
         traced, _ = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)
         classes = {t["module_class"] for t in traced if t["path"] == "transformer.h.0.attn"}
+        config = create_gpt2_config(vocab_size=8, max_seq_len=8, model_size="tiny")
 
-        assert classes == {"GPT2SdpaAttention"}
+        assert classes == {"GPT2Attention"}
+        assert config._attn_implementation == "sdpa"
 
     def test_both_layers_of_the_tiny_model_are_traced(self) -> None:
         traced, _ = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)

@@ -25,11 +25,12 @@ it, so a run states the site it measured at.
 
 WHY THE SITE MUST BE A TENSOR-VALUED MODULE. Extraction reuses
 :func:`~model_trainer.core.services.model.editing.activations.capture_module_io`,
-which refuses a module that runs with a non-tensor output -- a whole
-transformer block returns a tuple -- and that refusal is the honest one to
-inherit rather than to work around. The projection that writes a block's
-result back into the residual stream is tensor-valued and is where the edit
-literature already keys its own interventions.
+which refuses a module that runs with a non-tensor output -- an attention
+module returns its output together with its attention weights -- and that
+refusal is the honest one to inherit rather than to work around. The
+projection that writes a block's result back into the residual stream is
+tensor-valued and is where the edit literature already keys its own
+interventions.
 """
 
 from __future__ import annotations
@@ -232,9 +233,10 @@ def compose_directions(directions: Sequence[torch.Tensor]) -> torch.Tensor:
 def _steered(output: HookValue, shift: torch.Tensor, module_name: str) -> torch.Tensor:
     """Add the steering shift to a tensor-valued module's output.
 
-    ONE SHAPE, AND A REFUSAL FOR EVERYTHING ELSE. A transformer block returns
-    a tuple whose first element is the hidden state and whose remainder is
-    cache, and it would be easy to reach in and perturb element zero. That is
+    ONE SHAPE, AND A REFUSAL FOR EVERYTHING ELSE. An attention module returns
+    a tuple whose first element is its output and whose second is its
+    attention weights, and it would be easy to reach in and perturb element
+    zero. That is
     exactly what this refuses: the site is already required to be
     tensor-valued, because
     :func:`~model_trainer.core.services.model.editing.activations.capture_module_io`

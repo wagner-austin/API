@@ -7,8 +7,9 @@ return strictly typed values with no Any, cast, or type: ignore.
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Literal, Protocol
 
+import torch
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 
 from model_trainer.core.services.model.model_sizes import GPT2_MODEL_SIZES as MODEL_SIZES
@@ -25,6 +26,7 @@ class GPT2ConfigProto(Protocol):
     n_head: int
     bos_token_id: int
     eos_token_id: int
+    _attn_implementation: str | None
 
 
 class _GPT2ConfigCtorProto(Protocol):
@@ -40,6 +42,7 @@ class _GPT2ConfigCtorProto(Protocol):
         n_head: int,
         bos_token_id: int,
         eos_token_id: int,
+        attn_implementation: Literal["sdpa"],
     ) -> GPT2ConfigProto: ...
 
 
@@ -59,7 +62,7 @@ class _GPT2LMHeadModelLoaderProto(Protocol):
     """Protocol for GPT2LMHeadModel.from_pretrained class method."""
 
     @staticmethod
-    def from_pretrained(path: str) -> LMModelProto: ...
+    def from_pretrained(path: str, *, dtype: torch.dtype) -> LMModelProto: ...
 
 
 def _get_gpt2_config_class() -> _GPT2ConfigCtorProto:
@@ -114,6 +117,12 @@ def create_gpt2_config(
             model_trainer_status_for(ModelTrainerErrorCode.INVALID_MODEL_SIZE),
         )
     config_cls = _get_gpt2_config_class()
+    # sdpa is named, not left to transformers' choice. In transformers 5 one
+    # GPT2Attention class serves every attention implementation, so a forward
+    # trace's module class no longer tells two cards' attention paths apart
+    # (4.46 had GPT2SdpaAttention). An explicit request is refused where sdpa
+    # cannot run instead of falling back to eager, so every model this builds
+    # runs the same path or does not build.
     return config_cls(
         vocab_size=vocab_size,
         n_positions=max_seq_len,
@@ -122,6 +131,7 @@ def create_gpt2_config(
         n_head=size_config["n_head"],
         bos_token_id=0,
         eos_token_id=1,
+        attn_implementation="sdpa",
     )
 
 
@@ -163,7 +173,9 @@ def load_gpt2_model(path: str) -> LMModelProto:
         path: Path to the model directory containing config.json and model weights.
 
     Returns:
-        The loaded GPT2LMHeadModel conforming to LMModelProto.
+        The loaded GPT2LMHeadModel conforming to LMModelProto, in float32,
+        the precision transformers 4 always loaded. transformers 5 would
+        otherwise load whatever precision the checkpoint was saved in.
     """
     loader = _get_gpt2_lm_head_model_loader()
-    return loader.from_pretrained(path)
+    return loader.from_pretrained(path, dtype=torch.float32)

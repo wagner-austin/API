@@ -59,10 +59,10 @@ class TestNamingATracedTensor:
         assert trace_tensor_name(SAMPLE).endswith("|digest48")
 
     def test_the_module_class_is_part_of_the_name(self) -> None:
-        # Two cards that ran different attention classes must not pair their
+        # Two records from modules of different classes must not pair their
         # observations. The class being in the name is what prevents it.
         assert trace_tensor_name(SAMPLE) != trace_tensor_name(
-            {**SAMPLE, "module_class": "GPT2SdpaAttention"}
+            {**SAMPLE, "module_class": "GPT2Attention"}
         )
 
     def test_a_name_reads_back_into_the_fields_it_was_built_from(self) -> None:

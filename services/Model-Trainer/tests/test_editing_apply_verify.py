@@ -367,16 +367,16 @@ def test_capture_refuses_a_position_outside_the_sequence(position: int) -> None:
 
 
 def test_capture_refuses_a_module_whose_output_is_not_a_tensor() -> None:
-    """A transformer block returns a tuple, and there is no activation in it.
+    """An attention module returns a tuple, and no one activation is in it.
 
     Real module, real forward pass. The guard exists because a caller who
-    points the site at a block rather than at a projection gets a plausible
-    name and no vector.
+    points the site at the attention module rather than at its projection
+    gets a plausible name and no vector.
     """
     model, input_ids = _tiny()
     with pytest.raises(AppError) as caught:
         capture_module_io(
-            model=model, module_name="transformer.h.0", input_ids=input_ids, position=0
+            model=model, module_name="transformer.h.0.attn", input_ids=input_ids, position=0
         )
     assert caught.value.code is ModelTrainerErrorCode.EDIT_ACTIVATION_NOT_CAPTURED
 
