@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Protocol
+from typing import BinaryIO, Protocol
 
 from platform_langid._hook_protocols import (
     ModelProtocol,
@@ -66,70 +66,78 @@ def _detect_audio_format(audio_bytes: bytes) -> str:
     raise ValueError("Unknown audio format")
 
 
-class _PathProtocol(Protocol):
-    """Protocol for Path-like objects."""
+class _FramesProtocol(Protocol):
+    """Protocol for the (frames, channels) array soundfile.read returns."""
 
-    def __fspath__(self) -> str:
-        """Return filesystem path as string."""
+    def transpose(self) -> _FramesProtocol:
+        """The array transposed to (channels, frames)."""
         ...
 
 
-class _TorchaudioLoadFileProtocol(Protocol):
-    """Protocol for torchaudio.load with file path."""
+class _SoundfileReadProtocol(Protocol):
+    """Protocol for soundfile.read over an in-memory file."""
 
-    def __call__(self, filepath: _PathProtocol) -> tuple[_TorchTensorProtocol, int]:
-        """Load audio from file path.
+    def __call__(
+        self, file: BinaryIO, *, dtype: str, always_2d: bool
+    ) -> tuple[_FramesProtocol, int]:
+        """Decode a whole audio file.
 
         Args:
-            filepath: Path to audio file.
+            file: The encoded audio.
+            dtype: The sample type to decode to.
+            always_2d: Whether a mono file still comes back as (frames, 1).
 
         Returns:
-            Tuple of (waveform tensor, sample rate).
+            Tuple of (frames by channels array, sample rate).
         """
+        ...
+
+
+class _FromNumpyProtocol(Protocol):
+    """Protocol for torch.from_numpy."""
+
+    def __call__(self, array: _FramesProtocol) -> _TorchTensorProtocol:
+        """Wrap an array as a tensor sharing its memory."""
         ...
 
 
 def _default_audio_loader(audio_bytes: bytes, sample_rate: int) -> Sequence[float]:
     """Production implementation - loads and resamples audio.
 
-    Decodes audio from various formats (MP3, WAV, webm, etc.) using torchaudio.
-    The sample_rate parameter is ignored as torchaudio detects it automatically.
-    Uses a temp file for cross-platform compatibility.
+    Decodes the formats libsndfile reads (WAV, FLAC, OGG, MP3) with
+    soundfile, straight from memory, to float32 samples in [-1, 1]. Before
+    torchaudio 2.9 its load decoded these files through the same soundfile
+    backend on a machine without FFmpeg; from 2.9 that load needs the
+    separate torchcodec package and FFmpeg's shared libraries, so the
+    decode calls soundfile itself and torchaudio is kept for its resampler.
+    The sample_rate parameter is ignored as the file states its own rate.
 
     Args:
-        audio_bytes: Audio bytes in any format supported by torchaudio.
-        sample_rate: Ignored - torchaudio detects sample rate from file.
+        audio_bytes: Audio bytes in a format libsndfile reads.
+        sample_rate: Ignored - the decoded file carries its sample rate.
 
     Returns:
         Audio samples as sequence of floats at 16kHz.
 
     Raises:
-        ValueError: If audio format cannot be detected or is unsupported.
+        ValueError: If audio format cannot be detected.
+        soundfile.LibsndfileError: If libsndfile cannot decode the bytes.
     """
-    del sample_rate  # Ignored - torchaudio detects sample rate
+    del sample_rate  # Ignored - the file states its own rate
 
-    import tempfile
-    from pathlib import Path
+    import io
 
-    # Detect audio format from magic bytes
-    audio_format = _detect_audio_format(audio_bytes)
+    # Refuse bytes that are no audio format at all before decoding
+    _detect_audio_format(audio_bytes)
 
-    # Write to temp file (required for Windows compatibility)
-    with tempfile.NamedTemporaryFile(suffix=f".{audio_format}", delete=False) as tmp:
-        tmp.write(audio_bytes)
-        tmp_path = Path(tmp.name)
+    soundfile_mod = __import__("soundfile")
+    read_fn: _SoundfileReadProtocol = soundfile_mod.read
+    frames, source_rate = read_fn(io.BytesIO(audio_bytes), dtype="float32", always_2d=True)
+    torch_mod = __import__("torch")
+    from_numpy: _FromNumpyProtocol = torch_mod.from_numpy
+    waveform_raw = from_numpy(frames.transpose())
 
-    # Use torchaudio to decode audio from temp file
-    torchaudio_mod = __import__("torchaudio")
-    load_fn: _TorchaudioLoadFileProtocol = torchaudio_mod.load
-    waveform_and_rate = load_fn(tmp_path)
-    waveform_raw: _TorchTensorProtocol = waveform_and_rate[0]
-    source_rate: int = waveform_and_rate[1]
-
-    # Clean up temp file
-    tmp_path.unlink()
-
-    # torchaudio returns (channels, samples) - take first channel if stereo
+    # The waveform is (channels, samples) - take the first channel if stereo
     waveform: _TorchTensorProtocol = waveform_raw
     if waveform_raw.shape[0] > 1:
         waveform = waveform_raw[0].unsqueeze(0)

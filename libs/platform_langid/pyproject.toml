@@ -15,9 +15,10 @@ include = ["src/platform_langid/py.typed"]
 
 # The detector runs on DEFAULT_DEVICE "cpu" and no consumer reserves a GPU,
 # so torch comes from the PyTorch CPU index: PyPI's Linux wheel is the CUDA
-# build and brings 14 nvidia packages no test or deployment loads. torchaudio
-# stays below 2.9: from 2.9 its load needs the separate torchcodec package,
-# and _default_audio_loader calls torchaudio.load.
+# build and brings 14 nvidia packages no test or deployment loads. From 2.9
+# torchaudio's load needs the separate torchcodec package and FFmpeg, so
+# _default_audio_loader decodes with soundfile and takes only torchaudio's
+# Resample transform, which is plain torch.
 [[tool.poetry.source]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
@@ -26,10 +27,10 @@ priority = "explicit"
 [tool.poetry.dependencies]
 python = "^3.11"
 platform-core = { path = "../platform_core", develop = true }
-torch = { version = "^2.0.0", source = "pytorch-cpu" }
-torchaudio = { version = ">=2.0.0,<2.9", source = "pytorch-cpu" }
-transformers = "^4.30.0"
-soundfile = "^0.12.0"
+torch = { version = "^2.15.0", source = "pytorch-cpu" }
+torchaudio = { version = "^2.11.1", source = "pytorch-cpu" }
+transformers = "^5.23.0"
+soundfile = "^0.14.0"
 langcodes = "^3.5.1"
 
 [tool.poetry.group.dev.dependencies]

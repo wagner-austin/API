@@ -68,12 +68,12 @@ class TestDetectAudioFormat:
 class TestDefaultAudioLoader:
     """Tests for _default_audio_loader function.
 
-    Note: These tests use real audio files via torchaudio.
-    The audio loader decodes audio formats (MP3, WAV, etc.) using torchaudio.load.
+    Note: These tests decode real WAV bytes. The loader decodes with
+    soundfile and resamples with torchaudio's Resample transform.
     """
 
     def test_load_wav_audio(self) -> None:
-        """Load WAV audio from bytes using torchaudio."""
+        """Load WAV audio from bytes with soundfile."""
         # Create a minimal valid WAV file header + 16kHz mono audio
         # WAV format: RIFF header + fmt chunk + data chunk
         import struct

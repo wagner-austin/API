@@ -160,9 +160,10 @@ make check  # lint + test
 ## Requirements
 
 - Python 3.11+
-- torch ^2.0.0
-- torchaudio ^2.0.0
-- transformers ^4.30.0
+- torch ^2.15.0 (PyTorch CPU index)
+- torchaudio ^2.11.1 (PyTorch CPU index), for its resampler
+- transformers ^5.23.0
+- soundfile ^0.14.0, which decodes the audio
 - platform-core (monorepo shared library)
 
 ## Quality Standards
