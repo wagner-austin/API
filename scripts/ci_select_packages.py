@@ -296,27 +296,66 @@ def torch_carriers(packages: list[str], repo: pathlib.Path) -> list[str]:
     return sorted(carriers)
 
 
+def package_inputs(repo: pathlib.Path, package: str) -> list[str]:
+    """Every path a package's check reads, by the rule :func:`select` applies.
+
+    WHY (MCPs board task 05916ee9). MCPs' push gate keeps a project's fleet
+    pass for the next publish of the same tree, keyed by a digest of what its
+    check read, and hashes this repository's commit under these paths. They
+    are :func:`select`'s rule read the other way: a change selects a package
+    when it is under the package, under a package it depends on, transitively,
+    or under :data:`GLOBAL_PATHS`, so a change the selection would check the
+    package for always moves its digest. A nested package's files are under
+    its parent's directory too, which moves the parent's digest without
+    selecting it: that over-reads, which costs a rerun and never skips one.
+
+    Args:
+        repo: Repository root.
+        package: Repo-relative package directory.
+
+    Returns:
+        Each directory it reads, with a trailing ``/``, sorted, then each
+        global path as declared.
+    """
+    seen: set[str] = set()
+    pending = [package]
+    while pending:
+        current = pending.pop()
+        if current not in seen:
+            seen.add(current)
+            pending.extend(direct_dependencies(repo, current))
+    return [*sorted(f"{directory}/" for directory in seen), *GLOBAL_PATHS]
+
+
 #: Flag selecting the carrier listing instead of change selection.
 TORCH_CARRIERS_FLAG = "--torch-carriers"
 
+#: Flag selecting every gated package's inputs instead of change selection.
+INPUTS_FLAG = "--inputs"
+
 
 def main(argv: list[str]) -> int:
-    """Print the JSON matrix of packages to check, or the torch carriers.
+    """Print the JSON matrix of packages to check, the torch carriers, or the inputs.
 
     Args:
         argv: Changed file paths, repo-relative. Reads standard input, one
             path per line, when none are given. The single argument
             ``--torch-carriers`` instead prints every gated package whose
-            venv installs torch -- the set the workflow must not cache.
+            venv installs torch -- the set the workflow must not cache -- and
+            ``--inputs`` every gated package's :func:`package_inputs`.
 
     Returns:
-        Exit code 0. Either listing is written to standard output as a JSON
-        array.
+        Exit code 0. The listing is written to standard output as JSON: an
+        array, or for ``--inputs`` an object of package to its paths.
     """
     repo = pathlib.Path(__file__).resolve().parent.parent
     packages = gated_packages(repo)
     if argv == [TORCH_CARRIERS_FLAG]:
         sys.stdout.write(json.dumps(torch_carriers(packages, repo)))
+        return 0
+    if argv == [INPUTS_FLAG]:
+        inputs = {package: package_inputs(repo, package) for package in packages}
+        sys.stdout.write(json.dumps(inputs, sort_keys=True))
         return 0
     changed = argv if argv else [line.strip() for line in sys.stdin if line.strip() != ""]
     sys.stdout.write(json.dumps(select(changed, packages, dependents_of(packages, repo))))
