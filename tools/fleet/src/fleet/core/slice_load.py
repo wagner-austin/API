@@ -109,6 +109,8 @@ PRESSURE_CGROUP: Final = "pressure_cgroup"
 def pressure_line(stalls: tuple[str, str, str], wall: str) -> str:
     """The line naming how long the check's own tasks stalled on each resource.
 
+    It is printed inside single quotes in ``sh``, so it holds no apostrophe.
+
     Args:
         stalls: The ``some`` seconds on cpu, io and memory, or ``printf`` placeholders.
         wall: The check's seconds, or a ``printf`` placeholder.
@@ -118,7 +120,7 @@ def pressure_line(stalls: tuple[str, str, str], wall: str) -> str:
     """
     cpu, io, memory = stalls
     return (
-        f"{PRESSURE_MARKER}: the check's cgroup stalled {cpu} s on cpu, {io} s on io and "
+        f"{PRESSURE_MARKER}: the cgroup of the check stalled {cpu} s on cpu, {io} s on io and "
         f"{memory} s on memory in the {wall} s the check ran"
     )
 
@@ -129,7 +131,7 @@ def pressure_none_line() -> str:
     Returns:
         The line, without its newline.
     """
-    return f"{PRESSURE_MARKER}: the check's cgroup keeps no pressure stall information"
+    return f"{PRESSURE_MARKER}: the cgroup of the check keeps no pressure stall information"
 
 
 def _stall(resource: str) -> str:
