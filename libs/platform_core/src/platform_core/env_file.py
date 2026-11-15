@@ -1,4 +1,9 @@
-"""The compose stack's ``.env``, read by one parser in this monorepo.
+"""Every ``KEY=VALUE`` credentials file, read by one parser in this monorepo.
+
+Two files are read here. The machine's standing credentials,
+``tools/hpc-wake/runs/credentials.env`` in its API checkout, are read by
+the fleet ticks and the hpc-wake pump (MCPs board task b3afb1c8). The
+stack's ``.env`` is the other.
 
 WHOSE FILE, WHOSE GRAMMAR. The MCPs repository's ``.env`` holds the
 stack's credentials: ``MCP_INTERNAL_KEY`` and ``OPERATOR_TENANT_ID`` for the
@@ -23,9 +28,7 @@ readers did.
 
 A refusal names the source and the line NUMBER and never repeats the line,
 because a mis-typed credential is exactly the line that would be echoed into
-a log. The file's bytes are the caller's to read, through its own seam, as
-with :mod:`platform_core.env_assignments`, the parser of the PowerShell
-credentials file, whose grammar is a different one.
+a log. The file's bytes are the caller's to read, through its own seam.
 """
 
 from __future__ import annotations
