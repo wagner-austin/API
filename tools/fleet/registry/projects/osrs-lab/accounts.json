@@ -10,31 +10,12 @@
     "path": "accounts",
     "install": [
       {
-        "phase": "deps",
+        "phase": "install",
         "argv": [
-          "python3",
-          "../MCPs/mcp-shared-py/scripts/generate_contract_hash.py"
-        ]
-      },
-      {
-        "phase": "deps",
-        "argv": [
-          "poetry",
+          "make",
           "-C",
           "accounts",
-          "lock"
-        ]
-      },
-      {
-        "phase": "deps",
-        "argv": [
-          "poetry",
-          "-C",
-          "accounts",
-          "sync",
-          "--no-cache",
-          "--with",
-          "dev"
+          "install"
         ]
       }
     ],

@@ -64,8 +64,11 @@ their play, held to the shared guards, strict mypy and 100% coverage as
 osrs-lab's evaluation package is. Its mcp-shared-py dependency is MCPs'
 checkout beside the export, so MCPs is its companion, and the guard imports
 that package's contract_hash.py, which MCPs generates and does not commit,
-so the deps phase generates it before locking and syncing the venv. It runs
-no container, so it needs only a linux node.
+so its own make install generates it before installing the venv, as
+coax-drone's freecad-environment does: an install step's argv is rendered
+into the node's shell and may not open with ``../``, and no CUDA wheel in
+its lock calls for a deps phase. It runs no container, so it needs only a
+linux node.
 """
 
 from __future__ import annotations
@@ -168,7 +171,7 @@ def test_the_phone_run_is_pinned_to_the_pixel_s_host_and_holds_its_device_lease(
 
 
 def test_the_accounts_registry_installs_beside_mcps_on_any_linux_node() -> None:
-    """It generates mcp-shared-py's hash, then locks and syncs its venv beside MCPs."""
+    """Its own make install generates mcp-shared-py's hash beside MCPs, then installs its venv."""
     project = require_project(decode_fleet_workspace(shipped_document()), "osrs-lab/accounts")
 
     assert project["required_tags"] == (NodeTag.LINUX,)
@@ -178,17 +181,7 @@ def test_the_accounts_registry_installs_beside_mcps_on_any_linux_node() -> None:
     assert project["source"] == ProjectSource(
         remote="https://github.com/wagner-austin/osrs-lab.git",
         path="accounts",
-        install=(
-            InstallStep(
-                phase="deps",
-                argv=("python3", "../MCPs/mcp-shared-py/scripts/generate_contract_hash.py"),
-            ),
-            InstallStep(phase="deps", argv=("poetry", "-C", "accounts", "lock")),
-            InstallStep(
-                phase="deps",
-                argv=("poetry", "-C", "accounts", "sync", "--no-cache", "--with", "dev"),
-            ),
-        ),
+        install=(InstallStep(phase="install", argv=("make", "-C", "accounts", "install")),),
         companions=(
             ProjectCompanion(
                 remote="https://github.com/wagner-austin/MCPs.git", ref="main", directory="MCPs"
