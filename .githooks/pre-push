@@ -210,13 +210,9 @@ fi
 
 # The tool's own virtualenv, and NOTHING ELSE -- the interpreter its suite
 # ran against, so a green `make check` in that package is evidence about
-# this invocation. The two branches are PLATFORM DETECTION, not a fallback:
-# Windows puts the interpreter at Scripts/python.exe and POSIX at bin/python,
-# and they are the same venv. There is deliberately no "else use whatever
-# python is on PATH", for the reason `pre-commit` gives at length.
-if [ -x "$TOOL/.venv/Scripts/python.exe" ]; then
-    PYTHON="$TOOL/.venv/Scripts/python.exe"
-elif [ -x "$TOOL/.venv/bin/python" ]; then
+# this invocation. There is deliberately no "else use whatever python is on
+# PATH", for the reason `pre-commit` gives at length.
+if [ -x "$TOOL/.venv/bin/python" ]; then
     PYTHON="$TOOL/.venv/bin/python"
 else
     echo "ci-wake: no virtualenv at $TOOL/.venv" >&2

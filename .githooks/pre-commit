@@ -35,19 +35,13 @@ TOOL="$REPO/tools/commit-scope"
 # suite ran against, so a green `make check` in that package is evidence
 # about this invocation.
 #
-# The two branches are PLATFORM DETECTION, not a fallback: Windows puts the
-# interpreter at Scripts/python.exe and POSIX at bin/python, and they are the
-# same venv.
-#
 # There is deliberately no "else use whatever python is on PATH". That is a
 # fallback, and it fails in the worst available direction: an interpreter
 # without platform_core raises ImportError, git sees a non-zero hook, and
 # EVERY commit in the repository is blocked by a traceback that reads as
 # "the hook is broken" rather than as "the venv is missing". Refusing here
 # names the actual fix in one line instead.
-if [ -x "$TOOL/.venv/Scripts/python.exe" ]; then
-    PYTHON="$TOOL/.venv/Scripts/python.exe"
-elif [ -x "$TOOL/.venv/bin/python" ]; then
+if [ -x "$TOOL/.venv/bin/python" ]; then
     PYTHON="$TOOL/.venv/bin/python"
 else
     echo "commit-scope: no virtualenv at $TOOL/.venv" >&2
