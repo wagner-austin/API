@@ -23,16 +23,16 @@ python = "^3.11"
 # Wheel installs must use the live-tested driver: 1.64 fails in
 # wait_for_function after game login (2026-10-16 release gate).
 playwright = "1.63.0"
-websockets = "^15.0"
+websockets = "^17.4"
 httpx2 = "^2.16"
 rich = "^15.0"
-python-dotenv = "^1.0.0"
-pillow = "^11.0"
-aiohttp = "^3.10"
+python-dotenv = "^1.2.4"
+pillow = "^13.0.0"
+aiohttp = "^3.14.5"
 monorepo-guards = { path = "../../libs/monorepo_guards", develop = true }
 platform-core = { path = "../../libs/platform_core", develop = true }
-psutil = "^7.0"
-psycopg = {version = "^3.3", extras = ["binary"]}
+psutil = "^7.2.2"
+psycopg = {version = "^3.3.9", extras = ["binary"]}
 
 [tool.poetry.scripts]
 tankpit-sniff = "tankpit_bot.sniffer.core:main"
