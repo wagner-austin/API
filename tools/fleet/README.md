@@ -1510,6 +1510,14 @@ way on colossus, desktop-input passed 68 tests at lines 592/592 and branches
 lines 725/951 and branches 461/646. Each declares 4 workers of 1.5 GB, the
 4 cores and 6 GB its runs were measured in.
 
+**`osrs-lab/build-runner`** (board task 7de1aee5, 2026-11-15) owns the
+shared container and Gradle runner's CPU-grant, cache reuse, invalidation,
+deliberate-fault and concurrent-reader checks. Its separate Docker-lane
+project uses the same minimum four workers and six GB as the Java modules.
+The OSRS package lift moves those shared checks out of desktop-input, whose
+own check continues verifying native input. The registry is published before
+the consuming repository moves its shared runner into this directory.
+
 **`osrs-lab/observer-input-coverage`** (board task 4a83389f, 2026-11-02) is
 the same observer build with one per-class JaCoCo gate in place of the
 module's: its `make check` runs the observer's tests and then only that
