@@ -413,7 +413,7 @@ opportunity-radar-api/
 |---------|---------|
 | `fastapi` | Web framework |
 | `hypercorn` | ASGI server |
-| `httpx` | HTTP client |
+| `httpx2` | HTTP client |
 | `platform-core` | JSON utilities, error handling |
 | `platform-codebase` | Codebase scanning |
 | `platform-kaggle` | Kaggle API wrapper |

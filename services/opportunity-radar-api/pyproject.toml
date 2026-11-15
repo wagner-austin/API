@@ -15,9 +15,9 @@ include = ["src/opportunity_radar_api/py.typed"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-fastapi = "^0.124"
+fastapi = "^0.163"
 hypercorn = "^0.18"
-httpx = "^0.28"
+httpx2 = "^2.16"
 
 platform-core = { path = "../../libs/platform_core", develop = true }
 platform-codebase = { path = "../../libs/platform_codebase", develop = true }
