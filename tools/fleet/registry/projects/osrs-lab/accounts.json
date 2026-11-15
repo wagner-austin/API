@@ -1,0 +1,49 @@
+{
+  "worker_ram_gb": 1.0,
+  "minimum_workers": 1,
+  "expected_minutes": 6,
+  "required_tags": [
+    "linux"
+  ],
+  "source": {
+    "remote": "https://github.com/wagner-austin/osrs-lab.git",
+    "path": "accounts",
+    "install": [
+      {
+        "phase": "deps",
+        "argv": [
+          "python3",
+          "../MCPs/mcp-shared-py/scripts/generate_contract_hash.py"
+        ]
+      },
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "accounts",
+          "lock"
+        ]
+      },
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "accounts",
+          "sync",
+          "--no-cache",
+          "--with",
+          "dev"
+        ]
+      }
+    ],
+    "companions": [
+      {
+        "remote": "https://github.com/wagner-austin/MCPs.git",
+        "ref": "main",
+        "directory": "MCPs"
+      }
+    ]
+  }
+}

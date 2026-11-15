@@ -57,6 +57,15 @@ and 13af2e26). Its make check builds mobile's classes in the same image, then
 runs the run's main on the host, where adb's server and the phone are, so it
 is pinned there, holds the device lease MCPs' phone lanes hold, and is
 staged on main's history, from which it names the commit it runs.
+
+accounts (MCPs board task 0bd4fb82) is not a Gradle build but the Python
+registry of every character the bots or the operator play and the report of
+their play, held to the shared guards, strict mypy and 100% coverage as
+osrs-lab's evaluation package is. Its mcp-shared-py dependency is MCPs'
+checkout beside the export, so MCPs is its companion, and the guard imports
+that package's contract_hash.py, which MCPs generates and does not commit,
+so the deps phase generates it before locking and syncing the venv. It runs
+no container, so it needs only a linux node.
 """
 
 from __future__ import annotations
@@ -66,7 +75,7 @@ from typing import Final
 import pytest
 
 from fleet.contracts.release_artifact import ArtifactKind, ReleaseArtifact
-from fleet.contracts.source import ProjectSource
+from fleet.contracts.source import InstallStep, ProjectCompanion, ProjectSource
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace, require_project
 from tests._registry import shipped_document
@@ -155,4 +164,34 @@ def test_the_phone_run_is_pinned_to_the_pixel_s_host_and_holds_its_device_lease(
         install=(),
         companions=(),
         base_branch="main",
+    )
+
+
+def test_the_accounts_registry_installs_beside_mcps_on_any_linux_node() -> None:
+    """It generates mcp-shared-py's hash, then locks and syncs its venv beside MCPs."""
+    project = require_project(decode_fleet_workspace(shipped_document()), "osrs-lab/accounts")
+
+    assert project["required_tags"] == (NodeTag.LINUX,)
+    assert project["node"] is None
+    assert project["exclusive_resources"] == ()
+    assert project["release_artifact"] is None
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/osrs-lab.git",
+        path="accounts",
+        install=(
+            InstallStep(
+                phase="deps",
+                argv=("python3", "../MCPs/mcp-shared-py/scripts/generate_contract_hash.py"),
+            ),
+            InstallStep(phase="deps", argv=("poetry", "-C", "accounts", "lock")),
+            InstallStep(
+                phase="deps",
+                argv=("poetry", "-C", "accounts", "sync", "--no-cache", "--with", "dev"),
+            ),
+        ),
+        companions=(
+            ProjectCompanion(
+                remote="https://github.com/wagner-austin/MCPs.git", ref="main", directory="MCPs"
+            ),
+        ),
     )
