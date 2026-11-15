@@ -10,11 +10,17 @@ on nothing.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Final
 
 import pytest
+from platform_core.json_utils import (
+    load_json_str,
+    narrow_json_to_dict,
+    narrow_json_to_list,
+    narrow_json_to_str,
+    require_str_list,
+)
 
 from tests._ci_selection_world import ci_repository, run_selection
 
@@ -52,8 +58,8 @@ def _inputs(script: Path) -> dict[str, list[str]]:
     """The ``--inputs`` answer of a scratch repository's selection."""
     run = run_selection(script, ["--inputs"])
     assert (run.returncode, run.stderr) == (0, "")
-    answer: dict[str, list[str]] = json.loads(run.stdout)
-    return answer
+    answer = narrow_json_to_dict(load_json_str(run.stdout))
+    return {package: require_str_list(answer, package) for package in answer}
 
 
 def test_a_package_reads_itself_its_dependencies_transitively_and_the_global_paths(
@@ -73,7 +79,8 @@ def test_every_package_a_change_selects_reads_the_changed_path(
 ) -> None:
     script = ci_repository(tmp_path, DECLARATION, PACKAGES)
     run = run_selection(script, [changed])
-    selected: list[str] = json.loads(run.stdout)
+    answer = narrow_json_to_list(load_json_str(run.stdout))
+    selected = [narrow_json_to_str(entry) for entry in answer]
     inputs = _inputs(script)
 
     reading = sorted(
