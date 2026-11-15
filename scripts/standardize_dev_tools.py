@@ -23,6 +23,13 @@ This script only rewrites the constraints it is given, only inside the dev
 dependency group, and only where the tool is already declared. It does not add
 a tool to a package that never asked for one, and it does not touch runtime
 dependencies.
+
+TWO SPELLINGS OF A DEV GROUP. A Poetry package lists its tools under
+``[tool.poetry.group.dev.dependencies]`` as carets; a PEP 621 package such as
+libs/cleargbm_rs (built by maturin, installed by uv) lists them as ``>=``
+floors in ``[project.optional-dependencies]``'s ``dev`` array. Both are
+rewritten to the same STANDARD release, each in its own spelling, so no
+package's toolchain is left behind for being declared the other way.
 """
 
 from __future__ import annotations
@@ -50,6 +57,37 @@ STANDARD = {
 
 DEV_GROUP = re.compile(r"(\[tool\.poetry\.group\.dev\.dependencies\])(.*?)(?=\n\[|\Z)", re.S)
 
+#: A PEP 621 ``dev`` extra: the array under ``[project.optional-dependencies]``.
+PEP621_DEV = re.compile(r"(\[project\.optional-dependencies\][^\[]*?\ndev\s*=\s*\[)(.*?)(\])", re.S)
+
+
+def _restandardise_pep621(text: str) -> tuple[str, list[str]]:
+    """Rewrite a PEP 621 dev extra's ``>=`` floors to the standard releases.
+
+    Args:
+        text: The pyproject.toml contents.
+
+    Returns:
+        The rewritten contents and the tools whose floor changed.
+    """
+    match = PEP621_DEV.search(text)
+    if match is None:
+        return text, []
+
+    changed: list[str] = []
+
+    def replace(entry: re.Match[str]) -> str:
+        name, current = entry.group(1), entry.group(2)
+        wanted = STANDARD.get(name)
+        if wanted is None or current == wanted.removeprefix("^"):
+            return entry.group(0)
+        floor = wanted.removeprefix("^")
+        changed.append(f'{name} ">={current}" -> ">={floor}"')
+        return f'"{name}>={floor}"'
+
+    body = re.sub(r'"([A-Za-z0-9_.-]+)>=([0-9][0-9A-Za-z.]*)"', replace, match.group(2))
+    return text[: match.start(2)] + body + text[match.end(2) :], changed
+
 
 def restandardise(text: str) -> tuple[str, list[str]]:
     """Rewrite a pyproject's dev-group constraints to the standard set.
@@ -64,7 +102,7 @@ def restandardise(text: str) -> tuple[str, list[str]]:
     """
     match = DEV_GROUP.search(text)
     if match is None:
-        return text, []
+        return _restandardise_pep621(text)
 
     body = match.group(2)
     changed: list[str] = []
