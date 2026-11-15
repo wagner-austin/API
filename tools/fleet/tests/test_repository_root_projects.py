@@ -74,15 +74,14 @@ MCPS_COMPANION = ProjectCompanion(
             (
                 InstallStep(
                     phase="mcps-install",
-                    argv=("make", "-s", "-C", "../MCPs/scripts/fleet-prepare", "install"),
+                    argv=("make", "-s", "--directory=../MCPs/scripts/fleet-prepare", "install"),
                 ),
                 InstallStep(
                     phase="mcps-build",
                     argv=(
                         "make",
                         "-s",
-                        "-C",
-                        "../MCPs/scripts/fleet-prepare",
+                        "--directory=../MCPs/scripts/fleet-prepare",
                         "workspace-build",
                         "ROOTS=packages/db:packages/wiki-check:packages/wiki-cli",
                     ),
