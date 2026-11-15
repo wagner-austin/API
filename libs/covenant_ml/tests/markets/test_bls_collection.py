@@ -7,7 +7,7 @@ from hashlib import sha256
 from pathlib import Path
 
 import pytest
-from httpx import HTTPStatusError, RemoteProtocolError
+from httpx2 import HTTPStatusError, RemoteProtocolError
 from platform_core.json_utils import dump_json_str
 
 from covenant_ml.markets import _test_hooks

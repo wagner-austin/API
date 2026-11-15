@@ -108,7 +108,7 @@ def test_real_cli_failure_is_nonzero_and_no_report(
     assert process.returncode == 1
     if failure == "http":
         assert process.stderr.splitlines()[-2:] == [
-            "httpx.HTTPStatusError: Client error '404 Not Found' for url "
+            "httpx2.HTTPStatusError: Client error '404 Not Found' for url "
             f"'{api_server.url}{RELEASE_PATH}?'",
             "For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404",
         ]

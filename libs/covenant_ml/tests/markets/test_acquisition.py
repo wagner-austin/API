@@ -179,7 +179,7 @@ def test_trade_identity_conflicts_never_increase_fill_volume(
 def test_http_failure_and_missing_capture_propagate(tmp_path: Path, api_server: ApiServer) -> None:
     store = archive(tmp_path, api_server)
     # The dynamic library boundary supplies a typed exception class, not a mocked response.
-    module = __import__("httpx")
+    module = __import__("httpx2")
     error: type[Exception] = module.HTTPStatusError
     with pytest.raises(error, match="404"):
         store.capture("/absent", {})

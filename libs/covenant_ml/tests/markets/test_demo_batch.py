@@ -113,7 +113,7 @@ def test_disconnect_cannot_resend_and_later_account_visibility_resolves_it(
         serve_snapshot(api_server, account_document((baseline,), (100,)))
         serve_batch_quote(api_server, row, 100)
         api_server.disconnect_paths.add(PREFIX + "events/orders")
-        from httpx import RemoteProtocolError
+        from httpx2 import RemoteProtocolError
 
         with pytest.raises(RemoteProtocolError):
             service.advance(root)

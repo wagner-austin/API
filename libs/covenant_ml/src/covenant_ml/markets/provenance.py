@@ -34,7 +34,7 @@ def market_fingerprint(
         get_env,
         capture_host_record(_test_hooks.host_probe),
         capture_package_versions(
-            ("covenant-ml", "platform-core", "numpy", "scipy", "httpx", "scikit-learn"),
+            ("covenant-ml", "platform-core", "numpy", "scipy", "httpx2", "scikit-learn"),
             _test_hooks.installed_version,
         ),
     )

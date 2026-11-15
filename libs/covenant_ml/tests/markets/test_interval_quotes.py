@@ -6,7 +6,7 @@ from contextlib import closing
 from pathlib import Path
 
 import pytest
-from httpx import HTTPStatusError
+from httpx2 import HTTPStatusError
 from platform_core.json_utils import JSONObject, JSONValue, narrow_json_to_dict, require_list
 
 from covenant_ml.markets.collection import MarketCollector

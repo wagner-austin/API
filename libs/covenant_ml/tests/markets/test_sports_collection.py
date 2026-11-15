@@ -5,7 +5,7 @@ from __future__ import annotations
 from contextlib import closing
 from pathlib import Path
 
-import httpx
+import httpx2
 import pytest
 from platform_core.json_utils import (
     JSONObject,
@@ -186,7 +186,7 @@ def test_actual_http_failure_propagates(api_server: ApiServer, tmp_path: Path) -
         store = ResponseArchive(
             tmp_path, api_server.url, client, _test_hooks.clock, _test_hooks.pause
         )
-        with pytest.raises(httpx.HTTPStatusError, match="503"):
+        with pytest.raises(httpx2.HTTPStatusError, match="503"):
             collect_sports_pair(sports_pair(), store, store, True, 0, 9999999999999, 1000)
     assert len(api_server.requests) == 1
     assert list(tmp_path.glob("*.json")) == []

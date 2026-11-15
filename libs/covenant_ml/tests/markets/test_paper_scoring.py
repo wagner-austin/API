@@ -6,7 +6,7 @@ import math
 from contextlib import closing
 from pathlib import Path
 
-import httpx
+import httpx2
 import pytest
 from platform_core.json_utils import narrow_json_to_dict, require_dict, require_list
 
@@ -82,7 +82,7 @@ def test_real_http_failure_propagates(api_server: ApiServer, tmp_path: Path) -> 
         archive = ResponseArchive(
             tmp_path, api_server.url, client, _test_hooks.clock, _test_hooks.pause
         )
-        with pytest.raises(httpx.HTTPStatusError, match="404"):
+        with pytest.raises(httpx2.HTTPStatusError, match="404"):
             reconcile_predictions((saved_prediction(),), archive, True)
     assert api_server.requests == ["/markets/KXHIGHTBOS-26APR03-B60.5?"]
     assert list(tmp_path.glob("*.json")) == []

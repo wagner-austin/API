@@ -6,7 +6,7 @@ from collections.abc import Callable
 from contextlib import closing
 from pathlib import Path
 
-import httpx
+import httpx2
 import pytest
 from platform_core.json_utils import (
     JSONObject,
@@ -134,7 +134,7 @@ def test_exclusions_retain_ticker(api_server: ApiServer, tmp_path: Path, unsuppo
 
 
 def test_real_http_failure_cannot_become_predictions(api_server: ApiServer, tmp_path: Path) -> None:
-    with pytest.raises(httpx.HTTPStatusError, match="404"):
+    with pytest.raises(httpx2.HTTPStatusError, match="404"):
         collect(api_server, tmp_path, paper_plan(), fitted_report())
     assert api_server.requests == ["/series/KXHIGHTBOS?"]
     assert list(tmp_path.rglob("*.json")) == []

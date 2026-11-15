@@ -110,7 +110,7 @@ def test_real_cli_http_failure_exits_nonzero(api_server: ApiServer, tmp_path: Pa
         "&period1=1598572800&period2=1598918400"
     )
     assert process.stderr.splitlines()[-2:] == [
-        f"httpx.HTTPStatusError: Client error '404 Not Found' for url '{failed_url}'",
+        f"httpx2.HTTPStatusError: Client error '404 Not Found' for url '{failed_url}'",
         "For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404",
     ]
     assert output.exists() is False

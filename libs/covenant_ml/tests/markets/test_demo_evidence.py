@@ -7,7 +7,7 @@ from hashlib import sha256
 from pathlib import Path
 
 import pytest
-from httpx import RemoteProtocolError
+from httpx2 import RemoteProtocolError
 from platform_core.http_client import build_client
 from platform_core.json_utils import dump_json_str, require_dict
 

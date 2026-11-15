@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from httpx import HTTPStatusError
+from httpx2 import HTTPStatusError
 from platform_core.config import config_test_hooks
 from platform_core.determinism_cpu import NativeLibrariesAlreadyLoadedError
 from platform_core.json_utils import dump_json_str
