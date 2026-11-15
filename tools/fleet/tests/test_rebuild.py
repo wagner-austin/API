@@ -17,7 +17,7 @@ from fleet.core import _test_hooks, rebuild
 
 class TestRebuildArgv:
     def test_composes_the_exact_make_invocation(self) -> None:
-        root = pathlib.Path("C:/Users/Test/PROJECTS/MCPs")
+        root = pathlib.Path("/home/corvis/PROJECTS/MCPs")
 
         argv = rebuild.rebuild_argv(root, "opus-fleet-0911")
 

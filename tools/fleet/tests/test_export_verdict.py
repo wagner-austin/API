@@ -376,8 +376,8 @@ class TestJudgeAndRender:
             exit_code=0,
             tail=PYTEST_TAIL,
             ended_unix=1791146008,
-            log_path="C:/fleet/stage/run-1/result.txt.log",
-            results_path="C:/fleet/stage/logs/run-1.results",
+            log_path="/home/corvis/fleet/stage/run-1/result.txt.log",
+            results_path="/home/corvis/fleet/stage/logs/run-1.results",
             run_id="run-1",
             workers=4,
         )
@@ -386,11 +386,11 @@ class TestJudgeAndRender:
         assert verdict.render_verdict(judged) == (
             f"FLEET-CHECK 3f2a9c1e {PROJECT} sha={SHA} node=lavender exit=0 banner=yes "
             "tests=771p/0f coverage=total=100.00% budget=unread ended=2026-10-04T20:33:28Z "
-            "log=lavender:C:/fleet/stage/run-1/result.txt.log "
+            "log=lavender:/home/corvis/fleet/stage/run-1/result.txt.log "
             "run=run-1 workers=4 slowest=unread ci=unread dispatch=unread vmtests=unread "
             "generation=unread began=unread phases=unread steps=unread registry=unread "
             "artifact=unread mutation=unread stalls=unread containers=unread "
-            "results=lavender:C:/fleet/stage/logs/run-1.results"
+            "results=lavender:/home/corvis/fleet/stage/logs/run-1.results"
         )
 
     def test_a_red_run_says_no_banner_and_carries_the_failed_count(self) -> None:

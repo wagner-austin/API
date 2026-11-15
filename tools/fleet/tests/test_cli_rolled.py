@@ -51,14 +51,14 @@ STAND_IN_FILES: dict[str, str] = {
 class TestCommandLine:
     def test_the_separator_splits_the_launchers_flags_from_the_agents(self) -> None:
         parsed, passthrough = rolled_cli.split_command_line(
-            ["--repo-root", "C:/api", "--agent", "fleet-agent", "--", "--node", "sedona"]
+            ["--repo-root", "/srv/api", "--agent", "fleet-agent", "--", "--node", "sedona"]
         )
-        assert parsed == {"--repo-root": "C:/api", "--agent": "fleet-agent"}
+        assert parsed == {"--repo-root": "/srv/api", "--agent": "fleet-agent"}
         assert passthrough == ["--node", "sedona"]
 
     def test_a_command_line_without_the_separator_is_refused(self) -> None:
         with pytest.raises(ValueError) as refused:
-            rolled_cli.split_command_line(["--repo-root", "C:/api", "--agent", "fleet-agent"])
+            rolled_cli.split_command_line(["--repo-root", "/srv/api", "--agent", "fleet-agent"])
         assert str(refused.value) == (
             "FLEET_ROLL_USAGE: -- must separate ['--repo-root', '--agent'] from the agent's own "
             "command line"

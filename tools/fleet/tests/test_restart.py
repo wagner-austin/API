@@ -23,7 +23,7 @@ TARGET = "934d9975-0d65-4e68-83de-b74f8c4df0c4"
 #: The board task a handoff's fresh worker starts on (MCPs mig 831).
 TASK = "553cc92f-39d0-49f3-a631-0d6108a2c5ec"
 ROOT: Final = pathlib.Path(
-    "C:/Users/Test/AppData/Local/Corvis/session-verbs-releases/3f0c9d5e8a7b4c21b6e0f1d2a3c4b5e6/MCPs"
+    "/home/corvis/.local/share/corvis/session-verbs-releases/3f0c9d5e8a7b4c21b6e0f1d2a3c4b5e6/MCPs"
 )
 REGISTRY: Final = str(ROOT / "mcp-shared" / "src" / "source-registry")
 RELEASE: Final = SessionRelease(

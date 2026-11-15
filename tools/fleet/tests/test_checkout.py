@@ -38,7 +38,7 @@ class TestRepositoryName:
             ("https://github.com/wagner-austin/MCPs", "MCPs"),
             ("git@github.com:wagner-austin/MCPs.git", "MCPs"),
             ("git@github.com:MCPs.git", "MCPs"),
-            ("C:\\Users\\Test\\PROJECTS\\API\n", "API"),
+            ("/home/corvis/PROJECTS/API\n", "API"),
             ("/srv/git/API.git/", "API"),
             ("https://github.com/", "github.com"),
             ("/", ""),

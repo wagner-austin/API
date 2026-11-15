@@ -50,7 +50,7 @@ def repository_name(remote_url: str) -> str:
         The segment after the last ``/`` or ``:``, without ``.git``; an
         empty string when the url ends in a separator.
     """
-    segment = remote_url.strip().replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
+    segment = remote_url.strip().rstrip("/").rpartition("/")[2]
     return segment.rsplit(":", 1)[-1].removesuffix(".git")
 
 

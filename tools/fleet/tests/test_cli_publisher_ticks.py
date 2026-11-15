@@ -64,8 +64,8 @@ def _hub_hostname() -> str:
 
 class TestParseRan:
     def test_it_reads_a_bridge_s_name_exit_and_directory(self) -> None:
-        assert parse_ran("hpc-wake=0=C:/API/tools/hpc-wake") == RanPublisher(
-            publisher="hpc-wake", exit_code=0, directory=pathlib.Path("C:/API/tools/hpc-wake")
+        assert parse_ran("hpc-wake=0=/srv/API/tools/hpc-wake") == RanPublisher(
+            publisher="hpc-wake", exit_code=0, directory=pathlib.Path("/srv/API/tools/hpc-wake")
         )
 
     def test_a_signal_death_reads_negative(self) -> None:

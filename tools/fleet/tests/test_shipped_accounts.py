@@ -26,28 +26,27 @@ from tests._registry import shipped_document
 FLEET_ACCOUNT: Final = "corvis"
 
 
-def linux_accounts(document: JSONObject) -> dict[str, str | None]:
-    """Each Linux machine's declared account.
+def machine_accounts(document: JSONObject) -> dict[str, str | None]:
+    """Each machine's declared account.
 
     Args:
         document: A workspace document.
 
     Returns:
-        Every machine whose platform is linux, with its ``user``, or None
-        for a client the fleet logs in to nowhere.
+        Every machine with its ``user``, or None for a client the fleet logs
+        in to nowhere.
     """
     machines = require_dict(document, "machines")
     accounts: dict[str, str | None] = {}
     for name in sorted(machines):
         machine = require_dict(machines, name)
-        if require_str(machine, "platform") == "linux":
-            user = machine["user"]
-            accounts[name] = None if user is None else require_str(machine, "user")
+        user = machine["user"]
+        accounts[name] = None if user is None else require_str(machine, "user")
     return accounts
 
 
-def test_every_linux_machine_the_fleet_logs_in_to_is_reached_as_corvis() -> None:
-    accounts = linux_accounts(shipped_document())
+def test_every_machine_the_fleet_logs_in_to_is_reached_as_corvis() -> None:
+    accounts = machine_accounts(shipped_document())
     others = {name: user for name, user in accounts.items() if user not in (None, FLEET_ACCOUNT)}
 
     assert others == {}
@@ -60,8 +59,7 @@ def test_a_machine_file_naming_another_account_is_found() -> None:
             "kept": {"platform": "linux", "user": "user"},
             "client": {"platform": "linux", "user": None},
             "fleet": {"platform": "linux", "user": FLEET_ACCOUNT},
-            "elsewhere": {"platform": "windows", "user": "Test"},
         }
     }
 
-    assert linux_accounts(document) == {"client": None, "fleet": FLEET_ACCOUNT, "kept": "user"}
+    assert machine_accounts(document) == {"client": None, "fleet": FLEET_ACCOUNT, "kept": "user"}

@@ -77,7 +77,7 @@ class TestActiveRelease:
         assert session_release.pointer_path() == pointer_file(tmp_path)
 
     def test_the_pointer_lives_in_the_store_under_home(self, tmp_path: pathlib.Path) -> None:
-        _test_hooks.env = FakeEnv({"HOME": str(tmp_path), "LOCALAPPDATA": "/elsewhere"})
+        _test_hooks.env = FakeEnv({"HOME": str(tmp_path)})
 
         assert session_release.pointer_path() == (
             tmp_path / ".local" / "share" / "corvis" / "session-verbs-releases" / "active.json"
