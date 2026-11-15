@@ -85,6 +85,7 @@ from tests._registry import shipped_document
 
 DIRECTORIES: Final[tuple[str, ...]] = (
     "brain",
+    "build-runner",
     "desktop-input",
     "input-policy",
     "live-coverage",
