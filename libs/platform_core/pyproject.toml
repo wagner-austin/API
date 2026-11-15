@@ -20,12 +20,12 @@ httpx2 = "^2.16"
 rich = "^15.0"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^9.1.1"
-pytest-asyncio = "^1.4.0"
+pytest = "^9.2.0"
+pytest-asyncio = "^1.5.0"
 pytest-xdist = "^3.8.0"
 pytest-cov = "^7.1.0"
-mypy = "^2.3.1"
-ruff = "^0.16.6"
+mypy = "^2.4.1"
+ruff = "^0.17.5"
 numpy = "^2.3.5"
 cosmic-ray = "8.7.0"
 
