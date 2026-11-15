@@ -1,7 +1,7 @@
 """Public test utilities for platform_ml.
 
 Provides Protocol types and hooks for testing ML components against real code paths.
-HTTP transport fakes are defined in tests/ to avoid httpx import in src/.
+HTTP transport fakes are defined in tests/ to avoid an httpx2 import in src/.
 
 Usage:
     # For wandb publisher tests:
