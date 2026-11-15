@@ -2050,14 +2050,14 @@ typing-extensions = ">=4.5.0"
 
 [[package]]
 name = "packaging"
-version = "25.0"
+version = "26.3"
 description = "Core utilities for Python packages"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 groups = ["main", "dev"]
 files = [
-    {file = "packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484"},
-    {file = "packaging-25.0.tar.gz", hash = "sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f"},
+    {file = "packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"},
+    {file = "packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79"},
 ]
 
 [[package]]
@@ -3655,4 +3655,4 @@ wandb = ["wandb"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "fec00cdfc9b82c4294d05918097a0bbaf8aee609a2d8f18ff1d042ec2b147ae0"
+content-hash = "e1de90df0e3b434bd819e73fde94a4b96a3152a6ab2c19168fef99d9dd407cd5"
