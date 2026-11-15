@@ -23,7 +23,7 @@ priority = "explicit"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-fastapi = "^0.124"
+fastapi = "^0.163"
 hypercorn = "^0.18"
 python-multipart = "^0.0.18"
 typing-extensions = "^4.12.2"
@@ -41,7 +41,7 @@ pytest-cov = "^7.1.0"
 pytest-xdist = "^3.8.0"
 mypy = "^2.3.1"
 ruff = "^0.16.6"
-httpx = "^0.28.0"
+httpx2 = "^2.16"
 # Self-signed TLS material for the webserver tests. The six that need a
 # cert used to read `web/cert.pem`, which `.gitignore` excludes (line 29,
 # `web/*.pem`) precisely because a private key must not be committed -- so

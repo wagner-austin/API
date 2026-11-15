@@ -366,7 +366,7 @@ See [DEPLOYING_RAILWAY.md](./DEPLOYING_RAILWAY.md) for Railway deployment instru
 | `pytest-xdist` | Parallel tests |
 | `mypy` | Type checking |
 | `ruff` | Linting/formatting |
-| `httpx` | HTTP test client |
+| `httpx2` | HTTP test client |
 
 ---
 

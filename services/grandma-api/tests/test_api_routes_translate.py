@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Final
+
 from fastapi.testclient import TestClient
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
 from platform_stt import VerboseResponse, VerboseSegment
@@ -10,6 +12,11 @@ from grandma_api.api.main import create_app
 from grandma_api.config import GrandmaApiSettings, LogFormat, LogLevel
 
 from .conftest import generate_test_wav, make_test_container, set_fake_env
+
+#: The form fields a request sends, typed so the TestClient's
+#: ``Mapping[str, Any]`` parameter receives no ``Any`` of ours.
+TOKEN_FORM: Final[dict[str, str]] = {"token": "test-token"}
+WRONG_TOKEN_FORM: Final[dict[str, str]] = {"token": "wrong-token"}
 
 
 def _make_test_settings() -> GrandmaApiSettings:
@@ -45,7 +52,7 @@ def test_translate_success() -> None:
     audio_content = generate_test_wav()
     response = client.post(
         "/translate",
-        data={"token": "test-token"},
+        data=TOKEN_FORM,
         files={"audio": ("test.wav", audio_content, "audio/wav")},
     )
 
@@ -68,7 +75,7 @@ def test_translate_invalid_token() -> None:
     audio_content = generate_test_wav()
     response = client.post(
         "/translate",
-        data={"token": "wrong-token"},
+        data=WRONG_TOKEN_FORM,
         files={"audio": ("test.wav", audio_content, "audio/wav")},
     )
 
@@ -91,7 +98,7 @@ def test_translate_empty_audio() -> None:
 
     response = client.post(
         "/translate",
-        data={"token": "test-token"},
+        data=TOKEN_FORM,
         files={"audio": ("test.wav", b"", "audio/wav")},
     )
 
@@ -115,7 +122,7 @@ def test_translate_no_filename() -> None:
     audio_content = generate_test_wav()
     response = client.post(
         "/translate",
-        data={"token": "test-token"},
+        data=TOKEN_FORM,
         files={"audio": audio_content},
     )
 
@@ -146,7 +153,7 @@ def test_translate_english_skips_translation() -> None:
     audio_content = generate_test_wav()
     response = client.post(
         "/translate",
-        data={"token": "test-token"},
+        data=TOKEN_FORM,
         files={"audio": ("test.wav", audio_content, "audio/wav")},
     )
 
@@ -183,7 +190,7 @@ def test_translate_silent_audio_returns_empty() -> None:
     audio_content = generate_test_wav()
     response = client.post(
         "/translate",
-        data={"token": "test-token"},
+        data=TOKEN_FORM,
         files={"audio": ("test.wav", audio_content, "audio/wav")},
     )
 
