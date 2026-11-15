@@ -214,8 +214,8 @@ class SpokenLanguageDetectorProtocol(Protocol):
         """Detect spoken language from audio.
 
         Args:
-            audio_bytes: Audio bytes in any format supported by torchaudio
-                (MP3, WAV, webm, ogg, flac, etc.).
+            audio_bytes: Audio bytes in a format libsndfile reads (WAV,
+                FLAC, OGG, MP3); webm is not among them.
             sample_rate: Ignored - sample rate is detected from audio format.
 
         Returns:

@@ -36,36 +36,6 @@ def _default_processor_factory(model_id: str) -> ProcessorProtocol:
     return processor
 
 
-def _detect_audio_format(audio_bytes: bytes) -> str:
-    """Detect audio format from magic bytes.
-
-    Args:
-        audio_bytes: Audio file bytes.
-
-    Returns:
-        Format string for torchaudio (wav, mp3, ogg, flac, webm).
-
-    Raises:
-        ValueError: If format cannot be detected.
-    """
-    if len(audio_bytes) < 12:
-        raise ValueError("Audio data too short to detect format")
-
-    # Check magic bytes
-    if audio_bytes[:4] == b"RIFF" and audio_bytes[8:12] == b"WAVE":
-        return "wav"
-    if audio_bytes[:3] == b"ID3" or audio_bytes[:2] == b"\xff\xfb":
-        return "mp3"
-    if audio_bytes[:4] == b"OggS":
-        return "ogg"
-    if audio_bytes[:4] == b"fLaC":
-        return "flac"
-    if audio_bytes[:4] == b"\x1a\x45\xdf\xa3":  # EBML header (webm/mkv)
-        return "webm"
-
-    raise ValueError("Unknown audio format")
-
-
 class _FramesProtocol(Protocol):
     """Protocol for the (frames, channels) array soundfile.read returns."""
 
@@ -120,15 +90,12 @@ def _default_audio_loader(audio_bytes: bytes, sample_rate: int) -> Sequence[floa
         Audio samples as sequence of floats at 16kHz.
 
     Raises:
-        ValueError: If audio format cannot be detected.
-        soundfile.LibsndfileError: If libsndfile cannot decode the bytes.
+        soundfile.LibsndfileError: If libsndfile cannot decode the bytes,
+            the one judge of which formats this loader reads.
     """
     del sample_rate  # Ignored - the file states its own rate
 
     import io
-
-    # Refuse bytes that are no audio format at all before decoding
-    _detect_audio_format(audio_bytes)
 
     soundfile_mod = __import__("soundfile")
     read_fn: _SoundfileReadProtocol = soundfile_mod.read
