@@ -144,9 +144,9 @@ def _run(
     (tools / "systemctl").write_text(SYSTEMCTL, encoding="utf-8")
     (tools / "systemctl").chmod(0o755)
     if lane:
-        measured, directory = EXEC_LANE_CGROUP, LANE_MANAGER.removeprefix("/")
+        pressure_of, directory = EXEC_LANE_CGROUP, LANE_MANAGER.removeprefix("/")
     else:
-        measured, directory = _check_cgroup(tmp_path, root)
+        pressure_of, directory = _check_cgroup(tmp_path, root)
     cgroup = root / directory
     cgroup.mkdir(parents=True)
     for resource, (before_total, after_total) in pressure.items():
@@ -162,9 +162,9 @@ def _run(
         [
             f"PATH='{tools}':\"$PATH\"",
             "exec_uid=1001",
-            *sh_slice_load_start_lines(tuple(slices), str(root), measured),
+            *sh_slice_load_start_lines(tuple(slices), str(root), pressure_of),
             *changes,
-            *sh_slice_load_end_lines(tuple(slices), str(log), measured),
+            *sh_slice_load_end_lines(tuple(slices), str(log), pressure_of),
         ]
     )
     started = int(time.time())

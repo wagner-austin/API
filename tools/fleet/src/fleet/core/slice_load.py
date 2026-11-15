@@ -291,7 +291,7 @@ def _usage(cpu_stat: str) -> str:
 
 
 def sh_slice_load_start_lines(
-    slices: tuple[MeasuredSlice, ...], cgroup_root: str, measured: PressureCgroup
+    slices: tuple[MeasuredSlice, ...], cgroup_root: str, pressure_of: PressureCgroup
 ) -> list[str]:
     """The ``sh`` lines that note each slice's CPU time, the measured stalls and the clock.
 
@@ -301,13 +301,13 @@ def sh_slice_load_start_lines(
     Args:
         slices: The slices, :data:`MEASURED_SLICES` on a node.
         cgroup_root: :data:`CGROUP_ROOT` on a node.
-        measured: The cgroup whose stalls are read, :data:`CHECK_CGROUP` for
-            a build whose work runs in its own unit.
+        pressure_of: The cgroup whose stalls are read, :data:`CHECK_CGROUP`
+            for a build whose work runs in its own unit.
 
     Returns:
         The lines; ``<field>_usage_started`` is empty on a host without the slice.
     """
-    lines = _pressure_start_lines(cgroup_root, measured)
+    lines = _pressure_start_lines(cgroup_root, pressure_of)
     for measured in slices:
         started = f"{measured['field']}_usage_started"
         stat = measured["cpu_stat"]
@@ -319,7 +319,7 @@ def sh_slice_load_start_lines(
 
 
 def sh_slice_load_end_lines(
-    slices: tuple[MeasuredSlice, ...], log: str, measured: PressureCgroup
+    slices: tuple[MeasuredSlice, ...], log: str, pressure_of: PressureCgroup
 ) -> list[str]:
     """The ``sh`` lines that print each slice's CPU time over the recipe into the transcript.
 
@@ -330,7 +330,7 @@ def sh_slice_load_end_lines(
     Args:
         slices: The slices, :data:`MEASURED_SLICES` on a node.
         log: The transcript's path, appended to.
-        measured: The cgroup the start lines read, so the line names it.
+        pressure_of: The cgroup the start lines read, so the line names it.
 
     Returns:
         The lines, run after the recipe's phase and before the status is written.
@@ -353,7 +353,7 @@ def sh_slice_load_end_lines(
                 "fi",
             ]
         )
-    return [*lines, *_pressure_end_lines(log, measured)]
+    return [*lines, *_pressure_end_lines(log, pressure_of)]
 
 
 def read_slice_load(tail: str, measured: MeasuredSlice) -> str:
