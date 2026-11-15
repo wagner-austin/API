@@ -13,8 +13,13 @@ packages = [
 include = ["src/covenant_nn/py.typed"]
 
 [[tool.poetry.source]]
-name = "pytorch-cuda"
-url = "https://download.pytorch.org/whl/cu128"
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+priority = "explicit"
+
+[[tool.poetry.source]]
+name = "pytorch-cu132"
+url = "https://download.pytorch.org/whl/cu132"
 priority = "explicit"
 
 [tool.poetry.dependencies]
@@ -22,7 +27,16 @@ python = "^3.11"
 covenant-ml = { path = "../covenant_ml", develop = true }
 platform-ml = { path = "../platform_ml", develop = true }
 platform-core = { path = "../platform_core", develop = true }
-torch = {version = "^2.5", source = "pytorch-cuda"}
+# torch's NCCL must be xgboost's, which covenant_ml brings: nvidia-nccl-cu12
+# and nvidia-nccl-cu13 both install nvidia/nccl/lib/libnccl.so.2, so removing
+# either deletes the library the other loads. xgboost needs nccl-cu12 through
+# 3.3 and nccl-cu13 from 3.4.0, which needs Python 3.12, so each Python takes
+# the newest torch built against the same NCCL; CUDA 13.2 is the newest
+# demure's 595 driver runs. A consumer's root names these two sources too.
+torch = [
+  { version = "^2.14.1", source = "pytorch-cu126", python = "~3.11" },
+  { version = "^2.15.0", source = "pytorch-cu132", python = ">=3.12,<3.16" },
+]
 numpy = "^2.3"
 
 [tool.poetry.group.dev.dependencies]
