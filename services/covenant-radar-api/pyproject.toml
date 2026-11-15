@@ -38,12 +38,19 @@ confluent-kafka = "^2.16.1"
 
 google-genai = "^3.3"
 
-# torch comes from the pytorch-cuda index, as covenant_nn and platform_ml
-# declare it. Poetry reads only the root project's sources, so without this
-# line a relock may take PyPI's build instead, which CI's runner could not
-# load (libnccl.so.2 missing, run 43700695596 at 1a7d87bd5). Its triton
-# installs below Python 3.15, the same bound ddtrace carries above.
-torch = { version = "^2.11.0", source = "pytorch-cuda", python = "^3.11,<3.15" }
+# torch's NCCL must be xgboost's: nvidia-nccl-cu12 and nvidia-nccl-cu13 both
+# install nvidia/nccl/lib/libnccl.so.2, so with one of each, removing either
+# deletes the library the other loads (CI run 43700695596 at 1a7d87bd5 failed
+# twenty torch cases that way). xgboost needs nccl-cu12 through 3.3 and
+# nccl-cu13 from 3.4.0, which needs Python 3.12, so each Python takes the
+# newest torch built against the same NCCL: the CUDA 12.6 build on 3.11 and
+# the CUDA 13.2 build from 3.12, the newest CUDA demure's 595 driver runs.
+# Poetry reads only the root project's sources, so covenant_nn's own torch
+# source does not choose these. 2.15's triton installs below Python 3.16.
+torch = [
+  { version = "^2.14.1", source = "pytorch-cu126", python = "~3.11" },
+  { version = "^2.15.0", source = "pytorch-cu132", python = ">=3.12,<3.16" },
+]
 
 platform-core = { path = "../../libs/platform_core", develop = true }
 platform-workers = { path = "../../libs/platform_workers", develop = true }
@@ -56,8 +63,13 @@ openpyxl = "^3.1.5"
 xlrd = "^2.0.2"
 
 [[tool.poetry.source]]
-name = "pytorch-cuda"
-url = "https://download.pytorch.org/whl/cu128"
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+priority = "explicit"
+
+[[tool.poetry.source]]
+name = "pytorch-cu132"
+url = "https://download.pytorch.org/whl/cu132"
 priority = "explicit"
 
 [tool.poetry.group.dev.dependencies]
