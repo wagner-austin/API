@@ -2634,6 +2634,7 @@ develop = true
 
 [package.dependencies]
 numpy = "^2.3.5"
+packaging = "^26.3"
 platform-core = {path = "../platform_core", develop = true}
 sentencepiece = "^0.2.1"
 shap = "^0.51"
