@@ -17,7 +17,7 @@ include = ["src/platform_stt/py.typed"]
 python = "^3.11"
 platform-core = { path = "../platform_core", develop = true }
 numpy = "<2.0"
-openai = "^2.8.0"
+openai = "^3.51.0"
 fasttext-wheel = "^0.9.2"
 
 [tool.poetry.group.dev.dependencies]
