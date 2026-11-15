@@ -25,7 +25,13 @@ the check under its 100% floor (fleet job 1b48e90e). The Dashboards root's
 check ends in a provenance gate that runs the deliverable-write validator
 against the wikis its articles cite, all found beside the repository as a
 workstation keeps them in ``~/PROJECTS``, so the root carries those five
-repositories as companions under the directory names they have there.
+repositories as companions under the directory names they have there. The
+personal wiki's check (MCPs board task 96def18f) is TypeScript tooling whose
+package.json links corvis-db, corvis-wiki-check and corvis-wiki-cli by
+``file:../MCPs/packages/...``, so it carries MCPs as a companion, installs
+MCPs' workspace and builds those three packages there with MCPs' own
+fleet-prepare before its own ``npm ci``, and takes the pdftotext and cxx tags
+MCPs' wiki-check project takes.
 """
 
 from __future__ import annotations
@@ -62,6 +68,29 @@ MCPS_COMPANION = ProjectCompanion(
         ("hardware-wiki", (), (), (MCPS_COMPANION,)),
         ("tech-wiki", (), (), (MCPS_COMPANION,)),
         ("creator-wiki", (), (), (MCPS_COMPANION,)),
+        (
+            "wiki",
+            (NodeTag.CXX, NodeTag.PDFTOTEXT),
+            (
+                InstallStep(
+                    phase="mcps-install",
+                    argv=("make", "-s", "-C", "../MCPs/scripts/fleet-prepare", "install"),
+                ),
+                InstallStep(
+                    phase="mcps-build",
+                    argv=(
+                        "make",
+                        "-s",
+                        "-C",
+                        "../MCPs/scripts/fleet-prepare",
+                        "workspace-build",
+                        "ROOTS=packages/db:packages/wiki-check:packages/wiki-cli",
+                    ),
+                ),
+                NPM_CI,
+            ),
+            (MCPS_COMPANION,),
+        ),
         ("metabolomics-dashboard", (), (), (MCPS_COMPANION,)),
         ("corvis-stick", (NodeTag.LINUX,), (NPM_CI,), (MCPS_COMPANION,)),
         ("tree-bot", (), (), ()),

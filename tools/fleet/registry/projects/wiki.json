@@ -1,0 +1,50 @@
+{
+  "worker_ram_gb": 2,
+  "minimum_workers": 1,
+  "expected_minutes": 10,
+  "required_tags": [
+    "cxx",
+    "pdftotext"
+  ],
+  "source": {
+    "remote": "https://github.com/wagner-austin/wiki.git",
+    "path": "",
+    "install": [
+      {
+        "phase": "mcps-install",
+        "argv": [
+          "make",
+          "-s",
+          "-C",
+          "../MCPs/scripts/fleet-prepare",
+          "install"
+        ]
+      },
+      {
+        "phase": "mcps-build",
+        "argv": [
+          "make",
+          "-s",
+          "-C",
+          "../MCPs/scripts/fleet-prepare",
+          "workspace-build",
+          "ROOTS=packages/db:packages/wiki-check:packages/wiki-cli"
+        ]
+      },
+      {
+        "phase": "install",
+        "argv": [
+          "npm",
+          "ci"
+        ]
+      }
+    ],
+    "companions": [
+      {
+        "remote": "https://github.com/wagner-austin/MCPs.git",
+        "ref": "main",
+        "directory": "MCPs"
+      }
+    ]
+  }
+}
