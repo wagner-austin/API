@@ -114,7 +114,7 @@ def test_the_line_asks_exactly_the_contract_pins() -> None:
 
 
 def test_the_program_holds_no_quote_a_shell_would_read() -> None:
-    """Both probes pass it inside double quotes, PowerShell's inside single ones."""
+    """The probe passes it inside double quotes; it holds no quote at all, so no layer ends it."""
     assert ('"' in HOOKS_CHECK_PROGRAM, "'" in HOOKS_CHECK_PROGRAM) == (False, False)
 
 

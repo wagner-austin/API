@@ -59,10 +59,9 @@ def home_with_sessions(tmp_path: pathlib.Path, *records: JSONObject) -> dict[str
         *records: The registration documents, written as ``<pid>.json``.
 
     Returns:
-        The environment that makes ``~`` resolve there under both
-        ``os.path.expanduser`` spellings (``HOME`` on POSIX, ``USERPROFILE``
-        on Windows), over the parent environment read through the
-        monorepo's one permitted reader so the interpreter still starts.
+        The environment that makes ``~`` resolve there (``HOME``), over the
+        parent environment read through the monorepo's one permitted reader
+        so the interpreter still starts.
     """
     if records:
         sessions = tmp_path / ".claude" / "sessions"
@@ -70,7 +69,7 @@ def home_with_sessions(tmp_path: pathlib.Path, *records: JSONObject) -> dict[str
         for record in records:
             (sessions / f"{record['pid']}.json").write_text(dump_json_str(record), encoding="utf-8")
     parent = config_test_hooks.get_environment()
-    return {**parent, "HOME": str(tmp_path), "USERPROFILE": str(tmp_path)}
+    return {**parent, "HOME": str(tmp_path)}
 
 
 def this_node_pid_domain() -> str:

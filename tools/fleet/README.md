@@ -556,7 +556,7 @@ so a job queued once `make fleet-roll` returned runs the rolled registry's
 install steps; job 0fa14fab, claimed by pendragon 16 s before its boundary
 on the registry before roll 84bc5ff0b6a9, is the case. The first read that
 finds the move stops the serve's listing until its handover. The fires that
-arrive while it serves are skipped by `IgnoreNew` on purpose, and the node
+arrive while it serves are skipped, since the row runs one at a time, and the node
 goes unwatched only for those 10 s and the next start's few, once a serve. A
 serve of zero seconds is one start's shape: its opening passes, no listing,
 no read of the roll but its claims', and a handover at the first boundary.
@@ -1471,7 +1471,7 @@ are the same shape: another repository's remote, the package's directory as
 
 **`MCPs/packages/wiki-search` requires `linux`** (MCPs board task fd5cabfa,
 2026-09-25). Its install builds `hnswlib-node` from source with node-gyp,
-which needs a C++ toolchain, and no Windows node carries Visual Studio's:
+which needs a C++ toolchain, and the nodes of the time had none:
 dispatch job dd0b2ab3 failed on sedona with node v24.20.0 at `gyp ERR!
 find VS`, and de32d61e on serendipity the same way under node 18. Its only
 passes, 6c81f413 among them, ran on diphtheria, whose linux toolchain builds
@@ -1849,18 +1849,16 @@ declared budgets checked before and during.
 ## The one rule about talking to a node
 
 **Never interpolate a remote command.** Probing three nodes that way failed
-twice on 2026-09-04: quotes are stripped passing through the local shell, ssh,
-and `cmd` into `powershell`, and the second attempt arrived as
-`@(python,poetry,git,...)` — unquoted bare words, a parser error on the far
-side. `fleet.core.remote` renders the script, sends it over stdin, and runs it
+twice on 2026-09-04: the quotes were stripped by the shells the command
+crossed, and the second attempt arrived as unquoted bare words, a parser error
+on the far side. `fleet.core.remote` renders the script, sends it over stdin, and runs it
 by path, so the bytes that run are the bytes that were sent.
 
-**And the rule applies one layer further in.** The first Windows version
-passed the whole build inside a scheduled task's `-Argument` string, and
-PowerShell ended it at the first inner quote, so the task could not start
-and the ledger recorded a run that did not exist. So the build is its own
-script file, sent and named by path, and the launch interpolates one path
-and no code.
+**And the rule applies one layer further in.** A build passed inline is
+quoted once for the launcher and again for every shell it crosses, and one
+quote misread there turns the rest of the build into arguments nobody wrote.
+So the build is its own script file, sent and named by path, and the launch
+interpolates one path and no code.
 
 ## One dialect: `sh`
 

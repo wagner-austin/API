@@ -155,9 +155,9 @@ _SOURCE: Final[dict[Capability, str]] = {
     ),
 }
 
-#: A declared version: two to four dotted numbers, the shapes cargo (1.98.1),
-#: g++ (13.3.0) and vswhere (17.14.36310.24) print.
-VERSION: Final = re.compile(r"[0-9]+(?:\.[0-9]+){1,3}")
+#: A declared version: two or three dotted numbers, the shapes cargo (1.98.1),
+#: g++ (13.3.0), docker (29.9.1) and rootlesskit (2.3.6) print.
+VERSION: Final = re.compile(r"[0-9]+(?:\.[0-9]+){1,2}")
 
 
 def _version_in(capability: Capability, answer: str) -> str | None:

@@ -275,7 +275,6 @@ class TestStage:
                 f"commit --quiet --allow-empty --message 'fleet export {DEMO_RUN_ID}'\n"
             ).encode()
         )
-        assert not any("powershell" in argument for call in runner.calls for argument in call)
 
     def test_the_staged_tree_becomes_a_git_repository(self) -> None:
         """Ruff applies .gitignore ONLY inside a git repository, so without

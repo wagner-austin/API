@@ -149,8 +149,8 @@ class TestDefaultHooks:
 
     def test_run_gives_a_child_no_bytes_a_closed_stdin(self) -> None:
         """A child that reads stdin sees EOF at once, never this process's
-        own handle: under a scheduled task that handle is what a remote shell
-        waited on forever (board task 35940277, A2)."""
+        own handle, which is what a remote shell waited on forever (board task
+        35940277, A2)."""
         result = _test_hooks._default_run(
             [sys.executable, "-c", "import sys; print(repr(sys.stdin.read()))"],
             timeout_seconds=GENEROUS_SECONDS,
@@ -208,14 +208,14 @@ class TestDefaultHooks:
         assert withheld["stdout"].split() == ["False", "True"]
         assert inherited["stdout"].split() == ["True", "True"]
 
-    def test_a_python_child_logs_text_outside_its_code_page_and_it_arrives_whole(self) -> None:
+    def test_a_python_child_logs_an_em_dash_and_it_arrives_whole(self) -> None:
         """A real child writes the queue's em dash through a real logging handler.
 
         The shape that failed on 2026-09-29 (MCPs board task 88b8fe61): a
-        Python child on Windows wrote its pipes in cp1252, so the dash
-        arrived here as U+FFFD, and a child logging a character its stream
-        could not encode printed ``--- Logging error ---`` instead of the
-        line. Both streams must come back as the child meant them.
+        child whose streams were not UTF-8 sent the dash here as U+FFFD, and
+        a child logging a character its stream could not encode printed
+        ``--- Logging error ---`` instead of the line. Both streams must come
+        back as the child meant them.
         """
         dash = "—"
         probe = [

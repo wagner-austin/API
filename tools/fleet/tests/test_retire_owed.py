@@ -30,7 +30,7 @@ from fleet.contracts.retire_record import (
     decode_retire_record,
     encode_retire_record,
 )
-from fleet.core import _test_hooks, dispatch, leases, records, remote, retire_owed
+from fleet.core import _test_hooks, dispatch, leases, names, records, remote, retire_owed
 from tests._held_turns import is_held
 from tests._toolchain_fixtures import node
 from tests.conftest import (
@@ -465,7 +465,9 @@ class TestARunStillLive:
         _pass(path, tmp_path)
 
         assert retire_owed.owed_on(path, alias="lavender") == (DEMO_RUN_ID,)
-        assert not any(f"retire-{DEMO_RUN_ID}.ps1" in " ".join(c) for c in answered.calls)
+        sent = [" ".join(call) for call in answered.calls]
+        assert any(names.retire_stem(OTHER_RUN_ID) in argv for argv in sent)
+        assert not any(names.retire_stem(DEMO_RUN_ID) in argv for argv in sent)
         records.append_ledger(
             ledger,
             dispatch.closed_row(

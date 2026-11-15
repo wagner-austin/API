@@ -1,8 +1,6 @@
 """Scoring a runner audit's transcript, and every way one can fail to be scorable.
 
-The checks are a Linux host's (:func:`fleet.core.runner_audit.expected_checks`),
-the richest list either platform owes; loki's Windows audit is scored by the
-same reader, and :mod:`tests.test_runner_windows_host` drives that path.
+The checks are a runner host's (:func:`fleet.core.runner_audit.expected_checks`).
 """
 
 from __future__ import annotations

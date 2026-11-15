@@ -12,11 +12,9 @@ with ``origin/main`` at its real commit (fleet.core.stage_repository,
 companion_repository_commands). idle's check reads nothing beside it, and its
 browser project draws with WebGL in Chromium, so it takes the gpu tag.
 tree-bot's and Dashboards/rabbit's checks read nothing beside them and
-install through their own make check (MCPs board task ddd25310); tree-bot's
-recipes are PowerShell, so it takes a Windows node, while rabbit's, like
-the Dashboards root's, metabolomics-dashboard's and LSTM's, run under
-either platform's shell since MCPs board task e35812cc, so none of those
-takes windows. LSTM's check is a poetry install inside make check with no
+install through their own make check (MCPs board task ddd25310), and like
+the Dashboards root's and metabolomics-dashboard's they run under sh on any
+node, so none of them takes a tag. LSTM's check is a poetry install inside make check with no
 repository beside it, since platform_core arrives as a git dependency
 (board task bc12f18b). It takes the gpu tag, because its resume test
 restores CUDA RNG states on the card, the only place the bug it guards

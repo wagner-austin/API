@@ -115,9 +115,6 @@ class TestMeasured:
         assert measured(RUST, reports) == "1.98.1"
         assert measured(CXX, reports) == "13.3.0"
 
-    def test_a_windows_vc_tools_version_has_four_parts(self) -> None:
-        assert measured(CXX, _answered("cxx", True, "17.14.36310.24")) == "17.14.36310.24"
-
     def test_the_docker_line_carries_the_rootless_daemon_s_bare_server_version(self) -> None:
         """MCPs board task 6c4516af: the probe prints only the ServerVersion,
         and only when the daemon says it is rootless."""
@@ -214,10 +211,9 @@ class TestDecodeCapability:
         assert decode_capability(RUST, None) is None
         assert decode_capability(RUST, "1.98.1") == "1.98.1"
         assert decode_capability(CXX, "13.3") == "13.3"
-        assert decode_capability(CXX, "17.14.36310.24") == "17.14.36310.24"
 
     @pytest.mark.parametrize(
-        "value", ["1", "cargo 1.98.1", "1.98.1-nightly", "1.2.3.4.5", 1.98, True]
+        "value", ["1", "cargo 1.98.1", "1.98.1-nightly", "1.2.3.4", 1.98, True]
     )
     def test_anything_else_is_refused_naming_where_the_version_comes_from(
         self, value: str | float | bool
@@ -322,7 +318,7 @@ class TestTheReadinessGate:
         assert (
             toolchain.readiness_gap(
                 "lavender",
-                node("lavender", cxx="17.14.36310.24"),
+                node("lavender", cxx="15.3.0"),
                 toolchain.read_reports(DIPHTHERIA_2026_09_27),
             )
             is None

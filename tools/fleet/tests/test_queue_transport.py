@@ -61,9 +61,9 @@ DEADLINE_SECONDS: Final = 1
 #: Slack for thread scheduling between the deadline and the raise.
 SLACK_SECONDS: Final = 1.0
 
-#: What a peer's send meets once the client shut the connection: Windows
-#: reports an abort or a reset, Linux a broken pipe or a reset.
-HUNG_UP: Final = frozenset({"ConnectionAbortedError", "ConnectionResetError", "BrokenPipeError"})
+#: What a peer's send meets once the client shut the connection: a broken
+#: pipe, or a reset when the client's close found data it had not read.
+HUNG_UP: Final = frozenset({"ConnectionResetError", "BrokenPipeError"})
 
 
 def _post(answer: McpHttpResponse | OSError) -> McpPostProtocol:

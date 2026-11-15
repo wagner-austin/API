@@ -87,13 +87,6 @@ class TestTheVerdictReadsTheEnding:
             "before the build wrote its status; recorded exit 137"
         )
 
-    def test_a_windows_task_s_line_never_reads_as_ended_for_memory(self) -> None:
-        # The line a Windows node's result script appends (fleet.core.windows_result).
-        assert not killed_for_memory(
-            f"{UNIT_ENDED_MARKER}: task fleet-run ended with Task Scheduler state 3 (Ready) and "
-            "last result 0x00000001 before the build wrote its status; recorded exit 1"
-        )
-
 
 def _environment(**variables: str) -> dict[str, str]:
     """The suite's environment with systemd's ending variables replaced.
