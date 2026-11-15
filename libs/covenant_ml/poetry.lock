@@ -1604,7 +1604,6 @@ shap = "^0.51"
 typing-extensions = "^4.12.0"
 
 [package.extras]
-torch = ["torch (>=2.5,<3.0)"]
 wandb = ["wandb (>=0.18,<0.19)"]
 
 [package.source]
