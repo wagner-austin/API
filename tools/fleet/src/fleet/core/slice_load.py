@@ -144,7 +144,7 @@ def _stall(resource: str) -> str:
         The command.
     """
     path = f'"${PRESSURE_CGROUP}/{resource}.pressure"'
-    return f"awk '$1 == \"some\" {{ sub(\"total=\", \"\", $5); print $5 }}' {path}"
+    return f'awk \'$1 == "some" {{ sub("total=", "", $5); print $5 }}\' {path}'
 
 
 def _pressure_start_lines(cgroup_root: str, own_cgroup: str) -> list[str]:
@@ -167,7 +167,7 @@ def _pressure_start_lines(cgroup_root: str, own_cgroup: str) -> list[str]:
     for resource in PRESSURES:
         started = f"pressure_{resource}_started"
         lines.append(
-            f'if {started}="$({_stall(resource)} 2>/dev/null)"; then :; else {started}=\'\'; fi'
+            f"if {started}=\"$({_stall(resource)} 2>/dev/null)\"; then :; else {started}=''; fi"
         )
     return lines
 
