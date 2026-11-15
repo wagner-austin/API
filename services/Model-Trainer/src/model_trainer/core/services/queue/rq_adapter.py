@@ -97,7 +97,7 @@ class RQEnqueuer:
             retry=None,
             description=f"train:{payload['run_id']}",
         )
-        return job.get_id()
+        return job.id
 
     def remove_queued_job(self: RQEnqueuer, job_id: str) -> bool:
         """Remove a still-pending job from the queue.
@@ -134,7 +134,7 @@ class RQEnqueuer:
             retry=retry,
             description=f"eval:{payload['run_id']}:{payload['split']}",
         )
-        return job.get_id()
+        return job.id
 
     def enqueue_tokenizer(self: RQEnqueuer, payload: TokenizerTrainPayload) -> str:
         conn = self._connection()
@@ -160,7 +160,7 @@ class RQEnqueuer:
             retry=retry,
             description=f"tokenizer:{payload['tokenizer_id']}",
         )
-        return job.get_id()
+        return job.id
 
     def enqueue_cloze(self: RQEnqueuer, payload: ClozeJobPayload) -> str:
         conn = self._connection()
@@ -183,7 +183,7 @@ class RQEnqueuer:
             retry=retry,
             description=f"cloze:{payload['run_id']}:{payload['request_id']}",
         )
-        return job.get_id()
+        return job.id
 
     def enqueue_baseline_cloze(self: RQEnqueuer, payload: BaselineClozeJobPayload) -> str:
         """Enqueue a baseline cloze job for an untrained hub model.
@@ -208,7 +208,7 @@ class RQEnqueuer:
             retry=retry,
             description=f"baseline-cloze:{payload['hub_model_id']}:{payload['items_file_id']}",
         )
-        return job.get_id()
+        return job.id
 
     def enqueue_score(self: RQEnqueuer, payload: ScoreJobPayload) -> str:
         conn = self._connection()
@@ -234,7 +234,7 @@ class RQEnqueuer:
             retry=retry,
             description=f"score:{payload['run_id']}:{payload['request_id']}",
         )
-        return job.get_id()
+        return job.id
 
     def enqueue_generate(self: RQEnqueuer, payload: GenerateJobPayload) -> str:
         conn = self._connection()
@@ -266,7 +266,7 @@ class RQEnqueuer:
             retry=retry,
             description=f"generate:{payload['run_id']}:{payload['request_id']}",
         )
-        return job.get_id()
+        return job.id
 
     def enqueue_chat(self: RQEnqueuer, payload: ChatJobPayload) -> str:
         conn = self._connection()
@@ -293,4 +293,4 @@ class RQEnqueuer:
             retry=retry,
             description=f"chat:{payload['run_id']}:{payload['session_id']}:{payload['request_id']}",
         )
-        return job.get_id()
+        return job.id
