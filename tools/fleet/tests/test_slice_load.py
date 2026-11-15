@@ -10,6 +10,7 @@ lavender's own: MCPs/execution-deploy's per-file lines from its 308 s run
 
 from __future__ import annotations
 
+import os
 import pathlib
 import subprocess
 import time
@@ -17,8 +18,10 @@ import time
 from fleet.contracts.check_unit import DISPATCH_SLICE_NAME
 from fleet.contracts.runner_slice import CI_SLICE_NAME
 from fleet.core import verdict
+from fleet.core.linux_isolated_build import EXEC_LANE_CGROUP
 from fleet.core.slice_load import (
     CGROUP_ROOT,
+    CHECK_CGROUP,
     CI_SLICE,
     DISPATCH_SLICE,
     MEASURED_SLICES,
@@ -27,6 +30,7 @@ from fleet.core.slice_load import (
     PRESSURES,
     SLICE_LOAD_MARKER,
     MeasuredSlice,
+    PressureCgroup,
     pressure_line,
     pressure_none_line,
     read_slice_load,
@@ -58,6 +62,16 @@ LAVENDER_TAIL = (
 #: The 308 s run's ledger id.
 RUN = "MCPs-execution-deploy-lavender-1793327005"
 
+#: Where lavender's execdocker manager sat on 2026-11-15, as ``systemctl show`` printed it.
+LANE_MANAGER = "/system.slice/system-dispatch.slice/system-dispatch-checks.slice/user@1001.service"
+
+#: A ``systemctl`` answering only the lane cgroup's exact question, as lavender's did.
+SYSTEMCTL = (
+    "#!/bin/sh\n"
+    '[ "$*" = "show --property=ControlGroup --value user@1001.service" ] || exit 1\n'
+    f"printf '%s\\n' '{LANE_MANAGER}'\n"
+)
+
 
 def _psi(some: int) -> str:
     """One resource's pressure file as the kernel writes it, with this ``some`` total in µs."""
@@ -67,10 +81,26 @@ def _psi(some: int) -> str:
     )
 
 
+def _check_cgroup(tmp_path: pathlib.Path, root: pathlib.Path) -> tuple[PressureCgroup, str]:
+    """:data:`CHECK_CGROUP` reading this case's stand-in for ``/proc/self/cgroup``.
+
+    Returns:
+        The cgroup, and its directory below ``root``.
+    """
+    own_cgroup = tmp_path / "self-cgroup"
+    own_cgroup.write_text("0::/system.slice/fleet-check.service\n", encoding="utf-8")
+    locate = CHECK_CGROUP["locate"].replace(OWN_CGROUP, str(own_cgroup))
+    return (
+        PressureCgroup(subject=CHECK_CGROUP["subject"], locate=locate),
+        "system.slice/fleet-check.service",
+    )
+
+
 def _run(
     tmp_path: pathlib.Path,
     stats: dict[str, tuple[str | None, str | None]],
     pressure: dict[str, tuple[int | None, int | None]],
+    lane: bool,
 ) -> tuple[str, range]:
     """Run the start lines, change each stat file, run the end lines, and read the transcript.
 
@@ -86,9 +116,11 @@ def _run(
         tmp_path: The case's directory.
         stats: Each measured slice's field, with its stat file's text at the
             start and at the end, None for no file.
-        pressure: Each resource of :data:`PRESSURES` the build's own cgroup
+        pressure: Each resource of :data:`PRESSURES` the measured cgroup
             keeps a pressure file for, with its ``some`` total at the start
             and at the end, None for no file; empty for a cgroup without PSI.
+        lane: Measure :data:`EXEC_LANE_CGROUP`, located by :data:`SYSTEMCTL`
+            with ``exec_uid`` 1001, rather than the build's own cgroup.
 
     Returns:
         What the lines appended to the transcript, and every whole-second
@@ -108,12 +140,20 @@ def _run(
             MeasuredSlice(name=measured["name"], cpu_stat=str(stat), field=measured["field"])
         )
     root = tmp_path / "cgroup"
-    own = root / "system.slice" / "fleet-check.service"
-    own.mkdir(parents=True)
-    own_cgroup = tmp_path / "self-cgroup"
-    own_cgroup.write_text("0::/system.slice/fleet-check.service\n", encoding="utf-8")
+    environment = dict(os.environ)
+    if lane:
+        measured, directory = EXEC_LANE_CGROUP, LANE_MANAGER.removeprefix("/")
+        tools = tmp_path / "bin"
+        tools.mkdir()
+        (tools / "systemctl").write_text(SYSTEMCTL, encoding="utf-8")
+        (tools / "systemctl").chmod(0o755)
+        environment["PATH"] = f"{tools}:{environment['PATH']}"
+    else:
+        measured, directory = _check_cgroup(tmp_path, root)
+    cgroup = root / directory
+    cgroup.mkdir(parents=True)
     for resource, (before_total, after_total) in pressure.items():
-        path = own / f"{resource}.pressure"
+        path = cgroup / f"{resource}.pressure"
         if before_total is not None:
             path.write_text(_psi(before_total), encoding="utf-8")
         changes.append(
@@ -123,13 +163,14 @@ def _run(
         )
     script = "\n".join(
         [
-            *sh_slice_load_start_lines(tuple(slices), str(root), str(own_cgroup)),
+            "exec_uid=1001",
+            *sh_slice_load_start_lines(tuple(slices), str(root), measured),
             *changes,
-            *sh_slice_load_end_lines(tuple(slices), str(log)),
+            *sh_slice_load_end_lines(tuple(slices), str(log), measured),
         ]
     )
     started = int(time.time())
-    subprocess.run(["sh", "-eu", "-c", script], check=True, timeout=30)
+    subprocess.run(["sh", "-eu", "-c", script], check=True, timeout=30, env=environment)
     return log.read_text(encoding="utf-8"), range(int(time.time()) - started + 1)
 
 
@@ -158,6 +199,7 @@ class TestTheLinesOnTheNode:
                 "dispatch": ("usage_usec 5000000\n", "usage_usec 1468800000\nuser_usec 1\n"),
             },
             {},
+            False,
         )
 
         # The CI slice's end is read first, so its wall is never the later.
@@ -169,7 +211,7 @@ class TestTheLinesOnTheNode:
             and printed
             == _used(CI_SLICE_NAME, 412, ci)
             + _used(DISPATCH_SLICE_NAME, 1463, dispatch)
-            + f"{pressure_none_line()}\n"
+            + f"{pressure_none_line(CHECK_CGROUP)}\n"
         ]
         assert len(read) == 1
         ci, dispatch = read[0]
@@ -180,7 +222,10 @@ class TestTheLinesOnTheNode:
         self, tmp_path: pathlib.Path
     ) -> None:
         printed, walls = _run(
-            tmp_path, {"ci": (None, None), "dispatch": ("usage_usec 0\n", "usage_usec 0\n")}, {}
+            tmp_path,
+            {"ci": (None, None), "dispatch": ("usage_usec 0\n", "usage_usec 0\n")},
+            {},
+            False,
         )
 
         read = [
@@ -189,7 +234,7 @@ class TestTheLinesOnTheNode:
             if printed
             == f"{slice_none_line(CI_SLICE)}\n"
             + _used(DISPATCH_SLICE_NAME, 0, wall)
-            + f"{pressure_none_line()}\n"
+            + f"{pressure_none_line(CHECK_CGROUP)}\n"
         ]
         assert len(read) == 1
         assert read_slice_load(printed, CI_SLICE) == "none"
@@ -198,11 +243,13 @@ class TestTheLinesOnTheNode:
     def test_a_slice_gone_by_the_end_says_so_and_the_build_goes_on(
         self, tmp_path: pathlib.Path
     ) -> None:
-        printed, _ = _run(tmp_path, {"ci": (None, None), "dispatch": ("usage_usec 5\n", None)}, {})
+        printed, _ = _run(
+            tmp_path, {"ci": (None, None), "dispatch": ("usage_usec 5\n", None)}, {}, False
+        )
 
         assert printed == (
             f"{slice_none_line(CI_SLICE)}\n{slice_gone_line(DISPATCH_SLICE)}\n"
-            f"{pressure_none_line()}\n"
+            f"{pressure_none_line(CHECK_CGROUP)}\n"
         )
         assert read_slice_load(printed, DISPATCH_SLICE) == "gone"
         assert read_slice_load(printed, CI_SLICE) == "none"
@@ -217,15 +264,40 @@ class TestTheLinesOnTheNode:
             tmp_path,
             {"ci": idle, "dispatch": idle},
             {"cpu": (1_000_000, 4_900_000), "io": (0, 212_400_000), "memory": (5, 5)},
+            False,
         )
 
         stalled = [
             wall
             for wall in walls
-            if printed.endswith(f"{pressure_line(('3', '212', '0'), str(wall))}\n")
+            if printed.endswith(f"{pressure_line(CHECK_CGROUP, ('3', '212', '0'), str(wall))}\n")
         ]
         assert len(stalled) == 1
         assert printed.count(PRESSURE_MARKER) == 1
+
+    def test_a_docker_lane_build_prints_the_stalls_of_the_lane_manager_s_cgroup(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Measured on lavender (MCPs board task 2e2df92a): osrs-lab/observer's
+        unit used 1 CPU-s while execdocker's manager used 8 cores, so the
+        check's own cgroup says nothing of what a lane build waited on."""
+        idle = ("usage_usec 0\n", "usage_usec 0\n")
+        printed, walls = _run(
+            tmp_path,
+            {"ci": idle, "dispatch": idle},
+            {"cpu": (0, 80_000_000), "io": (7, 2_000_007), "memory": (0, 0)},
+            True,
+        )
+
+        stalled = [
+            wall
+            for wall in walls
+            if printed.endswith(f"{pressure_line(EXEC_LANE_CGROUP, ('80', '2', '0'), str(wall))}\n")
+        ]
+        assert len(stalled) == 1
+        assert (
+            "the docker lane cgroup, which every check on the lane shares, stalled 80 s" in printed
+        )
 
     def test_a_pressure_file_gone_by_the_end_says_so_and_the_build_goes_on(
         self, tmp_path: pathlib.Path
@@ -235,15 +307,20 @@ class TestTheLinesOnTheNode:
             tmp_path,
             {"ci": idle, "dispatch": idle},
             {"cpu": (1, 2), "io": (1, None), "memory": (1, 2)},
+            True,
         )
 
-        assert printed.endswith(f"\n{pressure_none_line()}\n")
+        assert printed.endswith(f"\n{pressure_none_line(EXEC_LANE_CGROUP)}\n")
 
     def test_the_node_s_pressure_is_read_from_the_build_s_own_cgroup(self) -> None:
         assert (CGROUP_ROOT, OWN_CGROUP, PRESSURES) == (
             "/sys/fs/cgroup",
             "/proc/self/cgroup",
             ("cpu", "io", "memory"),
+        )
+        assert (CHECK_CGROUP["subject"], CHECK_CGROUP["locate"]) == (
+            "the cgroup of the check",
+            "sed -n 's/^0:://p' '/proc/self/cgroup'",
         )
 
     def test_the_node_s_lines_read_the_ci_slice_and_dispatch_s_share(self) -> None:

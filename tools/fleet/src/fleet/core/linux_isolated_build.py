@@ -79,7 +79,7 @@ from fleet.core.run_summary import sh_run_summary_line
 from fleet.core.slice_load import (
     CGROUP_ROOT,
     MEASURED_SLICES,
-    OWN_CGROUP,
+    PressureCgroup,
     sh_slice_load_end_lines,
     sh_slice_load_start_lines,
 )
@@ -119,6 +119,17 @@ EXEC_LIBRARY_PATH = 'LD_LIBRARY_PATH="${LD_LIBRARY_PATH-}"'
 #: exclusively, in that user's runtime directory, over ``$exec_uid``. MCPs'
 #: scripts/host/lib/fleet-exec-docker.sh names the same file, EXEC_LANE_LOCK.
 EXEC_LANE_LOCK = "/run/user/$exec_uid/fleet-exec-docker.lock"
+
+#: The cgroup whose pressure stalls a docker project's build reports: execdocker's
+#: user manager, which holds its rootless daemon and every container that daemon
+#: starts, read with ``$exec_uid`` set. The check's unit holds only the shell
+#: that runs ``sudo``: on lavender on 2026-11-15 osrs-lab/observer's unit used 1
+#: CPU-s of its run while the manager used 8 cores (MCPs board task 2e2df92a).
+#: Every check on the lane shares the manager, so the line says so.
+EXEC_LANE_CGROUP = PressureCgroup(
+    subject="the docker lane cgroup, which every check on the lane shares,",
+    locate='systemctl show --property=ControlGroup --value "user@$exec_uid.service"',
+)
 
 
 def exec_root(run: str) -> str:
@@ -227,7 +238,7 @@ def isolated_build_lines(
         lines.append("fi")
     recipe = names.recipe_directory("$exec_root", path)
     shared = f"flock --shared '{EXEC_LANE_LOCK}'"
-    lines.extend(sh_slice_load_start_lines(MEASURED_SLICES, CGROUP_ROOT, OWN_CGROUP))
+    lines.extend(sh_slice_load_start_lines(MEASURED_SLICES, CGROUP_ROOT, EXEC_LANE_CGROUP))
     lines.extend(
         sh_phase_lines(
             phase=MAKE_TARGET,
@@ -235,7 +246,7 @@ def isolated_build_lines(
             log=log,
         )
     )
-    lines.extend(sh_slice_load_end_lines(MEASURED_SLICES, log))
+    lines.extend(sh_slice_load_end_lines(MEASURED_SLICES, log, EXEC_LANE_CGROUP))
     lines.extend(sh_vm_test_lines(log))
     lines.extend(
         sh_artifact_lines(
@@ -252,6 +263,7 @@ def isolated_build_lines(
 __all__ = [
     "EXEC_CACHE",
     "EXEC_HOME_LINE",
+    "EXEC_LANE_CGROUP",
     "EXEC_LANE_LOCK",
     "EXEC_LIBRARY_PATH",
     "EXEC_STAGE",

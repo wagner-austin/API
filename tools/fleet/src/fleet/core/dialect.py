@@ -74,8 +74,8 @@ from fleet.core.release_artifact import sh_artifact_lines
 from fleet.core.run_summary import sh_run_summary_line
 from fleet.core.slice_load import (
     CGROUP_ROOT,
+    CHECK_CGROUP,
     MEASURED_SLICES,
-    OWN_CGROUP,
     sh_slice_load_end_lines,
     sh_slice_load_start_lines,
 )
@@ -482,9 +482,9 @@ def build_script(
             f'if [ "$status" -ne 0 ]; then {sh_run_summary_line(log)}; {written}; exit 0; fi'
         )
     lines.append(f"cd '{names.recipe_directory(target, path)}'")
-    lines.extend(sh_slice_load_start_lines(MEASURED_SLICES, CGROUP_ROOT, OWN_CGROUP))
+    lines.extend(sh_slice_load_start_lines(MEASURED_SLICES, CGROUP_ROOT, CHECK_CGROUP))
     lines.extend(sh_phase_lines(phase=MAKE_TARGET, command=recipe_command(loopback_unit), log=log))
-    lines.extend(sh_slice_load_end_lines(MEASURED_SLICES, log))
+    lines.extend(sh_slice_load_end_lines(MEASURED_SLICES, log, CHECK_CGROUP))
     lines.extend(sh_vm_test_lines(log))
     lines.extend(sh_artifact_lines(log=log, root=target, artifact=artifact, run_as=""))
     recipe = names.recipe_directory(target, path)

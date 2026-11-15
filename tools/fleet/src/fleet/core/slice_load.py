@@ -41,6 +41,13 @@ information (``cpu.pressure``, ``io.pressure``, ``memory.pressure``, the
 in which at least one of its tasks stalled on each
 (:func:`pressure_line`); a kernel without PSI prints
 :func:`pressure_none_line`.
+
+A docker project's build reads the docker lane's cgroup instead
+(:mod:`fleet.core.linux_isolated_build` passes its own
+:class:`PressureCgroup`): its containers run under execdocker's user manager,
+not in the check's unit, whose cgroup holds only the shell that started
+them. Measured on lavender on 2026-11-15, osrs-lab/observer's unit used 1 CPU-s
+of its run while ``user@1001.service`` used 8 cores.
 """
 
 from __future__ import annotations
@@ -102,16 +109,34 @@ CGROUP_ROOT: Final = "/sys/fs/cgroup"
 #: Where the build reads its own cgroup's path: cgroup v2's one ``0::<path>`` line.
 OWN_CGROUP: Final = "/proc/self/cgroup"
 
-#: The shell variable holding the build's own cgroup directory.
+#: The shell variable holding the measured cgroup's directory.
 PRESSURE_CGROUP: Final = "pressure_cgroup"
 
 
-def pressure_line(stalls: tuple[str, str, str], wall: str) -> str:
-    """The line naming how long the check's own tasks stalled on each resource.
+class PressureCgroup(TypedDict):
+    """The cgroup whose pressure stalls a build reads.
 
-    It is printed inside single quotes in ``sh``, so it holds no apostrophe.
+    Attributes:
+        subject: What the transcript line calls it. The line is printed inside
+            single quotes in ``sh``, so it holds no apostrophe.
+        locate: The ``sh`` that prints its path below :data:`CGROUP_ROOT`.
+    """
+
+    subject: str
+    locate: str
+
+
+#: The build's own cgroup: the check's unit, read off cgroup v2's one ``0::<path>`` line.
+CHECK_CGROUP: Final = PressureCgroup(
+    subject="the cgroup of the check", locate=f"sed -n 's/^0:://p' '{OWN_CGROUP}'"
+)
+
+
+def pressure_line(measured: PressureCgroup, stalls: tuple[str, str, str], wall: str) -> str:
+    """The line naming how long the measured cgroup's tasks stalled on each resource.
 
     Args:
+        measured: The cgroup.
         stalls: The ``some`` seconds on cpu, io and memory, or ``printf`` placeholders.
         wall: The check's seconds, or a ``printf`` placeholder.
 
@@ -120,18 +145,21 @@ def pressure_line(stalls: tuple[str, str, str], wall: str) -> str:
     """
     cpu, io, memory = stalls
     return (
-        f"{PRESSURE_MARKER}: the cgroup of the check stalled {cpu} s on cpu, {io} s on io and "
+        f"{PRESSURE_MARKER}: {measured['subject']} stalled {cpu} s on cpu, {io} s on io and "
         f"{memory} s on memory in the {wall} s the check ran"
     )
 
 
-def pressure_none_line() -> str:
+def pressure_none_line(measured: PressureCgroup) -> str:
     """The line on a kernel or cgroup that keeps no pressure stall information.
+
+    Args:
+        measured: The cgroup.
 
     Returns:
         The line, without its newline.
     """
-    return f"{PRESSURE_MARKER}: the cgroup of the check keeps no pressure stall information"
+    return f"{PRESSURE_MARKER}: {measured['subject']} keeps no pressure stall information"
 
 
 def _stall(resource: str) -> str:
@@ -147,21 +175,21 @@ def _stall(resource: str) -> str:
     return f'awk \'$1 == "some" {{ sub("total=", "", $5); print $5 }}\' {path}'
 
 
-def _pressure_start_lines(cgroup_root: str, own_cgroup: str) -> list[str]:
-    """The ``sh`` lines that note the build's own cgroup and its stall totals.
+def _pressure_start_lines(cgroup_root: str, measured: PressureCgroup) -> list[str]:
+    """The ``sh`` lines that note the measured cgroup and its stall totals.
 
     Each read sits in an ``if`` condition, so it cannot end a build under
     ``set -e``; a file that cannot be read leaves its total empty.
 
     Args:
         cgroup_root: :data:`CGROUP_ROOT` on a node.
-        own_cgroup: :data:`OWN_CGROUP` on a node.
+        measured: The cgroup.
 
     Returns:
         The lines.
     """
     lines = [
-        f"if {PRESSURE_CGROUP}=\"{cgroup_root}$(sed -n 's/^0:://p' '{own_cgroup}')\"; then :; "
+        f'if {PRESSURE_CGROUP}="{cgroup_root}$({measured["locate"]})"; then :; '
         f"else {PRESSURE_CGROUP}=''; fi"
     ]
     for resource in PRESSURES:
@@ -172,11 +200,12 @@ def _pressure_start_lines(cgroup_root: str, own_cgroup: str) -> list[str]:
     return lines
 
 
-def _pressure_end_lines(log: str) -> list[str]:
-    """The ``sh`` lines that print the build's stall seconds over the recipe into the transcript.
+def _pressure_end_lines(log: str, measured: PressureCgroup) -> list[str]:
+    """The ``sh`` lines that print the measured cgroup's stall seconds into the transcript.
 
     Args:
         log: The transcript's path, appended to.
+        measured: The cgroup.
 
     Every read sits in the ``if`` condition, so a total that cannot be read
     at either end prints :func:`pressure_none_line` rather than ending the
@@ -196,12 +225,12 @@ def _pressure_end_lines(log: str) -> list[str]:
         f'"$(( (pressure_{resource}_ended - pressure_{resource}_started) / 1000000 ))"'
         for resource in PRESSURES
     )
-    line = pressure_line(("%s", "%s", "%s"), "%s")
+    line = pressure_line(measured, ("%s", "%s", "%s"), "%s")
     lines.extend(
         [
             f"  printf '{line}\\n' {seconds} \"$(( $(date +%s) - {CLOCK_STARTED} ))\" >> '{log}'",
             "else",
-            f"  printf '%s\\n' '{pressure_none_line()}' >> '{log}'",
+            f"  printf '%s\\n' '{pressure_none_line(measured)}' >> '{log}'",
             "fi",
         ]
     )
@@ -262,9 +291,9 @@ def _usage(cpu_stat: str) -> str:
 
 
 def sh_slice_load_start_lines(
-    slices: tuple[MeasuredSlice, ...], cgroup_root: str, own_cgroup: str
+    slices: tuple[MeasuredSlice, ...], cgroup_root: str, measured: PressureCgroup
 ) -> list[str]:
-    """The ``sh`` lines that note each slice's CPU time, the build's stalls and the clock.
+    """The ``sh`` lines that note each slice's CPU time, the measured stalls and the clock.
 
     Each read sits in an ``if`` condition, so it cannot end a build under
     ``set -e``.
@@ -272,12 +301,13 @@ def sh_slice_load_start_lines(
     Args:
         slices: The slices, :data:`MEASURED_SLICES` on a node.
         cgroup_root: :data:`CGROUP_ROOT` on a node.
-        own_cgroup: :data:`OWN_CGROUP` on a node.
+        measured: The cgroup whose stalls are read, :data:`CHECK_CGROUP` for
+            a build whose work runs in its own unit.
 
     Returns:
         The lines; ``<field>_usage_started`` is empty on a host without the slice.
     """
-    lines = _pressure_start_lines(cgroup_root, own_cgroup)
+    lines = _pressure_start_lines(cgroup_root, measured)
     for measured in slices:
         started = f"{measured['field']}_usage_started"
         stat = measured["cpu_stat"]
@@ -288,7 +318,9 @@ def sh_slice_load_start_lines(
     return lines
 
 
-def sh_slice_load_end_lines(slices: tuple[MeasuredSlice, ...], log: str) -> list[str]:
+def sh_slice_load_end_lines(
+    slices: tuple[MeasuredSlice, ...], log: str, measured: PressureCgroup
+) -> list[str]:
     """The ``sh`` lines that print each slice's CPU time over the recipe into the transcript.
 
     Every read sits in an ``if`` condition, so a slice that vanished during
@@ -298,6 +330,7 @@ def sh_slice_load_end_lines(slices: tuple[MeasuredSlice, ...], log: str) -> list
     Args:
         slices: The slices, :data:`MEASURED_SLICES` on a node.
         log: The transcript's path, appended to.
+        measured: The cgroup the start lines read, so the line names it.
 
     Returns:
         The lines, run after the recipe's phase and before the status is written.
@@ -320,7 +353,7 @@ def sh_slice_load_end_lines(slices: tuple[MeasuredSlice, ...], log: str) -> list
                 "fi",
             ]
         )
-    return [*lines, *_pressure_end_lines(log)]
+    return [*lines, *_pressure_end_lines(log, measured)]
 
 
 def read_slice_load(tail: str, measured: MeasuredSlice) -> str:
@@ -354,6 +387,7 @@ def read_slice_load(tail: str, measured: MeasuredSlice) -> str:
 
 __all__ = [
     "CGROUP_ROOT",
+    "CHECK_CGROUP",
     "CI_SLICE",
     "CLOCK_STARTED",
     "DISPATCH_SLICE",
@@ -364,6 +398,7 @@ __all__ = [
     "PRESSURE_MARKER",
     "SLICE_LOAD_MARKER",
     "MeasuredSlice",
+    "PressureCgroup",
     "pressure_line",
     "pressure_none_line",
     "read_slice_load",
