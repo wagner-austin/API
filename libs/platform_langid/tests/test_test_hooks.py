@@ -7,7 +7,7 @@ from typing import Protocol
 
 import pytest
 
-from platform_langid import _hook_defaults, _test_hooks
+from platform_langid import _test_hooks
 from platform_langid._hook_protocols import ModelConfigProtocol
 from platform_langid.testing import reset_hooks
 from platform_langid.types import default_detector_config
