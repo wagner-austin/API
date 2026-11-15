@@ -96,7 +96,7 @@ def test_rq_queue_enqueue_wrapper() -> None:
     conn = FakeRedisBytesClient()
     q_adapter = rq_queue("test", connection=conn)
     job = q_adapter.enqueue("my_func", "arg1", job_timeout=60, description="test job")
-    assert job.get_id() == "job-my_func"
+    assert job.id == "job-my_func"
 
 
 def test_rq_worker_work_wrapper() -> None:
@@ -130,8 +130,8 @@ def test_rq_queue_remove_forwards_to_the_underlying_queue() -> None:
     queue = rh.rq_queue("test", conn)
     job = queue.enqueue("my.func")
 
-    assert queue.remove(job.get_id()) == 1
-    assert queue.remove(job.get_id()) == 0
+    assert queue.remove(job.id) == 1
+    assert queue.remove(job.id) == 0
 
 
 def test_internal_fake_queue_remove_reports_zero_for_an_unknown_id() -> None:
@@ -159,7 +159,7 @@ def test_get_current_job_returns_job_inside_worker() -> None:
     result = get_current_job()
     if result is None:
         pytest.fail("expected current job")
-    assert result.get_id() == "job-123"
+    assert result.id == "job-123"
     assert result.origin == "test-queue"
 
 
@@ -192,7 +192,7 @@ def test_rq_fetch_job_uses_hook() -> None:
 
     conn = FakeRedisBytesClient()
     result = rq_fetch_job("job-abc", conn)
-    assert result.get_id() == "job-abc"
+    assert result.id == "job-abc"
     assert result.get_status() == "finished"
     assert result.return_value() == {"key": "value"}
 
@@ -276,11 +276,11 @@ def test_rq_fetch_job_production_path_success() -> None:
     # Create a job using rq directly so we have something to fetch
     queue = Queue(connection=conn)
     job = queue.enqueue(len, "test")  # Simple function call
-    job_id = job.get_id()
+    job_id = job.id
 
     # Fetch the job using our production path (no hook set)
     fetched = rq_fetch_job(job_id, conn)
-    assert fetched.get_id() == job_id
+    assert fetched.id == job_id
     assert fetched.get_status() in ("queued", "started", "finished", "failed")
 
 
@@ -311,7 +311,7 @@ class TestConnectingQueue:
 
         job = connecting_queue("transcripts", "redis://x").enqueue("my_func")
 
-        assert job.get_id() == "job-my_func"
+        assert job.id == "job-my_func"
 
     def test_a_callable_reference_is_stringified(self) -> None:
         """RQ takes a dotted path, so a caller passing the job function itself
@@ -336,7 +336,7 @@ class TestConnectingQueue:
 
         job = connecting_queue("q", "redis://x").enqueue(_Job())
 
-        assert job.get_id() == "job-pkg.module.my_job"
+        assert job.id == "job-pkg.module.my_job"
 
     def test_each_enqueue_opens_its_own_connection(self) -> None:
         """Connecting per call rather than holding one open is why this is an
@@ -372,4 +372,4 @@ class TestConnectingQueue:
         self._fakes()
         queue: QueueProtocol = connecting_queue("q", "redis://x")
 
-        assert queue.enqueue("f").get_id() == "job-f"
+        assert queue.enqueue("f").id == "job-f"

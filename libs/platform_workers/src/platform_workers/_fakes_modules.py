@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from platform_workers._fakes_logging import FakeAsyncRedis
 from platform_workers._fakes_redis import FakeRedisClient
-from platform_workers._fakes_rq import FakeRetry
+from platform_workers._fakes_rq import FakeJob, FakeRetry
 from platform_workers.rq_harness import _JsonValue
 
 from .redis import (
@@ -12,9 +12,9 @@ from .redis import (
 )
 from .rq_harness import (
     CurrentJobProto,
+    RQJobLike,
     RQRetryLike,
     _QueueCtor,
-    _RQJobInternal,
     _RQQueueInternal,
     _WorkerCtorRaw,
 )
@@ -106,28 +106,9 @@ class _FakeCurrentJob:
         self._id = job_id
         self.origin = origin
 
-    def get_id(self) -> str:
-        return self._id
-
-
-class _FakeRQJob:
-    """Internal fake RQ job for testing.
-
-    Mirrors rq's own Job, which exposes `id` as a property. This fake used to
-    provide `get_id()` instead; because the harness called that, every test
-    passed while the real rq raised AttributeError in production.
-    """
-
-    def __init__(self, job_id: str = "fake-job-id") -> None:
-        self._id = job_id
-
     @property
     def id(self) -> str:
-        """Job identifier.
-
-        Returns:
-            The job id, as rq's Job.id does.
-        """
+        """The job identifier, as rq's Job.id."""
         return self._id
 
 
@@ -149,10 +130,10 @@ class _FakeRQQueueInternal:
         failure_ttl: int | None = None,
         retry: RQRetryLike | None = None,
         description: str | None = None,
-    ) -> _RQJobInternal:
+    ) -> RQJobLike:
         job_id = f"job-{func_ref}"
         self._pending.append(job_id)
-        return _FakeRQJob(job_id)
+        return FakeJob(job_id)
 
     def remove(self, job_or_id: str) -> int:
         """Drop one pending job id, as RQ's LREM-backed remove does.

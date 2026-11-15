@@ -40,20 +40,6 @@ class _RQWorkerLike(Protocol):
     def work(self, *, with_scheduler: bool, max_jobs: int | None) -> bool: ...
 
 
-class _RQJobInternal(Protocol):
-    """Protocol for internal RQ Job object.
-
-    RQ exposes the identifier as an `id` property. It also had a `get_id()`
-    method historically, which this protocol used to declare -- but RQ has
-    since removed it, so calling it raised AttributeError against any modern
-    rq while the test fakes (which implement the protocol as written) kept
-    passing. The protocol now mirrors what rq actually provides.
-    """
-
-    @property
-    def id(self) -> str: ...
-
-
 class _RQQueueInternal(Protocol):
     """Protocol for internal RQ Queue."""
 
@@ -66,7 +52,7 @@ class _RQQueueInternal(Protocol):
         failure_ttl: int | None = ...,
         retry: RQRetryLike | None = ...,
         description: str | None = ...,
-    ) -> _RQJobInternal: ...
+    ) -> RQJobLike: ...
 
     # Named `job_or_id` because that is RQ's own parameter name; the real
     # method accepts a Job or an id string and we only ever pass the id.
@@ -135,9 +121,16 @@ class RQClientQueue(Protocol):
 
 
 class RQJobLike(Protocol):
-    """Public protocol for RQ Job."""
+    """Public protocol for RQ Job.
 
-    def get_id(self) -> str: ...
+    It declares what rq's Job provides, its ``id`` property, so the job a
+    queue returns is handed to callers as rq made it. rq removed the
+    ``get_id()`` method this protocol once declared (it is gone from 2.10),
+    and only the test fakes kept implementing it.
+    """
+
+    @property
+    def id(self) -> str: ...
 
 
 class CurrentJobProto(Protocol):
@@ -145,7 +138,8 @@ class CurrentJobProto(Protocol):
 
     origin: str | None
 
-    def get_id(self) -> str: ...
+    @property
+    def id(self) -> str: ...
 
 
 class _QueueCtor(Protocol):
@@ -172,7 +166,7 @@ class _RQQueueAdapter(_RQQueueLike, RQClientQueue):
         retry: RQRetryLike | None = None,
         description: str | None = None,
     ) -> RQJobLike:
-        job = self._inner.enqueue(
+        return self._inner.enqueue(
             func_ref,
             *args,
             job_timeout=job_timeout,
@@ -181,15 +175,6 @@ class _RQQueueAdapter(_RQQueueLike, RQClientQueue):
             retry=retry,
             description=description,
         )
-
-        class _Job(RQJobLike):
-            def __init__(self, inner: _RQJobInternal) -> None:
-                self._inner = inner
-
-            def get_id(self) -> str:
-                return str(self._inner.id)
-
-        return _Job(job)
 
     def remove(self, job_or_id: str) -> int:
         """Remove a job id from this queue's pending list.
@@ -301,7 +286,8 @@ def run_single_job_rq_worker(config: WorkerConfig) -> None:
 class FetchedJobProto(Protocol):
     """Protocol for a fetched RQ job."""
 
-    def get_id(self) -> str: ...
+    @property
+    def id(self) -> str: ...
 
     def get_status(self) -> str: ...
 
@@ -470,7 +456,6 @@ __all__ = [
     "WorkerConfig",
     "_JobFetchCallable",
     "_QueueCtor",
-    "_RQJobInternal",
     "_RQModuleProtocol",
     "_RQQueueInternal",
     "_RQWorkerInternal",

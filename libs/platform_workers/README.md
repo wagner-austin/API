@@ -105,12 +105,12 @@ job = queue.enqueue(
     job_timeout=300,
     retry=rq_retry(max_retries=3, intervals=[10, 30, 60]),
 )
-print(job.get_id())
+print(job.id)
 
 # Inside worker job
 job = get_current_job()
 if job:
-    print(job.get_id())
+    print(job.id)
 ```
 
 ### Worker Configuration

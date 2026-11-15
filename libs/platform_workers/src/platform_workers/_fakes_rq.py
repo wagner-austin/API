@@ -14,12 +14,14 @@ from .rq_harness import (
 
 
 class FakeJob(RQJobLike):
-    """Fake RQ job for testing."""
+    """Fake RQ job for testing, exposing ``id`` as rq's Job does."""
 
     def __init__(self, job_id: str = "test-job-id") -> None:
         self._id = job_id
 
-    def get_id(self) -> str:
+    @property
+    def id(self) -> str:
+        """The job identifier, as rq's Job.id."""
         return self._id
 
 
@@ -36,7 +38,9 @@ class FakeFetchedJob(FetchedJobProto):
         self._status = status
         self._result = result
 
-    def get_id(self) -> str:
+    @property
+    def id(self) -> str:
+        """The job identifier, as rq's Job.id."""
         return self._id
 
     def get_status(self) -> str:

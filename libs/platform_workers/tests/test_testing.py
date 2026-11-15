@@ -315,11 +315,11 @@ class TestFakeRedisClient:
 class TestFakeJob:
     def test_default_job_id(self) -> None:
         job = FakeJob()
-        assert job.get_id() == "test-job-id"
+        assert job.id == "test-job-id"
 
     def test_custom_job_id(self) -> None:
         job = FakeJob("custom-id")
-        assert job.get_id() == "custom-id"
+        assert job.id == "custom-id"
 
 
 class TestFakeFetchedJob:
@@ -327,7 +327,7 @@ class TestFakeFetchedJob:
         from platform_workers.testing import FakeFetchedJob
 
         job = FakeFetchedJob()
-        assert job.get_id() == "test-job-id"
+        assert job.id == "test-job-id"
         assert job.get_status() == "finished"
         assert job.return_value() is None
 
@@ -335,7 +335,7 @@ class TestFakeFetchedJob:
         from platform_workers.testing import FakeFetchedJob
 
         job = FakeFetchedJob(job_id="custom-123", status="queued", result={"key": "value"})
-        assert job.get_id() == "custom-123"
+        assert job.id == "custom-123"
         assert job.get_status() == "queued"
         assert job.return_value() == {"key": "value"}
 
@@ -363,7 +363,7 @@ class TestFakeQueue:
     def test_enqueue_returns_job(self) -> None:
         queue = FakeQueue()
         job = queue.enqueue("my.func", "arg1", "arg2")
-        assert job.get_id() == "test-job-id"
+        assert job.id == "test-job-id"
 
     def test_enqueue_tracks_jobs(self) -> None:
         queue = FakeQueue()
@@ -415,7 +415,7 @@ class TestFakeQueue:
     def test_enqueue_with_custom_job_id(self) -> None:
         queue = FakeQueue("custom-job")
         job = queue.enqueue("func")
-        assert job.get_id() == "custom-job"
+        assert job.id == "custom-job"
 
 
 class TestFakeLogger:
