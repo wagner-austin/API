@@ -323,8 +323,8 @@ class TestAPeftAdapterReloadsInPlace:
         model.save_pretrained(str(saved))
 
         # The tampered copy goes in its own directory. safetensors memory-maps
-        # the file it reads, and Windows refuses to rewrite a mapped file
-        # ("a file with a user-mapped section open", os error 1224).
+        # the file it reads, so the tampered tensors are written to a file
+        # other than the one mapped.
         foreign = tmp_path / "foreign"
         shutil.copytree(saved, foreign)
         safetensors: _SafetensorsProto = __import__(

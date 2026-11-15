@@ -114,18 +114,9 @@ fail_under = 100
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
-# -n 8 RATHER THAN -n auto, AND BOTH HALVES OF THE REASON ARE MEASURED.
-#
-# On 2026-09-10 this suite ran 16-wide inside lavender's WSL and ballooned
-# the VM to 25.88 GB against 1.83 GB of host memory left, at which point the
-# host stopped scheduling the VM: everything inside froze, the runners' HTTPS
-# listeners timed out, and BOTH GitHub runners dropped offline mid-run. One
-# suite did that. It also explains why the 900s pytest-timeout below recorded
-# ZERO firings over a 10322s hang -- a watchdog thread inside a VM that is not
-# being scheduled cannot fire, so every bound armed INSIDE the VM is blind to
-# this failure and only a bound outside it can see one.
-#
-# Measured here, same suite, same box, --no-cov, matched runs:
+# -n 8 RATHER THAN -n auto, AND THE REASON IS MEASURED. Run wide, this suite
+# once took a node's memory to exhaustion. Same suite, same box, --no-cov,
+# matched runs:
 #
 #   -n auto   24.45 GB peak over 38 processes   126 s
 #   -n 8      16.86 GB peak over 23 processes   106 s

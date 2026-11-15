@@ -8,8 +8,8 @@ from platform_core.errors import AppError, ModelTrainerErrorCode
 from model_trainer.core.services.data.corpus import iter_lines, open_corpus
 from model_trainer.core.services.training.dataset_builder import read_corpus_lines
 
-# 0x93 and 0x94 are cp1252 smart quotes. They are not valid UTF-8 anywhere, so
-# a corpus saved from Word or Notepad on a Windows box carries them. Read with
+# 0x93 and 0x94 are cp1252 smart quotes. They are not valid UTF-8 anywhere,
+# and a corpus saved in the cp1252 encoding carries them. Read with
 # errors="ignore" they simply vanish and the surrounding text trains as though
 # the document had always been written without them.
 CP1252_SMART_QUOTES = b"the model said \x93hello\x94 to the world\n"

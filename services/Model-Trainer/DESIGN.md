@@ -583,9 +583,6 @@ Resilience:
 - Worker runs jobs out-of-process so API can restart without stopping training.
 - Checkpoints and manifests on shared volume allow resume after restarts.
 
-Windows note:
-- Use Docker Desktop; bind mounts map project paths to containers. Commands are OS-agnostic via Compose.
-
 ## 24. Dependency & Tooling (Poetry, Ruff, Mypy)
 
 Poetry:

@@ -91,6 +91,3 @@ corpus_cache/
 # had to be written too.
 !/corpus/traits/
 !/corpus/traits/*.json
-
-# Windows reserved paths that can sometimes appear due to tooling
-nul

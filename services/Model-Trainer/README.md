@@ -22,8 +22,8 @@ Strictly typed, modular system for training and evaluating small language models
 ### Prerequisites
 
 - Python 3.11+
-- Poetry 1.8+
-- Docker Desktop (for Redis and containerized deployment)
+- Poetry 2.4+ (the lock is written by 2.4.2)
+- Docker with Compose (for Redis and containerized deployment)
 
 ### Installation
 
@@ -48,10 +48,10 @@ curl http://localhost:8000/readyz
 
 ### GPU (CUDA) Build and Run
 
-Prereqs (Windows + 3090 Ti):
-- Docker Desktop with WSL 2 backend enabled
-- NVIDIA Windows driver (recent), and WSL GPU support enabled
-- NVIDIA Container Toolkit (provided by Docker Desktop with WSL 2)
+Prereqs (Linux with an NVIDIA GPU):
+- An NVIDIA driver that runs CUDA 13.2 (595 or later), since torch comes from
+  the cu132 wheel index
+- Docker with the NVIDIA Container Toolkit
 
 Build and run with GPU support:
 

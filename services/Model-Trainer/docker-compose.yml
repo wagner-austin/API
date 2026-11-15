@@ -24,13 +24,10 @@ services:
       - HF_HOME=/hf-cache
     volumes:
       - ./artifacts:/data/artifacts
-      # checkpoints and model staging live on named volumes, NOT the host bind:
-      # bind-mount writes cross the WSL/Windows file-sharing boundary at a few
-      # MB/s, which turned each epoch's ~5.7GB checkpoint+best-model save into
-      # a multi-minute stall (measured 2026-08-19 on run 3b1d6c5f). Nothing on
-      # the host needs these files: a finished model is packed into the
-      # artifact store under ./artifacts/store and cleaned up; checkpoints are
-      # consumed by resume inside the containers.
+      # checkpoints and model staging live on named volumes, NOT the host
+      # bind, because nothing on the host needs these files: a finished model
+      # is packed into the artifact store under ./artifacts/store and cleaned
+      # up; checkpoints are consumed by resume inside the containers.
       # Both services mount both volumes because the API's resume gate checks
       # checkpoint existence on the same path the worker writes.
       - trainer-checkpoints:/data/artifacts/checkpoints
@@ -84,8 +81,7 @@ services:
       - HF_HOME=/hf-cache
     volumes:
       - ./artifacts:/data/artifacts
-      # See the api service's volume comment: keep heavy per-epoch writes off
-      # the WSL/Windows file-sharing boundary. Must match the api mounts.
+      # See the api service's volume comment. Must match the api mounts.
       - trainer-checkpoints:/data/artifacts/checkpoints
       - trainer-model-staging:/data/artifacts/models
       - ./corpus:/data/corpus:ro

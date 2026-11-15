@@ -76,10 +76,10 @@ negative result from Triton without writing it.
 
 The second is this package's own bar, and it is worth stating plainly rather
 than working around. Coverage is ``fail_under = 100`` with ``omit = []``, and
-Triton does not install on Windows at all -- so a ``@triton.jit`` body cannot
-be executed, and cannot be covered, by the suite that gates every commit
-here. Shipping one would mean adding a coverage exemption, which is the
-thing this workspace bans by name. It needs a GPU-capable test runner, not a
+a ``@triton.jit`` body executes only on a GPU, so the suite that gates every
+commit here could cover one only where every runner of it has a GPU. Shipping
+one anywhere else would mean adding a coverage exemption, which is the thing
+this workspace bans by name. It needs a GPU-capable test runner, not a
 cleverer import.
 """
 

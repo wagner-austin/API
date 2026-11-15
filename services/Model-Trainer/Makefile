@@ -34,9 +34,8 @@ _lint-mypy:
 # coverage writes one SQLite file at a fixed path, and two overlapping runs
 # corrupt it, which surfaces as a spurious failure on a run whose tests all
 # passed; several sessions work this repo at once, so overlap is normal. It
-# adds a pre-run sweep and, on Windows, a kill-on-close job object so a run
-# that dies cannot strand its xdist workers; its module header carries the
-# 2026-08-19 incident that motivated both.
+# adds a pre-run sweep that reaps what a dead run stranded, and its module
+# header (maketools.test_run) lists everything else it adds.
 #
 # --durations=0 with --durations-min=1.0 names every test step of a second or
 # more in every check's log, as services/covenant-radar-api does, so a run
