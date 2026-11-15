@@ -213,24 +213,16 @@ asyncio_mode = "auto"
 # signal that the predicate is wrong, and the predicate here is "how long may a
 # single test legitimately take" -- the honest answer is just larger than the
 # live cases' wait.
-#
-# Windows has no SIGALRM, so timeout_method can only be "thread", whose expiry
-# calls os._exit(1): the worker dies with no cleanup and no protocol shutdown,
-# and the xdist controller is left waiting on a dead channel. A timeout here is
-# not a soft failure. See tools/maketools/src/maketools/reap.py for the 2026-08-19 incident and
-# --max-worker-restart=0, which turns that into a loud stop rather than a
-# 124-clone crash loop.
 timeout = 600
-timeout_method = "thread"
 # THE BOUND COVERS THE TEST, NOT ITS FIXTURES' TEARDOWN.
 #
 # Default is false, which charges setup and teardown to the test they happen
 # to bracket. tests/browser/test_real_chromium.py shares one module-scoped
 # headless Chromium across its cases because ``launch()`` is the expensive
-# call, so ``browser.close()`` lands on whichever test ran LAST -- and on a host whose filesystem minifilter inspects browser
-# teardown that close has been measured at tens of seconds on its own. The
+# call, so ``browser.close()`` lands on whichever test ran LAST. The
 # 2026-09-04 run that failed this way is the evidence: three real-browser tests
-# passed and the fourth, the last in its module, took the worker down.
+# passed and the fourth, the last in its module, timed out on the close
+# charged to it.
 #
 # Bounding that would be bounding the fixture, and reporting it would name the
 # wrong test. What this loses is a hang INSIDE a fixture, and that is a real
