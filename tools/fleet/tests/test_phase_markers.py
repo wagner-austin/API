@@ -15,7 +15,6 @@ import subprocess
 from datetime import UTC, datetime
 
 from fleet.core.phase_markers import PHASE_MARKER, sh_phase_lines
-from tests._host_bash import host_bash
 
 STAMP = r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)"
 
@@ -33,7 +32,7 @@ def _run(log: pathlib.Path, command: str) -> str:
     lines = ["set -eu", *sh_phase_lines(phase="install", command=command, log=log.as_posix())]
     script = "\n".join([*lines, 'printf "%s" "$status"']) + "\n"
     completed = subprocess.run(
-        [host_bash(), "-c", script], capture_output=True, text=True, check=False, timeout=60
+        ["bash", "-c", script], capture_output=True, text=True, check=False, timeout=60
     )
     assert completed.returncode == 0, completed.stderr
     return completed.stdout
@@ -48,7 +47,7 @@ def test_each_phase_adds_its_seconds_to_the_run_s_list(tmp_path: pathlib.Path) -
         'printf "%s" "$phases"',
     ]
     completed = subprocess.run(
-        [host_bash(), "-c", "\n".join(lines) + "\n"],
+        ["bash", "-c", "\n".join(lines) + "\n"],
         capture_output=True,
         text=True,
         check=False,

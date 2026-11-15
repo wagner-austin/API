@@ -316,7 +316,7 @@ def machine_of(sessions: NodeSessions) -> str:
 
     Returns:
         ``<platform>:<hostname>``, the ledger's machine key, which since
-        Claude Code 2.1.294 is the harness's ``pidDomain`` on Windows only.
+        Claude Code 2.1.294 is no longer the harness's ``pidDomain``.
     """
     return f"{sessions['platform']}:{sessions['hostname']}"
 

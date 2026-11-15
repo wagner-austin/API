@@ -24,7 +24,7 @@ needs since the queue's close posts a task-naming job's outcome under the
 closing runner's label (MCPs board task 2fecad69). The hub lane runs on the
 machine holding the control duty, as ``fleet-hub-<that machine's name>``
 (MCPs board task c39ee056), so moving the duty gives the new holder its own
-identity rather than lending it austinpc's. The ``fleet-sessions``
+identity rather than lending it another machine's. The ``fleet-sessions``
 job, placed on the machine holding the sessions duty, runs the ``sessions``
 lane for that machine as ``fleet-sessions-<alias>``, with
 ``sessions-announce`` its check-in (MCPs board task c39ee056). The
@@ -32,23 +32,10 @@ lane for that machine as ``fleet-sessions-<alias>``, with
 the ``netboot`` lane as ``fleet-netboot-<that machine's name>``, with
 ``netboot-announce`` its check-in (MCPs board task 83102d9d): the row names
 the installed netboot release it arms from, the node binary, the served root
-and the workspace env file, and the tick hands them to the agent. Until the
-hub runner, each of these was a scheduled task of its own,
-``API-FleetAgent-3min`` and ``API-FleetNode-<alias>-3min``. The
-``elevated`` lane, a Windows node's second runner (MCPs board task
-a98d7083), left with the fleet's last Windows node (board task e705f08c).
+and the workspace env file, and the tick hands them to the agent. The row runs
+this module with ``poetry run`` in the fleet package's own environment.
 
-WHY PYTHON AND NOT POWERSHELL (MCPs board task 94ac1c4f). The ticks ran
-``powershell.exe`` over a script until 2026-09-29. On the hub,
-``powershell.exe`` run as a task action under ``LogonType=S4U`` can stall
-before its engine loads, and it never exits: on 2026-09-28 diphtheria's tick
-hung 16 minutes and sedona's 7, and under IgnoreNew each hang refused every
-later tick of its node (0x800710E0) while the queue grew. A native binary
-under the same principal does not stall; the hpc-wake pump moved to Python
-for this reason on 2026-09-09. The action is ``poetry.exe``, itself a native
-launcher, running this module in the fleet package's own environment.
-
-WHAT A TICK DOES, which is what ``FleetTick.ps1`` did:
+WHAT A TICK DOES:
 
 * reads the machine's credentials from the hpc-wake pump's untracked
   ``runs/credentials.env``, ``KEY=VALUE`` lines read by
@@ -66,13 +53,13 @@ WHAT A TICK DOES, which is what ``FleetTick.ps1`` did:
 
 THE EXIT CODE IS THE AGENT'S. The agents exit 0 whenever they worked, refused
 jobs and failed suites included, so a non-zero means the tick itself broke
-and the scheduler's last result shows something real.
+and the hub runner's record of the run shows something real.
 
-THE DEADLINES NEST. The agent's wall is one minute inside the tasks'
-40-minute ExecutionTimeLimit (:data:`fleet.cli.rolled.AGENT_WALL_SECONDS`);
-this tick's is half a minute past the agent's, so a stuck agent is ended and
+THE DEADLINES NEST. The agent's wall is one minute inside the row's
+40-minute deadline (:data:`fleet.cli.rolled.AGENT_WALL_SECONDS`); this
+tick's is half a minute past the agent's, so a stuck agent is ended and
 logged by the launcher, a stuck launcher is ended and logged here, and the
-scheduler's limit ends only a tick that escaped both.
+runner's deadline ends only a tick that escaped both.
 """
 
 from __future__ import annotations

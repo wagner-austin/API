@@ -43,8 +43,8 @@ _log = get_logger(__name__)
 #:
 #: An hour: a hub verb closes in the tick that claimed it, so the lease only
 #: has to outlive the longest of them (an arm's first ISO fetch, bounded at
-#: 1800 s, or a bake, bounded at 1800 s by its own deadline) and the tick's
-#: own ExecutionTimeLimit ends anything past that.
+#: 1800 s, or a bake, bounded at 1800 s by its own deadline) and the hub
+#: runner row's own 40-minute deadline ends anything past that.
 CLAIM_LEASE_SECONDS = 3600
 
 #: How long a claim survives before its start is reported.

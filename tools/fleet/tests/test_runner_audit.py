@@ -24,7 +24,7 @@ from fleet.core.runner_audit_types import AuditFinding, AuditOutcome
 from fleet.core.runner_job_scope_render import JOB_SCOPE_PATH
 from fleet.core.runner_reaper_render import REAPER_PATH
 from tests._audit_rows import run_rows
-from tests._host_bash import bash_path, bash_says
+from tests._host_bash import bash_says
 from tests._runner_fixtures import a_host, an_install, no_dropped_jobs
 from tests.conftest import FakeRun, failed, ok
 
@@ -46,16 +46,15 @@ _CLEAN: Mapping[str, str] = {
 
 @pytest.fixture(name="base")
 def _base(tmp_path: pathlib.Path) -> str:
-    """The case's directory as the host's bash spells it.
+    """The case's directory, the form every path in the host and its rows takes.
 
     Args:
         tmp_path: The case's directory.
 
     Returns:
-        :func:`tests._host_bash.bash_path` of it, the form every path in
-        the host and its rows takes.
+        Its path with ``/`` separators.
     """
-    return bash_path(tmp_path)
+    return tmp_path.as_posix()
 
 
 def _host(tmp_path: pathlib.Path) -> HostRunnerSpec:
@@ -69,9 +68,9 @@ def _host(tmp_path: pathlib.Path) -> HostRunnerSpec:
 
     Returns:
         One install with a GPU, one timer, a pinned jar and a writable
-        directory, every path spelled as the host's bash spells it.
+        directory.
     """
-    base = bash_path(tmp_path)
+    base = tmp_path.as_posix()
     root = tmp_path / "actions-runner-api-1"
     (root / "_work").mkdir(parents=True)
     (root / ".path").write_text(f"{base}/stand-ins:{EXEC_PATH}")

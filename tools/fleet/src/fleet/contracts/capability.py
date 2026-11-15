@@ -18,10 +18,9 @@ the whole tree and before any test runs:
   and a node with the compiler alone carries no ``rust`` tag.
 - ``cxx`` (MCPs board task 3f19c136). Every MCPs TypeScript project installs
   with a root ``npm ci``, which rebuilds ``hnswlib-node`` under node-gyp, and
-  node-gyp needs a C++ toolchain: the Visual Studio VC tools on Windows, g++
-  on Linux. Measured 2026-09-27, no Windows node had the VC tools; dispatch
-  job 31fd1548 on lavender and 69f696cb on serendipity died in
-  ``find-visualstudio.js``.
+  node-gyp needs a C++ toolchain, ``g++``. Measured 2026-09-27, dispatch
+  job 31fd1548 on lavender and 69f696cb on serendipity died in node-gyp's
+  compiler discovery on nodes that had none.
 - ``docker`` (MCPs board task 6c4516af). MCPs/execution-deploy runs the
   real make deploy against a throwaway compose project, and on the
   operator's ruling of 2026-09-27 it may only use a ROOTLESS daemon under a

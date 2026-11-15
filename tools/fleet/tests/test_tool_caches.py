@@ -14,7 +14,6 @@ import time
 from typing import Final
 
 from fleet.core import names, tool_caches
-from tests._host_bash import host_bash
 
 #: One day in seconds.
 DAY: Final = 86400
@@ -45,7 +44,7 @@ def _run(tools: pathlib.Path, marker: pathlib.Path) -> tuple[str, str]:
         encoding="utf-8",
     )
     ran = subprocess.run(
-        [host_bash(), script.as_posix()], capture_output=True, text=True, check=False, timeout=60
+        ["bash", script.as_posix()], capture_output=True, text=True, check=False, timeout=60
     )
     assert ran.returncode == 0, ran.stderr
     cache, began = ran.stdout.split()

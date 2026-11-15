@@ -28,7 +28,6 @@ from fleet.core import (
     runner_workspace_unlock,
 )
 from tests._audit_rows import run_rows
-from tests._host_bash import host_bash
 from tests._runner_fixtures import an_install
 
 #: The unit every case runs.
@@ -196,7 +195,7 @@ def _run(
     (table / "stand-ins.sh").write_bytes(STAND_INS.encode())
     return subprocess.run(
         [
-            host_bash(),
+            "bash",
             "-c",
             'TABLE="$PWD"; source stand-ins.sh; source helper.sh "$@"',
             "x",

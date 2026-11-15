@@ -21,7 +21,6 @@ import time
 import pytest
 
 from fleet.core import runner_reaper_render
-from tests._host_bash import host_bash
 from tests.test_runner_reaper import (
     OWN,
     SCOPE,
@@ -234,7 +233,7 @@ class TestAgainstARealTree:
         )
         listener = subprocess.Popen(
             [
-                host_bash(),
+                "bash",
                 "-c",
                 f'exec -a "{bin_dir}/Runner.Listener" bash "{tmp_path}/listener.sh"',
             ],
@@ -268,7 +267,7 @@ class TestAgainstARealTree:
             )
             ran = subprocess.run(
                 [
-                    host_bash(),
+                    "bash",
                     "-c",
                     'source stand-ins.sh; source reaper.sh "$@"',
                     "x",

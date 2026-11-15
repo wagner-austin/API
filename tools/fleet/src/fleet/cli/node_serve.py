@@ -1,10 +1,10 @@
 """A node runner SERVES across its scheduled starts instead of ticking once.
 
 WHY (MCPs board task 8993c306). Each node's runner is started every 3
-minutes, one run at a time: a job of the MCPs hub runner since MCPs board
-task b27bd34a (``scripts/fleet/hub-jobs.json``), a scheduled task under
-IgnoreNew before it. Run once per start, it claimed a job only on a start and closed a finished one
-only on a start, so a row's wall time carried up to two waits of 3 minutes
+minutes, one run at a time: a job of the MCPs hub runner (MCPs board task
+b27bd34a, ``scripts/fleet/hub-jobs.json``). Run once per start, it claimed
+a job only on a start and closed a finished one only on a start, so a
+row's wall time carried up to two waits of 3 minutes
 beside its work. Measured on 2026-10-04 (board task 74b13c20, lavender-wsl):
 job 3308c976 did 20 s of work in a 182 s row, closed 148 s after its check
 ended, after 150 s queued on an idle node. The 100-second watch that followed
@@ -41,9 +41,9 @@ to dbf5c71 left all seven gate checks of MCPs d1f64219f queued from
 23:10:50 to 23:11:56Z while no node claimed anything, and lavender alone
 handed over nine times for rolls that day. The fleet-node row follows
 itself in MCPs ``scripts/fleet/hub-jobs.json``, so the hub runner starts the
-next serve, on the rolled commit, the poll after this one exits. The scheduler's fires that
-arrive while it serves are skipped by IgnoreNew, as intended, and the
-next fire after the handover starts the next serve: the node is unwatched
+next serve, on the rolled commit, the poll after this one exits. The
+runner's fires that arrive while it serves are skipped, since the row runs
+one at a time, and the next fire after the handover starts the next serve: the node is unwatched
 only for those seconds and the next start's few, once a serve rather than
 for 80 s of every start. A serve past its time claims nothing more, so it
 reaches an idle boundary within a fire or two.

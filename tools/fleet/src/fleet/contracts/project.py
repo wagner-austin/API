@@ -87,8 +87,8 @@ class ProjectConfig(TypedDict):
             from :class:`~fleet.contracts.tags.NodeTag`; empty for a suite
             any reachable node may run, which is every poetry project here.
             REQUIRED, never defaulted: ``slime`` (MCPs board task 41f45bd7)
-            drives a real scene through Chromium on the machine's GPU with a
-            Windows-only ANGLE backend, and a project that needed that and
+            drives a real scene through Chromium on the machine's GPU, and a
+            project that needed that and
             did not say so would be sent to a CPU-only linux box and time out
             there in a way that reads as a regression in the change under
             test. The planner refuses a node missing any of them by name

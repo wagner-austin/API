@@ -377,7 +377,7 @@ def observe_sessions(
     Args:
         credentials: The board's endpoint and headers.
         machine: The node's machine id in the harness's ``pidDomain``
-            spelling, ``win32:serendipity``.
+            spelling, ``linux:serendipity``.
         observations: Every record read from the node, already in the tool's
             wire shape.
         identity: From :func:`identity_arguments`.

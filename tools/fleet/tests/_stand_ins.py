@@ -12,8 +12,6 @@ import pathlib
 import subprocess
 from collections.abc import Mapping, Sequence
 
-from tests._host_bash import bash_path, host_bash
-
 
 def run_with_stand_ins(
     tmp_path: pathlib.Path,
@@ -26,9 +24,8 @@ def run_with_stand_ins(
 
     Args:
         tmp_path: The case's directory; the stand-ins land in its
-            ``stand-ins`` directory, written into the script as bash spells
-            it (:func:`tests._host_bash.bash_path`), and the script runs
-            from it.
+            ``stand-ins`` directory, written into the script by its path,
+            and the script runs from it.
         lines: The bash lines, as rendered.
         commands: Each command the lines ask, by the name or absolute path
             they spell it with, to the body of the bash script that answers
@@ -42,7 +39,7 @@ def run_with_stand_ins(
     """
     stand_ins = tmp_path / "stand-ins"
     stand_ins.mkdir()
-    spelled = f"{bash_path(tmp_path)}/stand-ins"
+    spelled = stand_ins.as_posix()
     body = "\n".join(lines)
     for command, answer in commands.items():
         name = command.rsplit("/", 1)[-1]
@@ -53,7 +50,7 @@ def run_with_stand_ins(
             body = body.replace(command, f"{spelled}/{name}")
     (tmp_path / "script.sh").write_bytes(f'PATH="{spelled}:$PATH"\n{body}\n'.encode())
     return subprocess.run(
-        [host_bash(), *options, "script.sh"],
+        ["bash", *options, "script.sh"],
         cwd=tmp_path,
         capture_output=True,
         text=True,

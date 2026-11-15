@@ -22,7 +22,6 @@ from typing_extensions import TypedDict
 from fleet.cli.runners import load_runner_spec
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import runner_reaper_render
-from tests._host_bash import host_bash
 
 #: The unit every case runs.
 UNIT = "actions.runner.wagner-austin-API.lavender.service"
@@ -167,7 +166,7 @@ def _run(
     (table / "stand-ins.sh").write_bytes(STAND_INS.encode())
     return subprocess.run(
         [
-            host_bash(),
+            "bash",
             "-c",
             'TABLE="$PWD"; source stand-ins.sh; source reaper.sh "$@"',
             "x",

@@ -75,9 +75,10 @@ AGENT_MODULES: Final[dict[str, str]] = {
     "fleet-research": "fleet.cli.research",
 }
 
-#: The agent's deadline: one minute inside the 40-minute ExecutionTimeLimit
-#: both scheduled tasks carry, so the launcher reports a timeout in the
-#: tick's log before Task Scheduler ends the tick without a word.
+#: The agent's deadline: one minute inside the 40-minute deadline
+#: (``deadlineSeconds`` 2400) every fleet row of the MCPs hub runner carries,
+#: so the launcher reports a timeout in the tick's log before the runner ends
+#: the tick without a word.
 AGENT_WALL_SECONDS: Final[int] = 39 * 60
 
 #: The exit status when no rolled tree could be extracted.

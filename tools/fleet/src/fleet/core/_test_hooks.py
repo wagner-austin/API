@@ -52,7 +52,7 @@ from typing import Protocol
 from platform_core.config import _optional_env_str, config_test_hooks
 from platform_core.mcp_client import McpPostProtocol, urllib_mcp_post
 
-from fleet.core._command import CHILD_IO_ENCODING, TIMED_OUT_RETURNCODE, CommandResult, _awaited
+from fleet.core._command import TIMED_OUT_RETURNCODE, CommandResult, _awaited
 from fleet.core.queue_transport import answering
 from fleet.core.scratch_root import SCRATCH_ROOT
 
@@ -102,19 +102,17 @@ class RunProtocol(Protocol):
                 command is for. Required, so a call cannot omit the decision.
             stdin_bytes: Bytes to write to the process's standard input, or
                 None to give the child a closed stdin (``DEVNULL``) rather
-                than this process's own, which under a scheduled task is a
-                handle a remote shell can wait on forever.
+                than this process's own, which is a handle a remote shell can
+                wait on forever.
             unset_env: Names of environment variables the child must NOT
                 inherit; every other variable of this process reaches it
                 unchanged. Measured 2026-09-17: the agent itself runs under
                 ``poetry run``, which exports ``VIRTUAL_ENV``, and poetry
                 honours an activated venv over a ``-C`` project's own, so a
                 session-audit invocation inherited the fleet venv and could
-                not import ``session_audit``. There is no argv-level way to
-                drop a variable on Windows, so the seam carries it.
+                not import ``session_audit``.
             set_env: ``(name, value)`` pairs the child receives on top of
-                what it inherits, applied after ``unset_env``. There is no
-                argv-level way to set one on Windows either: a session verb
+                what it inherits, applied after ``unset_env``: a session verb
                 turns bytecode writes off through this, so it never changes
                 the sealed release it runs (:mod:`fleet.core.restart`).
 
@@ -362,7 +360,6 @@ def _default_run(
     # hands back is filtered here, never mutated.
     parent = config_test_hooks.get_environment()
     environment = {name: value for name, value in parent.items() if name not in withheld}
-    environment[CHILD_IO_ENCODING[0]] = CHILD_IO_ENCODING[1]
     environment.update(set_env)
     if stdin_bytes is None:
         return _awaited(

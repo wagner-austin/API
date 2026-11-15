@@ -15,7 +15,6 @@ import stat
 import subprocess
 
 from fleet.core import runner_workspace_unlock
-from tests._host_bash import host_bash
 
 #: A read-only directory's mode, as a sealed release payload leaves one.
 SEALED = 0o555
@@ -38,7 +37,7 @@ def _unlock(install: pathlib.Path, tmp_path: pathlib.Path) -> subprocess.Complet
         encoding="utf-8",
     )
     return subprocess.run(
-        [host_bash(), script.as_posix()], capture_output=True, text=True, check=False, timeout=60
+        ["bash", script.as_posix()], capture_output=True, text=True, check=False, timeout=60
     )
 
 

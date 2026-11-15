@@ -22,7 +22,6 @@ import time
 import pytest
 
 from fleet.core import runner_action_cache
-from tests._host_bash import host_bash
 
 #: ``git`` with every github.com URL pointed at the test's repositories; a
 #: fetch is recorded as ``<owner>/<repo> <sha>``, and refused while the
@@ -184,7 +183,7 @@ class Fill:
             The finished process.
         """
         return subprocess.run(
-            [host_bash(), "fill.sh", *arguments],
+            ["bash", "fill.sh", *arguments],
             cwd=self.root,
             capture_output=True,
             text=True,

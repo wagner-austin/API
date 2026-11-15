@@ -34,15 +34,11 @@ ARCHIVE_NAME = "tree.tgz"
 
 #: The script that runs the suite, which is all it does.
 #:
-#: THE BUILD IS A SEPARATE FILE FROM THE THING THAT LAUNCHES IT, and that is
-#: the fix for a real bug rather than a tidiness preference. The first version
-#: passed the whole build as ``-Argument '-Command "cd ''{path}''; ..."'``, and
-#: PowerShell ended the single-quoted argument at the first inner quote: the
-#: registered task carried ``-Command "cd`` as its arguments and the remaining
-#: two hundred characters as its WORKING DIRECTORY. Measured on sedona
-#: 2026-09-04, the resulting task could not be started at all -- ``Element not
-#: found``, because that working directory does not exist. Sending the script
-#: and naming it by path is the same rule :mod:`fleet.core.remote` follows for
+#: THE BUILD IS A SEPARATE FILE FROM THE THING THAT LAUNCHES IT. A build
+#: passed inline is quoted once for the launcher and again for every shell it
+#: crosses, and one quote misread there turns the rest of the build into
+#: arguments or a working directory nobody wrote. Sending the script and
+#: naming it by path is the same rule :mod:`fleet.core.remote` follows for
 #: ssh, applied one layer further in; the launch then interpolates one path
 #: and no code.
 BUILD_STEM = "build"

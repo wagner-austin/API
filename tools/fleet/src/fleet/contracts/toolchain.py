@@ -25,12 +25,6 @@ resolved every lockfile against the wrong minor version, silently, and the
 build would have failed resolving rather than testing. Presence says nothing;
 the version says everything.
 
-AND WHY THE INSTALL KIND MATTERS TOO. ``sedona``'s Python was the Microsoft
-Store build, which sandboxes ``%LOCALAPPDATA%`` writes and has broken poetry
-venv creation before. It was replaced with a python.org install at the same
-path the other nodes use. A probe that only asked "is there a python" would
-have called that node ready.
-
 WHY THIS REFUSES RATHER THAN INSTALLS BY DEFAULT. These are other people's
 machines. Installing software on one is not something a dispatcher should do
 because a build wanted it, so :mod:`fleet.cli.bootstrap` reports and names the

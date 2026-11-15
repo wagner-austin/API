@@ -19,7 +19,6 @@ from fleet.contracts.node import NodeConfig
 from fleet.core import _test_hooks, dialect, names, retire
 from fleet.core.dialect import PROLOGUE
 from fleet.core.linux_isolated_build import EXEC_HOME_LINE
-from tests._host_bash import host_bash
 from tests.conftest import DEMO_RUN_ID, FakeRun, failed, ok, retire_replies
 
 #: The stage root, as the roster declares it.
@@ -252,7 +251,7 @@ class TestTheShScriptRunsForReal:
             encoding="utf-8",
         )
         ran = subprocess.run(
-            [host_bash(), script.as_posix()],
+            ["bash", script.as_posix()],
             capture_output=True,
             text=True,
             check=False,

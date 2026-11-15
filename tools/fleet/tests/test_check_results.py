@@ -38,7 +38,6 @@ from fleet.core.check_results import (
     sh_retire_lines,
     sh_totals_line,
 )
-from tests._host_bash import host_bash
 
 #: What MCPs' maketools ``write_failures`` wrote for a check whose suite
 #: failed one case and whose mypy refused one line: ``json.dumps`` of the
@@ -77,7 +76,7 @@ def run_lines(lines: list[str], cwd: pathlib.Path) -> subprocess.CompletedProces
     script = cwd / "lines.sh"
     script.write_text(dialect.PROLOGUE + "\n".join(lines) + "\n", encoding="utf-8")
     return subprocess.run(
-        [host_bash(), script.as_posix()],
+        ["bash", script.as_posix()],
         cwd=cwd,
         capture_output=True,
         text=True,

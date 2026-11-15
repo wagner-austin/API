@@ -17,7 +17,6 @@ from typing import Final
 import pytest
 
 from fleet.core import runner_tool_caches, runner_work_clear
-from tests._host_bash import host_bash
 
 #: What each laid-out file holds: one MiB.
 MIB: Final = 1024 * 1024
@@ -50,7 +49,7 @@ def _hook(
     first, rest = runner_work_clear.JOB_COMPLETED_SCRIPT.split("\n", 1)
     script.write_text(f"{first}\n{environment}{rest}", encoding="utf-8")
     return subprocess.run(
-        [host_bash(), script.as_posix()], capture_output=True, text=True, check=False, timeout=60
+        ["bash", script.as_posix()], capture_output=True, text=True, check=False, timeout=60
     )
 
 

@@ -22,7 +22,6 @@ from fleet.core.run_summary import (
     sh_run_summary_line,
 )
 from fleet.core.tool_caches import sh_build_lines
-from tests._host_bash import host_bash
 
 
 def _build(tmp_path: pathlib.Path, run: str) -> str:
@@ -51,7 +50,7 @@ def _build(tmp_path: pathlib.Path, run: str) -> str:
         sh_run_summary_line(log),
     ]
     ran = subprocess.run(
-        [host_bash(), "-c", "\n".join(lines) + "\n"],
+        ["bash", "-c", "\n".join(lines) + "\n"],
         capture_output=True,
         text=True,
         check=False,
@@ -123,7 +122,7 @@ def test_a_build_with_no_phase_says_none(tmp_path: pathlib.Path) -> None:
     log = (tmp_path / "result.txt.log").as_posix()
     script = "\n".join(["set -eu", "generation=1 generation_began=no", sh_run_summary_line(log)])
     ran = subprocess.run(
-        [host_bash(), "-c", script + "\n"], capture_output=True, text=True, check=False, timeout=60
+        ["bash", "-c", script + "\n"], capture_output=True, text=True, check=False, timeout=60
     )
     assert ran.returncode == 0, ran.stderr
     assert read_run_summary(pathlib.Path(log).read_text(encoding="utf-8"))["phases"] == "none"

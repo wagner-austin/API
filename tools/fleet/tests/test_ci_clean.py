@@ -21,7 +21,6 @@ import pytest
 
 from fleet.core import ci_clean, names
 from fleet.core.runner_tool_caches import RUNNER_VIRTUALENVS
-from tests._host_bash import host_bash
 
 #: One day in seconds.
 DAY: Final = 86400
@@ -234,7 +233,7 @@ def _run_caches(tmp_path: pathlib.Path, home: pathlib.Path) -> subprocess.Comple
     header = f"set -euo pipefail\nHOME={shlex.quote(str(home))}\n"
     script.write_text(header + ci_clean.CI_CLEAN_CACHES, encoding="utf-8")
     return subprocess.run(
-        [host_bash(), str(script)], capture_output=True, text=True, check=False, timeout=120
+        ["bash", str(script)], capture_output=True, text=True, check=False, timeout=120
     )
 
 
@@ -420,7 +419,7 @@ def _run_work_trees(
     header = f"set -euo pipefail\nHOME={shlex.quote(str(home))}\n"
     script.write_text(header + "".join(f"{line}\n" for line in lines), encoding="utf-8")
     return subprocess.run(
-        [host_bash(), str(script)], capture_output=True, text=True, check=False, timeout=120
+        ["bash", str(script)], capture_output=True, text=True, check=False, timeout=120
     )
 
 

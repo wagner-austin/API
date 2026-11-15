@@ -21,7 +21,6 @@ import time
 from fleet.contracts.action_cache import STATUS_PATH
 from fleet.contracts.runners import RunnerInstall
 from fleet.core import runner_action_cache, runner_cache_adopt
-from tests._host_bash import host_bash
 from tests._runner_fixtures import an_install
 
 #: The setting a unit reads the cache by.
@@ -272,7 +271,7 @@ class Host:
             The finished process.
         """
         return subprocess.run(
-            [host_bash(), script, *arguments],
+            ["bash", script, *arguments],
             cwd=self.root,
             capture_output=True,
             text=True,

@@ -15,7 +15,6 @@ import shlex
 import subprocess
 
 from fleet.core import names, runner_tool_caches
-from tests._host_bash import host_bash
 
 
 def _hook(tmp_path: pathlib.Path, runner_temp: str) -> subprocess.CompletedProcess[str]:
@@ -41,7 +40,7 @@ def _hook(tmp_path: pathlib.Path, runner_temp: str) -> subprocess.CompletedProce
         header + "".join(f"{line}\n" for line in runner_tool_caches.HOOK_LINES), encoding="utf-8"
     )
     return subprocess.run(
-        [host_bash(), script.as_posix()], capture_output=True, text=True, check=False, timeout=60
+        ["bash", script.as_posix()], capture_output=True, text=True, check=False, timeout=60
     )
 
 

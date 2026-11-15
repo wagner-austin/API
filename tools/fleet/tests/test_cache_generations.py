@@ -19,7 +19,6 @@ from platform_core.errors import AppError, FleetErrorCode
 from fleet.contracts.node import NodeConfig
 from fleet.core import _test_hooks, cache_generations, names
 from fleet.core.linux_isolated_build import EXEC_HOME_LINE
-from tests._host_bash import host_bash
 from tests.conftest import FakeRun, failed, ok
 
 #: One day in seconds.
@@ -156,7 +155,7 @@ def _remove(stage: pathlib.Path, current: str) -> subprocess.CompletedProcess[st
     script = stage / f"{cache_generations.REMOVAL_STEM}.sh"
     script.write_text(cache_generations.removal_script(stage.as_posix(), isolated=False), "utf-8")
     return subprocess.run(
-        [host_bash(), script.as_posix()], capture_output=True, text=True, check=False, timeout=60
+        ["bash", script.as_posix()], capture_output=True, text=True, check=False, timeout=60
     )
 
 
@@ -231,7 +230,7 @@ def test_a_node_whose_builds_have_not_started_a_generation_says_so(
     )
 
     ran = subprocess.run(
-        [host_bash(), script.as_posix()], capture_output=True, text=True, check=False, timeout=60
+        ["bash", script.as_posix()], capture_output=True, text=True, check=False, timeout=60
     )
 
     assert (ran.returncode, ran.stdout) == (
