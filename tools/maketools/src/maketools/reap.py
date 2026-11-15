@@ -5,19 +5,20 @@ in the torch projects every worker imports torch, which RESERVES ~1.1 GB of
 address space on import. Working set stays tiny, so a wedged run looks
 harmless while it holds tens of GB of commit.
 
-The wedge: pytest-timeout has no SIGALRM on Windows, so it uses the
-``thread`` method, whose expiry path is literally ``os._exit(1)``. That
-kills a worker with no cleanup and no protocol shutdown, so the xdist
-controller is left waiting on a channel that will never answer, and the
-remaining workers block forever in ``sys.stdin.readline()`` -- which is
-their entire command line::
+A worker that dies without the protocol's shutdown leaves the xdist
+controller waiting on a channel that will never answer, and the remaining
+workers block forever in ``sys.stdin.readline()`` -- which is their entire
+command line::
 
     python -u -c "import sys;exec(eval(sys.stdin.readline()))"
 
-2026-08-19 incident: three ``make check`` runs on 08-18 left 101 live
-processes holding ~112 GB of commit for 23 hours. The box threw an "Out of
-Virtual Memory" popup that night, and a 22,906-feature SIRIUS annotation run
-died at 67% the next morning.
+2026-08-19 incident, on a Windows host: pytest-timeout had no SIGALRM there,
+so every package ran its ``thread`` method, whose expiry is ``os._exit(1)``,
+and three ``make check`` runs on 08-18 left 101 live processes holding
+~112 GB of commit for 23 hours. Every node is Linux now and every package
+uses the default ``signal`` method, under which a test reaching its bound
+fails in its own worker (MCPs board task d10a2560); a worker still dies
+without the shutdown when its launcher is killed, which is what this reaps.
 
 TWO MODES. Descendants of a pid are ours by construction, so no age or idle
 gate is applied. A standalone sweep of a PREVIOUS run's wreckage is gated
