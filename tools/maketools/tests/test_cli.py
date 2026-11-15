@@ -234,10 +234,10 @@ def test_lint_makefiles_reports_the_count_and_the_violations(world: World) -> No
     bad = root / "tools" / "maketools" / "runs" / "bad" / "Makefile"
     bad.parent.mkdir(parents=True, exist_ok=True)
     # The appended line lands in check's recipe after the banner, so it
-    # breaks the grammar (a cmdlet) AND the banner rule (a command after the
+    # breaks the grammar (a pipe) AND the banner rule (a command after the
     # banner); the prologue at the wrong depth is the third, and the old
     # check shape, with prerequisites and no budget call, is the last four.
-    bad.write_text(PORTABLE + "\tWrite-Host x\n", encoding="utf-8")
+    bad.write_text(PORTABLE + "\tcmd | tail\n", encoding="utf-8")
     world.tracked = [bad.relative_to(root)]
     assert dispatch(["lint-makefiles"]) == 1
     assert world.errors[-1] == "lint-makefiles: 7 violation(s) in 1 tracked Makefile(s)"
@@ -246,7 +246,7 @@ def test_lint_makefiles_reports_the_count_and_the_violations(world: World) -> No
         "include ../../../../scripts/make/shell.mk"
     )
     assert world.errors[2].endswith(
-        "Makefile:14: check: runs a command after the pass banner: Write-Host x"
+        "Makefile:14: check: runs a command after the pass banner: cmd | tail"
     )
     bad.unlink()
     with pytest.raises(AppError, match=r"lint-makefiles takes no arguments"):
