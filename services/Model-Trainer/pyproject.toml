@@ -42,11 +42,11 @@ platform-workers = { path = "../../libs/platform_workers", develop = true }
 platform-ml = { path = "../../libs/platform_ml", develop = true, extras = ["wandb"] }
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^9.1.1"
-pytest-asyncio = "^1.4.0"
+pytest = "^9.2.0"
+pytest-asyncio = "^1.5.0"
 pytest-timeout = "^2.4.0"
-mypy = "^2.3.1"
-ruff = "^0.16.6"
+mypy = "^2.4.1"
+ruff = "^0.17.5"
 fakeredis = {version = "^2.26", extras = ["lua"]}
 pytest-cov = "^7.1.0"
 pytest-xdist = "^3.8.0"
