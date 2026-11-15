@@ -13,7 +13,7 @@ from platform_core.http_client import HttpxAsyncClient, build_async_client
 
 
 def _default_build_client(timeout_seconds: float) -> HttpxAsyncClient:
-    """Default client builder using real httpx.
+    """Default client builder using real httpx2.
 
     Args:
         timeout_seconds: Request timeout.

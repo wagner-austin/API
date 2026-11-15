@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 
-import httpx
+import httpx2
 import pytest
 from platform_codebase import FakeGitHubClient, GitHubClientProtocol
 from platform_core.http_client import HttpxAsyncClient
@@ -102,9 +102,9 @@ class TestStatsEndpoint:
 
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api?username=testuser")
 
         assert response.status_code == 200
@@ -123,9 +123,9 @@ class TestStatsEndpoint:
 
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api?username=testuser&theme=dark")
 
         assert response.status_code == 200
@@ -142,9 +142,9 @@ class TestStatsEndpoint:
 
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api?username=testuser&hide_border=true")
 
         assert response.status_code == 200
@@ -161,9 +161,9 @@ class TestStatsEndpoint:
 
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api?username=testuser&hide=stars,prs")
 
         assert response.status_code == 200
@@ -173,9 +173,9 @@ class TestStatsEndpoint:
         """Test /api endpoint without username returns 400."""
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api")
 
         assert response.status_code == 400
@@ -191,9 +191,9 @@ class TestStatsEndpoint:
 
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api?username=testuser")
 
         assert "Cache-Control" in response.headers
@@ -220,9 +220,9 @@ class TestTopLangsEndpoint:
 
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/top-langs?username=testuser")
 
         assert response.status_code == 200
@@ -240,9 +240,9 @@ class TestTopLangsEndpoint:
 
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/top-langs?username=testuser&layout=compact")
 
         assert response.status_code == 200
@@ -259,9 +259,9 @@ class TestTopLangsEndpoint:
 
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/top-langs?username=testuser&hide=python")
 
         assert response.status_code == 200
@@ -279,9 +279,9 @@ class TestTopLangsEndpoint:
 
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/top-langs?username=testuser&langs_count=1")
 
         assert response.status_code == 200
@@ -291,9 +291,9 @@ class TestTopLangsEndpoint:
         """Test /api/top-langs endpoint without username returns 400."""
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/top-langs")
 
         assert response.status_code == 400
@@ -309,9 +309,9 @@ class TestTopLangsEndpoint:
 
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/top-langs?username=testuser")
 
         assert "Cache-Control" in response.headers
@@ -381,9 +381,9 @@ class TestCapabilitiesEndpoint:
 
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/capabilities?repo=owner/repo")
 
         assert response.status_code == 200
@@ -402,9 +402,9 @@ class TestCapabilitiesEndpoint:
 
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/capabilities?repo=owner/repo&theme=dracula")
 
         assert response.status_code == 200
@@ -422,9 +422,9 @@ class TestCapabilitiesEndpoint:
 
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/capabilities?repo=owner/repo&hide_border=true")
 
         assert response.status_code == 200
@@ -441,9 +441,9 @@ class TestCapabilitiesEndpoint:
 
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/capabilities?repo=owner/empty-repo")
 
         assert response.status_code == 200
@@ -453,9 +453,9 @@ class TestCapabilitiesEndpoint:
         """Test /api/capabilities endpoint without repo returns 400."""
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/capabilities")
 
         assert response.status_code == 400
@@ -464,9 +464,9 @@ class TestCapabilitiesEndpoint:
         """Test /api/capabilities endpoint with invalid repo format returns 400."""
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/capabilities?repo=invalid-format")
 
         assert response.status_code == 400
@@ -482,9 +482,9 @@ class TestCapabilitiesEndpoint:
 
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/capabilities?repo=owner/repo")
 
         assert "Cache-Control" in response.headers
@@ -498,9 +498,9 @@ class TestHeroEndpoint:
         """Test /api/hero endpoint returns SVG."""
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get(
                 "/api/hero?name=Austin%20Wagner"
                 "&subtitle=Full-Stack%20Developer"
@@ -517,9 +517,9 @@ class TestHeroEndpoint:
         """Test /api/hero endpoint returns error when name is missing."""
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/hero")
 
         assert response.status_code == 400
@@ -528,9 +528,9 @@ class TestHeroEndpoint:
         """Test /api/hero endpoint sets cache-control header."""
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/hero?name=Test")
 
         assert "Cache-Control" in response.headers
@@ -544,9 +544,9 @@ class TestSkillsEndpoint:
         """Test /api/skills endpoint returns SVG."""
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get(
                 "/api/skills?skills=Python,TypeScript,React&theme=cyberpunk"
             )
@@ -561,9 +561,9 @@ class TestSkillsEndpoint:
         """Test /api/skills endpoint returns error when skills is missing."""
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/skills")
 
         assert response.status_code == 400
@@ -572,9 +572,9 @@ class TestSkillsEndpoint:
         """Test /api/skills endpoint sets cache-control header."""
         test_settings = _make_test_settings()
         app = create_app(test_settings)
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx2.ASGITransport(app=app)
 
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/skills?skills=Python")
 
         assert "Cache-Control" in response.headers

@@ -330,7 +330,7 @@ The `RAILWAY_DOCKERFILE_PATH` tells Railway to use the service's Dockerfile whil
 |---------|---------|
 | `fastapi` | Web framework |
 | `hypercorn` | ASGI server |
-| `httpx` | Async HTTP client |
+| `httpx2` | Async HTTP client |
 | `platform-core` | Logging, errors, config, HTTP client protocols |
 | `platform-codebase` | Repo capability detection behind `/api/capabilities` |
 | `platform-kaggle` | Competition capability matching |

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import httpx
+import httpx2
 import pytest
 
 from github_stats_api.api.main import create_app
@@ -16,10 +16,10 @@ def _make_test_settings() -> Settings:
     }
 
 
-def _make_app(test_settings: Settings) -> httpx.ASGITransport:
+def _make_app(test_settings: Settings) -> httpx2.ASGITransport:
     """Create test app with ASGI transport."""
     fastapi_app = create_app(test_settings)
-    return httpx.ASGITransport(app=fastapi_app)
+    return httpx2.ASGITransport(app=fastapi_app)
 
 
 test_settings = pytest.fixture(_make_test_settings)
@@ -29,25 +29,25 @@ app = pytest.fixture(_make_app)
 class TestHealthRoutes:
     """Tests for health check routes."""
 
-    async def test_health_endpoint(self, app: httpx.ASGITransport) -> None:
+    async def test_health_endpoint(self, app: httpx2.ASGITransport) -> None:
         """Test /health endpoint returns ok."""
-        async with httpx.AsyncClient(transport=app, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=app, base_url="http://test") as client:
             response = await client.get("/health")
 
         assert response.status_code == 200
         assert response.text == "ok"
 
-    async def test_healthz_endpoint(self, app: httpx.ASGITransport) -> None:
+    async def test_healthz_endpoint(self, app: httpx2.ASGITransport) -> None:
         """Test /healthz endpoint returns ok."""
-        async with httpx.AsyncClient(transport=app, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=app, base_url="http://test") as client:
             response = await client.get("/healthz")
 
         assert response.status_code == 200
         assert response.text == "ok"
 
-    async def test_readyz_endpoint(self, app: httpx.ASGITransport) -> None:
+    async def test_readyz_endpoint(self, app: httpx2.ASGITransport) -> None:
         """Test /readyz endpoint returns ok."""
-        async with httpx.AsyncClient(transport=app, base_url="http://test") as client:
+        async with httpx2.AsyncClient(transport=app, base_url="http://test") as client:
             response = await client.get("/readyz")
 
         assert response.status_code == 200
