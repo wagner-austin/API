@@ -28,11 +28,11 @@ rw-fleet = "rw_bot.harness.fleet_http:main"
 # compute image (tests/test_architecture.py holds that line).
 [tool.poetry.group.dev.dependencies]
 hpc3 = {path = "../../tools/hpc3", develop = true}
-pytest = "^9.1.1"
+pytest = "^9.2.0"
 pytest-cov = "^7.1.0"
 pytest-xdist = "^3.8.0"
-ruff = "^0.16.6"
-mypy = "^2.3.1"
+ruff = "^0.17.5"
+mypy = "^2.4.1"
 
 [tool.mypy]
 python_version = "3.11"
