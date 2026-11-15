@@ -10,13 +10,13 @@ Shared Python libraries for the monorepo. Each library is a standalone Poetry pa
 | [covenant-ml](./covenant_ml) | Pluggable ML backends, Optuna optimizers, DART boosting, feature explainers | covenant-domain, platform-ml, xgboost, lightgbm, torch, optuna |
 | [covenant-persistence](./covenant_persistence) | PostgreSQL repository layer for covenants | covenant-domain, psycopg |
 | [monorepo-guards](./monorepo_guards) | Code quality enforcement rules | None |
-| [platform-core](./platform_core) | Shared utilities: errors, validation, logging, service config | FastAPI, httpx |
+| [platform-core](./platform_core) | Shared utilities: errors, validation, logging, service config | FastAPI, httpx2, rich |
 | [platform-ml](./platform_ml) | ML artifacts, manifests, device selection, explainers (SHAP, permutation, gradient) | platform-core, shap, torch |
 | [platform-workers](./platform_workers) | Redis/RQ background job processing | platform-core, redis, rq |
 | [cleargbm](./cleargbm) | From-scratch interpretable gradient boosting (pure stdlib) | None |
 | [platform-calendar](./platform_calendar) | Google Calendar API for competition deadlines | platform-core |
 | [platform-codebase](./platform_codebase) | Codebase capability detection and profiling | platform-core |
-| [platform-devpost](./platform_devpost) | Devpost hackathon discovery + capability matching | platform-core, platform-codebase, httpx |
+| [platform-devpost](./platform_devpost) | Devpost hackathon discovery + capability matching | platform-core, platform-codebase, httpx2 |
 | [platform-kaggle](./platform_kaggle) | Kaggle competition discovery + capability matching | platform-core, platform-codebase, kaggle |
 | [platform-stt](./platform_stt) | Speech-to-text with Whisper, chunking, language detection | platform-core, numpy, openai, fasttext-wheel |
 
