@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 from platform_core.json_utils import JSONObject
@@ -325,12 +326,34 @@ def test_browser_session_setup_cdp_handlers() -> None:
 
 
 def test_browser_hook_source_captures_closure_scoped_game_client() -> None:
-    """Injected browser hook stores the active game client outside tpclient closure scope."""
+    """Injected browser hook stores the active game client outside tpclient closure scope.
+
+    It traps ``Fa`` and nothing else on ``Object.prototype``: a trapped ``h``
+    or ``s`` is inherited by the ``{h: 0}`` handle Playwright sends with
+    ``wait_for_function``, which its in-page parser then reads as a Set.
+    """
     assert "window.__tankpitActiveGame = null;" in BROWSER_HOOK_SOURCE
     assert "function maybeCaptureGameClient(candidate)" in BROWSER_HOOK_SOURCE
-    assert "installClientProbe('map');" in BROWSER_HOOK_SOURCE
-    assert "installClientProbe('Ha');" in BROWSER_HOOK_SOURCE
     assert "window.__tankpitActiveGame = candidate;" in BROWSER_HOOK_SOURCE
+    probes = [
+        line.strip()
+        for line in BROWSER_HOOK_SOURCE.splitlines()
+        if line.strip().startswith("installClientProbe(")
+    ]
+    assert probes == ["installClientProbe('Fa');"]
+
+
+def test_the_reference_client_assigns_fa_after_the_last_recognition_field() -> None:
+    """The checked-in ``tpclient.js`` assigns ``Fa`` straight after ``s``.
+
+    The hook recognizes the game client when it assigns ``Fa``, which holds
+    only while ``$d`` assigns ``s`` (the last of the six fields the hook
+    checks) immediately before it. The checked-in copy is the reference the
+    static-key capture refreshes from the live page, so a client build that
+    reorders the constructor fails here.
+    """
+    reference = Path(__file__).resolve().parents[2] / "tpclient.js"
+    assert "this.s=-1;this.Fa=null;" in reference.read_text(encoding="utf-8")
 
 
 def test_get_captured_raw_messages_requires_value_field() -> None:

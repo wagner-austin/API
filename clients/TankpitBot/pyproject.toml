@@ -20,9 +20,11 @@ include = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-# Wheel installs must use the live-tested driver: 1.64 fails in
-# wait_for_function after game login (2026-10-16 release gate).
-playwright = "1.63.0"
+# An exact pin: a wheel install takes this driver, and its browser build is
+# tied to it, so the release image runs the driver the live gate tested.
+# 1.64 and later read the hook's Object.prototype traps for h and s as
+# serialization tags (2026-10-16 release gate); the hook traps Fa instead.
+playwright = "1.65.2"
 websockets = "^17.4"
 httpx2 = "^2.16"
 rich = "^15.0"

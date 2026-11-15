@@ -5,9 +5,24 @@ client code runs:
 
 1. Captures the live game-client object onto
    ``window.__tankpitActiveGame`` using a ``defineProperty`` trap on
-   ``Object.prototype``. The first object that assigns all six minified
-   properties (``map``, ``h``, ``i``, ``va``, ``Ha``, ``s``) is
-   recognized as the game client.
+   ``Object.prototype``. The game client is the object holding all six
+   minified properties (``map``, ``h``, ``i``, ``va``, ``Ha``, ``s``), and
+   it is recognized when it assigns ``Fa``: tpclient's constructor ``$d``
+   runs its base ``Oc`` (``map``, ``h``, ``i``), then assigns ``va``,
+   ``Ha`` and ``s``, and ``this.s=-1;this.Fa=null`` puts ``Fa`` straight
+   after the last of the six, so the check runs once all six are there.
+
+   WHY NOT TRAP THE SIX THEMSELVES. A trap makes its name an inherited
+   property of every object, so ``name in value`` is true for all of them.
+   Playwright's in-page ``parseEvaluationResultValue`` reads each value it
+   is sent by testing its tag that way, and two of the six are its tags:
+   ``h`` (a handle) and, since 1.64, ``s`` (a Set), tested before ``h``.
+   ``wait_for_function`` sends its injected script as the handle
+   ``{h: 0}``, so with ``s`` trapped that handle parsed as a Set whose
+   members the trap's getter left undefined, and the call raised
+   ``TypeError: value.s is not iterable`` (release v0.1.0-7ede29e57 on
+   Playwright 1.64.0, 2026-10-16, before its first decision tick).
+   ``Fa`` is no Playwright tag.
 2. Hooks ``EventTarget.prototype.addEventListener`` so that every
    ``WebSocket`` instance the page creates has its incoming-message
    handler wrapped. Incoming binary frames are base64-encoded and
@@ -109,12 +124,7 @@ BROWSER_HOOK_SOURCE = """
                     });
                 }
 
-                installClientProbe('map');
-                installClientProbe('h');
-                installClientProbe('i');
-                installClientProbe('va');
-                installClientProbe('Ha');
-                installClientProbe('s');
+                installClientProbe('Fa');
 
                 // Hook EventTarget.prototype.addEventListener globally.
                 // This catches ALL addEventListener calls, including those

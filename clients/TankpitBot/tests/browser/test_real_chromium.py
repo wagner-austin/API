@@ -55,6 +55,7 @@ from tankpit_bot._test_hooks import (
 )
 from tankpit_bot._test_hooks.cdp import RouteFulfillTarget
 from tankpit_bot.bot.base import Bot
+from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.browser.lifecycle import _capture_static_key, gather_intel
 from tankpit_bot.diagnostics.combat_screenshot import save_screenshot
 from tests.conftest import FakeFileSystem
@@ -121,6 +122,11 @@ def intel_page(chromium: BrowserProtocol) -> Generator[_IntelPage, None, None]:
     try:
         page = context.new_page()
         shared = _IntelPage(page, context.new_cdp_session(page))
+        # The bot's own hook runs on every document, installed as production
+        # installs it. Its Object.prototype trap is what broke
+        # wait_for_function under Playwright 1.64 on the live page while
+        # these cases, run without it, passed (MCPs board task 2cad4eb2).
+        CDPService().setup_cdp_handlers(shared.cdp)
 
         def _fulfill_page(route: RouteFulfillTarget) -> None:
             route.fulfill(content_type="text/html", body=_PAGE_HTML)
@@ -225,6 +231,27 @@ def test_capture_static_key_no_key_in_content(intel_page: _IntelPage) -> None:
     """Real browser: tpclient.js exists but has no 1000-char string."""
     page = _serve(intel_page, "var x = 1;")
     assert _capture_static_key(page) is None
+
+
+@pytest.mark.usefixtures("fake_fs")
+def test_the_hook_captures_a_client_built_in_tpclients_order(intel_page: _IntelPage) -> None:
+    """Real browser: the hook captures the game client and the capture still waits.
+
+    The served script builds a client the way tpclient's ``$d`` does: its
+    base ``Oc`` assigns ``map``, ``h`` and ``i``, then ``va``, ``Ha``, ``s``
+    and ``Fa``. The hook must hand that object to
+    ``window.__tankpitActiveGame`` while ``_capture_static_key``'s
+    ``wait_for_function`` runs on the same document.
+    """
+    page = _serve(
+        intel_page,
+        "function Oc(){this.map={};this.h={j:{actions:[]}};this.i={};}"
+        "function $d(c){Oc.call(this);this.va=c;this.Ha=!1;this.s=-1;this.Fa=null;}"
+        "window.__built=new $d({});",
+    )
+
+    assert _capture_static_key(page) is None
+    assert page.evaluate("window.__tankpitActiveGame === window.__built") is True
 
 
 def test_save_screenshot_writes_real_png_file(
