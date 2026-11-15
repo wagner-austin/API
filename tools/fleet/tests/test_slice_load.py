@@ -18,11 +18,17 @@ from fleet.contracts.check_unit import DISPATCH_SLICE_NAME
 from fleet.contracts.runner_slice import CI_SLICE_NAME
 from fleet.core import verdict
 from fleet.core.slice_load import (
+    CGROUP_ROOT,
     CI_SLICE,
     DISPATCH_SLICE,
     MEASURED_SLICES,
+    OWN_CGROUP,
+    PRESSURE_MARKER,
+    PRESSURES,
     SLICE_LOAD_MARKER,
     MeasuredSlice,
+    pressure_line,
+    pressure_none_line,
     read_slice_load,
     sh_slice_load_end_lines,
     sh_slice_load_start_lines,
@@ -53,8 +59,18 @@ LAVENDER_TAIL = (
 RUN = "MCPs-execution-deploy-lavender-1793327005"
 
 
+def _psi(some: int) -> str:
+    """One resource's pressure file as the kernel writes it, with this ``some`` total in µs."""
+    return (
+        f"some avg10=0.00 avg60=0.00 avg300=0.00 total={some}\n"
+        "full avg10=0.00 avg60=0.00 avg300=0.00 total=1\n"
+    )
+
+
 def _run(
-    tmp_path: pathlib.Path, stats: dict[str, tuple[str | None, str | None]]
+    tmp_path: pathlib.Path,
+    stats: dict[str, tuple[str | None, str | None]],
+    pressure: dict[str, tuple[int | None, int | None]],
 ) -> tuple[str, range]:
     """Run the start lines, change each stat file, run the end lines, and read the transcript.
 
@@ -70,6 +86,9 @@ def _run(
         tmp_path: The case's directory.
         stats: Each measured slice's field, with its stat file's text at the
             start and at the end, None for no file.
+        pressure: Each resource of :data:`PRESSURES` the build's own cgroup
+            keeps a pressure file for, with its ``some`` total at the start
+            and at the end, None for no file; empty for a cgroup without PSI.
 
     Returns:
         What the lines appended to the transcript, and every whole-second
@@ -88,9 +107,23 @@ def _run(
         slices.append(
             MeasuredSlice(name=measured["name"], cpu_stat=str(stat), field=measured["field"])
         )
+    root = tmp_path / "cgroup"
+    own = root / "system.slice" / "fleet-check.service"
+    own.mkdir(parents=True)
+    own_cgroup = tmp_path / "self-cgroup"
+    own_cgroup.write_text("0::/system.slice/fleet-check.service\n", encoding="utf-8")
+    for resource, (before_total, after_total) in pressure.items():
+        path = own / f"{resource}.pressure"
+        if before_total is not None:
+            path.write_text(_psi(before_total), encoding="utf-8")
+        changes.append(
+            f"rm -f '{path}'"
+            if after_total is None
+            else f"printf '%s' '{_psi(after_total)}' > '{path}'"
+        )
     script = "\n".join(
         [
-            *sh_slice_load_start_lines(tuple(slices)),
+            *sh_slice_load_start_lines(tuple(slices), str(root), str(own_cgroup)),
             *changes,
             *sh_slice_load_end_lines(tuple(slices), str(log)),
         ]
@@ -124,6 +157,7 @@ class TestTheLinesOnTheNode:
                 "ci": ("usage_usec 1000000000\nuser_usec 7\n", "usage_usec 1412500000\n"),
                 "dispatch": ("usage_usec 5000000\n", "usage_usec 1468800000\nuser_usec 1\n"),
             },
+            {},
         )
 
         # The CI slice's end is read first, so its wall is never the later.
@@ -133,7 +167,9 @@ class TestTheLinesOnTheNode:
             for dispatch in walls
             if ci <= dispatch
             and printed
-            == _used(CI_SLICE_NAME, 412, ci) + _used(DISPATCH_SLICE_NAME, 1463, dispatch)
+            == _used(CI_SLICE_NAME, 412, ci)
+            + _used(DISPATCH_SLICE_NAME, 1463, dispatch)
+            + f"{pressure_none_line()}\n"
         ]
         assert len(read) == 1
         ci, dispatch = read[0]
@@ -144,13 +180,16 @@ class TestTheLinesOnTheNode:
         self, tmp_path: pathlib.Path
     ) -> None:
         printed, walls = _run(
-            tmp_path, {"ci": (None, None), "dispatch": ("usage_usec 0\n", "usage_usec 0\n")}
+            tmp_path, {"ci": (None, None), "dispatch": ("usage_usec 0\n", "usage_usec 0\n")}, {}
         )
 
         read = [
             wall
             for wall in walls
-            if printed == f"{slice_none_line(CI_SLICE)}\n" + _used(DISPATCH_SLICE_NAME, 0, wall)
+            if printed
+            == f"{slice_none_line(CI_SLICE)}\n"
+            + _used(DISPATCH_SLICE_NAME, 0, wall)
+            + f"{pressure_none_line()}\n"
         ]
         assert len(read) == 1
         assert read_slice_load(printed, CI_SLICE) == "none"
@@ -159,11 +198,53 @@ class TestTheLinesOnTheNode:
     def test_a_slice_gone_by_the_end_says_so_and_the_build_goes_on(
         self, tmp_path: pathlib.Path
     ) -> None:
-        printed, _ = _run(tmp_path, {"ci": (None, None), "dispatch": ("usage_usec 5\n", None)})
+        printed, _ = _run(tmp_path, {"ci": (None, None), "dispatch": ("usage_usec 5\n", None)}, {})
 
-        assert printed == f"{slice_none_line(CI_SLICE)}\n{slice_gone_line(DISPATCH_SLICE)}\n"
+        assert printed == (
+            f"{slice_none_line(CI_SLICE)}\n{slice_gone_line(DISPATCH_SLICE)}\n"
+            f"{pressure_none_line()}\n"
+        )
         assert read_slice_load(printed, DISPATCH_SLICE) == "gone"
         assert read_slice_load(printed, CI_SLICE) == "none"
+
+    def test_the_build_s_own_cgroup_prints_the_seconds_its_tasks_stalled_on_each_resource(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The figure 86f3aa91 lacked (MCPs board task 2e2df92a): whether a
+        check beside a docker-lane build waited on CPU, disk or memory."""
+        idle = ("usage_usec 0\n", "usage_usec 0\n")
+        printed, walls = _run(
+            tmp_path,
+            {"ci": idle, "dispatch": idle},
+            {"cpu": (1_000_000, 4_900_000), "io": (0, 212_400_000), "memory": (5, 5)},
+        )
+
+        stalled = [
+            wall
+            for wall in walls
+            if printed.endswith(f"{pressure_line(('3', '212', '0'), str(wall))}\n")
+        ]
+        assert len(stalled) == 1
+        assert printed.count(PRESSURE_MARKER) == 1
+
+    def test_a_pressure_file_gone_by_the_end_says_so_and_the_build_goes_on(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        idle = ("usage_usec 0\n", "usage_usec 0\n")
+        printed, _ = _run(
+            tmp_path,
+            {"ci": idle, "dispatch": idle},
+            {"cpu": (1, 2), "io": (1, None), "memory": (1, 2)},
+        )
+
+        assert printed.endswith(f"\n{pressure_none_line()}\n")
+
+    def test_the_node_s_pressure_is_read_from_the_build_s_own_cgroup(self) -> None:
+        assert (CGROUP_ROOT, OWN_CGROUP, PRESSURES) == (
+            "/sys/fs/cgroup",
+            "/proc/self/cgroup",
+            ("cpu", "io", "memory"),
+        )
 
     def test_the_node_s_lines_read_the_ci_slice_and_dispatch_s_share(self) -> None:
         assert [measured["cpu_stat"] for measured in MEASURED_SLICES] == [

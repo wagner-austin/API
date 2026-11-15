@@ -77,7 +77,9 @@ from fleet.core.phase_markers import sh_phase_lines
 from fleet.core.release_artifact import sh_artifact_lines
 from fleet.core.run_summary import sh_run_summary_line
 from fleet.core.slice_load import (
+    CGROUP_ROOT,
     MEASURED_SLICES,
+    OWN_CGROUP,
     sh_slice_load_end_lines,
     sh_slice_load_start_lines,
 )
@@ -225,7 +227,7 @@ def isolated_build_lines(
         lines.append("fi")
     recipe = names.recipe_directory("$exec_root", path)
     shared = f"flock --shared '{EXEC_LANE_LOCK}'"
-    lines.extend(sh_slice_load_start_lines(MEASURED_SLICES))
+    lines.extend(sh_slice_load_start_lines(MEASURED_SLICES, CGROUP_ROOT, OWN_CGROUP))
     lines.extend(
         sh_phase_lines(
             phase=MAKE_TARGET,
