@@ -157,13 +157,6 @@ addopts = "-v -n 8 --dist loadgroup"
 # times slower and 300 s left only ~3x headroom -- the bound was firing on
 # slow-but-working tests, not on hangs.
 #
-# That mattered because timeout_method has no benign path on Windows: there is no
-# SIGALRM, so "thread" is the only option, and its expiry calls os._exit(1). The
-# worker dies with no cleanup and no protocol shutdown, the xdist controller is
-# left waiting on a dead channel, and the survivors block forever. See
-# tools/maketools/src/maketools/reap.py for the 2026-08-19 incident.
-#
 # This bound is here to catch a genuine hang, not to police a slow test. Revisit
 # with real parallel-run durations rather than by guessing.
 timeout = 900
-timeout_method = "thread"

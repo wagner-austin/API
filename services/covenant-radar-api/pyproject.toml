@@ -154,7 +154,6 @@ addopts = "-v -n auto --dist loadgroup"
 # trains torch models, uses 900. 60 was the tightest in the monorepo by five
 # times, in the second-largest suite, in a package that trains models.
 timeout = 300
-timeout_method = "thread"
 filterwarnings = [
     "ignore::sklearn.exceptions.ConvergenceWarning",
     "ignore::ResourceWarning",
