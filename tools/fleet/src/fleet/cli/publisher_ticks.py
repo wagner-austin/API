@@ -20,7 +20,7 @@ it moved to, and the next tick records the commit that then runs.
 
 IT RUNS AS ONE OF THE PUMP'S OWN ROWS, in the fleet package's environment,
 with the credentials the pump hands every bridge (``FLEET_MCP_API_KEY`` and
-``CORVIS_TENANT_ID`` from its ``runs/env.ps1``), so a record that could not be
+``CORVIS_TENANT_ID`` from its ``runs/credentials.env``), so a record that could not be
 made is a red row in the pump's health record like any bridge's, never a
 tick that crashed. It acts under the dispatch identity of the hub runner on
 the machine it runs on (:func:`fleet.cli.tick.runner_identity`): it is the

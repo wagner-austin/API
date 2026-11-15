@@ -9,7 +9,7 @@ from collections.abc import Sequence
 
 from platform_core import cli_args
 from platform_core.cli_boundary import run_cli
-from platform_core.env_assignments import parse_env_assignments
+from platform_core.env_file import parse_env_file
 from platform_core.json_utils import dump_json_str
 from platform_core.report_line import emit_error_line, emit_line
 
@@ -63,7 +63,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     tenant = cli_args.require_flag(flags, "--tenant")
     document = research_control.read_specification(root, request, tenant)
     env_file = pathlib.Path(cli_args.require_flag(flags, "--env-file"))
-    environment = parse_env_assignments(_test_hooks.read_text(env_file), source=str(env_file))
+    environment = tuple(
+        parse_env_file(_test_hooks.read_text(env_file), source=str(env_file)).items()
+    )
     directory = root / request["spec_sha256"]
     with file_turn.held(
         directory / "poll.turn",

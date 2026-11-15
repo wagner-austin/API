@@ -169,7 +169,7 @@ class TestOneNetbootTick:
         root = tmp_path / "PROJECTS" / "API"
         env_file = root / pathlib.PurePosixPath(tick.ENV_FILE)
         env_file.parent.mkdir(parents=True)
-        env_file.write_text("$env:FLEET_MCP_API_KEY = 'fleet-key'\n", encoding="utf-8")
+        env_file.write_text("FLEET_MCP_API_KEY=fleet-key\n", encoding="utf-8")
         logs = tmp_path / "logs"
         runner = FakeRun([ok("netboot lane empty\n")])
         _test_hooks.run = runner

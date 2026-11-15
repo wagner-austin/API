@@ -27,8 +27,8 @@ STARTED = 1_790_642_400
 
 CREDENTIALS = (
     "# hpc-wake credentials. UNTRACKED.\n"
-    "$env:TASKBOARD_MCP_API_KEY = 'board-key'\n"
-    "$env:FLEET_MCP_API_KEY = 'fleet-key'\n"
+    "TASKBOARD_MCP_API_KEY=board-key\n"
+    "FLEET_MCP_API_KEY=fleet-key\n"
 )
 
 
@@ -378,7 +378,7 @@ class TestOneTick:
         self, api_root: pathlib.Path, tmp_path: pathlib.Path, clock: list[int]
     ) -> None:
         env_file = api_root / pathlib.PurePosixPath(tick.ENV_FILE)
-        env_file.write_text(CREDENTIALS + '$env:CORVIS_TENANT_ID = "double"\n', encoding="utf-8")
+        env_file.write_text(CREDENTIALS + "CORVIS_TENANT_ID double\n", encoding="utf-8")
         runner = FakeRun([])
         _test_hooks.run = runner
 

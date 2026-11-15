@@ -33,8 +33,8 @@ def test_native_cli_resolves_authorized_bytes_and_emits_only_metadata(
     directory = tmp_path / digest
     directory.mkdir()
     (directory / "request.json").write_bytes(payload)
-    env = tmp_path / "env.ps1"
-    env.write_text("$env:TASKBOARD_MCP_API_KEY = 'private-token'\n")
+    env = tmp_path / "credentials.env"
+    env.write_text("TASKBOARD_MCP_API_KEY=private-token\n")
     reply: JSONObject = (
         {"attempts": [_row("running")]} if backend == "hpc3" else {"job_id": "123", "state": "r"}
     )

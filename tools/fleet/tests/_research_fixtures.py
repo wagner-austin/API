@@ -18,7 +18,7 @@ def worker() -> ResearchWorker:
         host="ziggurat",
         python="/private/runtime/bin/python",
         root="/private/requests",
-        env_file="/private/env.ps1",
+        env_file="/private/credentials.env",
         script="/private/poll.sh",
     )
 

@@ -51,9 +51,10 @@ launcher, running this module in the fleet package's own environment.
 WHAT A TICK DOES, which is what ``FleetTick.ps1`` did:
 
 * reads the machine's credentials from the hpc-wake pump's untracked
-  ``runs/env.ps1`` with :mod:`platform_core.env_assignments`, the parser
-  that pump shares, and hands them to the agent's environment and to
-  nothing else. A missing key surfaces as the agent's own named refusal;
+  ``runs/credentials.env``, ``KEY=VALUE`` lines read by
+  :mod:`platform_core.env_file` as that pump reads them, and hands them to
+  the agent's environment and to nothing else. A missing key surfaces as the
+  agent's own named refusal;
 * removes this lane's logs older than :data:`RETENTION_DAYS`, so the log
   directory bounds itself;
 * runs :mod:`fleet.cli.rolled`, which runs the agent from the rolled commit,
@@ -87,7 +88,7 @@ from typing import Final, TypedDict
 
 from platform_core import cli_args
 from platform_core.cli_boundary import run_cli
-from platform_core.env_assignments import parse_env_assignments
+from platform_core.env_file import parse_env_file
 from platform_core.members import find_member
 from platform_core.report_line import emit_error_line, emit_line
 
@@ -183,7 +184,7 @@ def runner_identity(lane: DispatchLane, alias: str) -> tuple[str, str]:
 
 
 #: The credentials file, relative to the API checkout.
-ENV_FILE: Final = pathlib.PurePosixPath("tools/hpc-wake/runs/env.ps1")
+ENV_FILE: Final = pathlib.PurePosixPath("tools/hpc-wake/runs/credentials.env")
 
 #: How many days a lane's log is kept.
 RETENTION_DAYS: Final[int] = 14
@@ -398,7 +399,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     Raises:
         ValueError: ``FLEET_TICK_USAGE`` for a malformed command line.
         AppError: ``CONFIG_ERROR`` when the credentials file holds a line
-            that is not a plain assignment.
+            with no ``=``.
         OSError: When the credentials file or the log directory cannot be
             read or written.
     """
@@ -410,7 +411,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     netboot = {flag: parsed[flag] for flag in agent_cli.NETBOOT_FLAGS if flag in parsed}
     plan = plan_tick(api_root, lane, parsed.get(NODE_FLAG), netboot)
     env_file = api_root / ENV_FILE
-    credentials = parse_env_assignments(_test_hooks.read_text(env_file), source=str(env_file))
+    credentials = tuple(
+        parse_env_file(_test_hooks.read_text(env_file), source=str(env_file)).items()
+    )
 
     started = _test_hooks.now()
     remove_stale_logs(log_directory, plan["stem"], now_unix=started)

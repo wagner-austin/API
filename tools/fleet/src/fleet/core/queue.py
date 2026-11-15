@@ -86,8 +86,8 @@ def load_credentials() -> McpCredentials:
             code=FleetErrorCode.QUEUE_CREDENTIALS_MISSING,
             message=(
                 f"{API_KEY_VARIABLE} is unset; it is fleet-mcp's own "
-                "MCP_INTERNAL_KEY, exported by the hpc-wake runs/env.ps1 the "
-                "tick scripts dot-source, and must be set before the agent runs"
+                "MCP_INTERNAL_KEY, which the tick reads from the hpc-wake "
+                "runs/credentials.env, and must be set before the agent runs"
             ),
         )
     tenant_id = _test_hooks.env(TENANT_ID_VARIABLE)

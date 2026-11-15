@@ -93,7 +93,7 @@ class TestCredentials:
             queue.load_credentials()
 
         assert raised.value.code is FleetErrorCode.QUEUE_CREDENTIALS_MISSING
-        assert "hpc-wake runs/env.ps1" in raised.value.message
+        assert "hpc-wake runs/credentials.env" in raised.value.message
 
     def test_a_missing_tenant_id_names_where_its_value_comes_from(self) -> None:
         _test_hooks.env = FakeEnv({queue.API_KEY_VARIABLE: "k"})

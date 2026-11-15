@@ -63,7 +63,7 @@ def test_rendered_shell_and_native_cli_run_real_controller_children(
         "path": str(controller),
         "sha256": hashlib.sha256(controller.read_bytes()).hexdigest(),
     }
-    env = tmp_path / "env.ps1"
+    env = tmp_path / "credentials.env"
     env.write_text("# intentionally no external credentials in this process twin\n")
     payload = dump_json_str(document).encode()
     digest = hashlib.sha256(payload).hexdigest()
