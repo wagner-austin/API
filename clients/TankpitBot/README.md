@@ -427,7 +427,7 @@ get_env: Callable[[str], str | None] = lambda key: os.environ.get(key)
 | `playwright` | Browser automation |
 | `websockets` | Direct WebSocket client |
 | `aiohttp` | Bot service HTTP + SSE server |
-| `httpx` | HTTP client |
+| `httpx2` | HTTP client |
 | `rich` | Console output formatting |
 | `python-dotenv` | `.env` support |
 | `pillow` | Image processing (minimap terrain, live view) |

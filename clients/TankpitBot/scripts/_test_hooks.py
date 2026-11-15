@@ -189,16 +189,16 @@ class HttpGetProtocol(Protocol):
 
 
 def _real_http_get(url: str) -> HttpGetResponseProtocol:
-    """Real implementation using httpx.
+    """Real implementation using httpx2.
 
     Args:
         url: URL to fetch.
 
     Returns:
-        httpx Response.
+        httpx2 Response.
     """
-    httpx_mod = __import__("httpx")
-    response: HttpGetResponseProtocol = httpx_mod.get(url, timeout=30.0, follow_redirects=True)
+    httpx2_mod = __import__("httpx2")
+    response: HttpGetResponseProtocol = httpx2_mod.get(url, timeout=30.0, follow_redirects=True)
     return response
 
 

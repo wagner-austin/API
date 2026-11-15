@@ -7,7 +7,7 @@ import sys
 from collections.abc import Generator
 from pathlib import Path
 
-import httpx
+import httpx2
 import pytest
 
 from scripts import _test_hooks
@@ -143,5 +143,5 @@ def test_real_http_get_raises_when_nothing_answers() -> None:
     released.bind(("127.0.0.1", 0))
     bound: tuple[str, int] = released.getsockname()
     released.close()
-    with pytest.raises(httpx.ConnectError):
+    with pytest.raises(httpx2.ConnectError):
         _test_hooks._real_http_get(f"http://127.0.0.1:{bound[1]}/play/field01.gif")
