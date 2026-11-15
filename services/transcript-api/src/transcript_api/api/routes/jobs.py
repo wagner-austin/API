@@ -97,7 +97,7 @@ def build_router() -> APIRouter:
         logger.info(
             "Enqueued STT job %s (rq_id=%s)",
             job_id,
-            job.get_id(),
+            job.id,
             extra={"job_id": job_id, "url": parsed.url, "user_id": parsed.user_id},
         )
 

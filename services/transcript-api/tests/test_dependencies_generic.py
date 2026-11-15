@@ -8,7 +8,7 @@ from platform_core.json_utils import JSONValue
 from platform_core.testing import make_fake_env
 from platform_workers.redis import RedisStrProto
 from platform_workers.rq_harness import EnqueueCallable, QueueProtocol, RQJobLike, RQRetryLike
-from platform_workers.testing import FakeRedis
+from platform_workers.testing import FakeJob, FakeRedis
 
 from transcript_api import _test_hooks
 from transcript_api.dependencies import (
@@ -17,16 +17,6 @@ from transcript_api.dependencies import (
     get_request_logger,
     provider_context,
 )
-
-
-class _JobStub:
-    """Stub job implementing RQJobLike."""
-
-    def __init__(self, job_id: str) -> None:
-        self._job_id = job_id
-
-    def get_id(self) -> str:
-        return self._job_id
 
 
 class _QueueStub:
@@ -48,7 +38,7 @@ class _QueueStub:
         # For test purposes, we only support string func_refs
         func_ref = func if isinstance(func, str) else "callable"
         self.enqueued.append((func_ref, args))
-        return _JobStub("job-id")
+        return FakeJob("job-id")
 
 
 def test_get_redis_yields_and_closes() -> None:
@@ -83,7 +73,7 @@ def test_get_queue_via_provider_context() -> None:
 
     q = get_queue()
     job = q.enqueue("transcript_api.jobs.process_stt", {"url": "u"})
-    assert job.get_id() == "job-id"
+    assert job.id == "job-id"
     assert queue.enqueued
 
 
@@ -121,7 +111,7 @@ def test_get_queue_production_adapter() -> None:
 
     # Enqueue a job to verify the adapter works
     job = q.enqueue("my.func", "arg1", job_timeout=60, description="test")
-    assert job.get_id() == "job-my.func"
+    assert job.id == "job-my.func"
 
     # Restore hooks
     hooks.load_redis_bytes_module = orig_bytes_hook
