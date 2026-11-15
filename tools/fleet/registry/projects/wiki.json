@@ -2,7 +2,11 @@
   "worker_ram_gb": 2,
   "minimum_workers": 1,
   "expected_minutes": 10,
+  "exclusive_resources": [
+    "corvis-fleet-testdb"
+  ],
   "required_tags": [
+    "testdb",
     "cxx",
     "pdftotext"
   ],
@@ -27,6 +31,16 @@
           "--directory=../MCPs/scripts/fleet-prepare",
           "workspace-build",
           "ROOTS=packages/db:packages/wiki-check:packages/wiki-cli"
+        ]
+      },
+      {
+        "phase": "test-database",
+        "argv": [
+          "make",
+          "-s",
+          "--directory=../MCPs/scripts/fleet-prepare",
+          "test-database",
+          "CONTAINER=corvis-fleet-testdb"
         ]
       },
       {

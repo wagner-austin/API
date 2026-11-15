@@ -31,7 +31,12 @@ package.json links corvis-db, corvis-wiki-check and corvis-wiki-cli by
 ``file:../MCPs/packages/...``, so it carries MCPs as a companion, installs
 MCPs' workspace and builds those three packages there with MCPs' own
 fleet-prepare before its own ``npm ci``, and takes the pdftotext and cxx tags
-MCPs' wiki-check project takes.
+MCPs' wiki-check project takes. One of its cases drives the production vault
+read against a live Postgres with the vault's schema, so it also takes the
+testdb tag and the node's ``corvis-fleet-testdb`` container, and MCPs'
+``test-database`` step migrates corvis_test and writes the ``../MCPs/.env``
+whose DATABASE_TEST_URL the wiki's ``make test`` lifts (fleet job 601bba96
+failed that case with nothing to connect to).
 """
 
 from __future__ import annotations
@@ -70,7 +75,7 @@ MCPS_COMPANION = ProjectCompanion(
         ("creator-wiki", (), (), (MCPS_COMPANION,)),
         (
             "wiki",
-            (NodeTag.CXX, NodeTag.PDFTOTEXT),
+            (NodeTag.TESTDB, NodeTag.CXX, NodeTag.PDFTOTEXT),
             (
                 InstallStep(
                     phase="mcps-install",
@@ -84,6 +89,16 @@ MCPS_COMPANION = ProjectCompanion(
                         "--directory=../MCPs/scripts/fleet-prepare",
                         "workspace-build",
                         "ROOTS=packages/db:packages/wiki-check:packages/wiki-cli",
+                    ),
+                ),
+                InstallStep(
+                    phase="test-database",
+                    argv=(
+                        "make",
+                        "-s",
+                        "--directory=../MCPs/scripts/fleet-prepare",
+                        "test-database",
+                        "CONTAINER=corvis-fleet-testdb",
                     ),
                 ),
                 NPM_CI,
@@ -111,6 +126,12 @@ def test_each_repository_s_root_check_is_declared_with_what_it_reads(
         install=install,
         companions=companions,
     )
+
+
+def test_the_wiki_holds_the_node_s_test_database_for_its_whole_run() -> None:
+    workspace = decode_fleet_workspace(shipped_document())
+    project = require_project(workspace, "wiki")
+    assert project["exclusive_resources"] == ("corvis-fleet-testdb",)
 
 
 def test_rabbit_is_checked_from_its_directory_in_dashboards() -> None:
