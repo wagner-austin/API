@@ -3,11 +3,11 @@
 MCPs board task 2e2df92a. A docker project's containers run under
 execdocker's user manager in the checks slice, beside every other check on
 the node, and the fleet charges a check only the workers it granted. On
-2026-11-15 an osrs-lab observer build with no CPU bound used 8.15 cores of
-lavender's 8-core dispatch quota against its 4-core charge, and the
-packages/maketools check beside it ran 416 s of its 300 (fleet job
-86f3aa91). Whether a container held its grant was then in a session's
-sampler and nowhere a query could read.
+2026-11-15 on lavender, MCPs packages/maketools' check beside an osrs-lab
+observer build with no CPU bound ran 321 s and 422 s of its 300 (fleet jobs
+a16adfb0 and dc7c6f91), and 185 s and 170 s beside the same work bounded to
+its grant (bfc7b2d2 and 94c97ee7). Whether a container held its grant was
+first read by a session's sampler, which no query could read back.
 
 So a container states its own bound: a line reading
 ``FLEET_CONTAINER_CPU: <its cgroup's cpu.max>`` (:data:`CONTAINER_CPU_MARKER`,
