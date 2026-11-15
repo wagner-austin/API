@@ -91,7 +91,9 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # 73 since media-review-mcp joined (MCPs board task c33e4c11).
     # 74 since the CI contracts joined (MCPs board task cf418418).
     # 75 since mediawiki-mcp joined (MCPs board task 9a49a297).
-    assert len(prepared) == 75
+    # 76 since MCPs/repo-contracts, the checks that read the whole tree,
+    # left mcp-shared's suite (MCPs board task 2b1e55de).
+    assert len(prepared) == 76
     assert prepared["MCPs/scripts/ci-contracts"] == (
         InstallStep(phase="install", argv=(*PREPARE, "install")),
         InstallStep(
