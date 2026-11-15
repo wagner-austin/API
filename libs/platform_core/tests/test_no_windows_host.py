@@ -32,9 +32,7 @@ PACKAGE: Final = Path(__file__).resolve().parents[1]
 #: What code or prose written for a Windows host names: the platform, its
 #: shell, the ``sys.platform`` value, the job-object API's library and the
 #: ctypes loader for it, and the PowerShell environment drive.
-WINDOWS_NAMES: Final = re.compile(
-    r"windows|powershell|win32|kernel32|windll|\$env:", re.IGNORECASE
-)
+WINDOWS_NAMES: Final = re.compile(r"windows|powershell|win32|kernel32|windll|\$env:", re.IGNORECASE)
 
 #: One line from each removed module, verbatim, so the pattern is shown to
 #: catch what it exists to catch rather than assumed to.
