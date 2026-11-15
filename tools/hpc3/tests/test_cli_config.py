@@ -77,7 +77,7 @@ def _whereis(label: str) -> McpHttpResponse:
     """``task_whereis`` for :data:`SESSION`, bound to ``label`` (or, empty,
     never written to the board), as taskboard-mcp renders it."""
     board = (
-        f"board     {label} — 2 posts, last post 6m ago, C:\\x\n"
+        f"board     {label} — 2 posts, last post 6m ago, /x\n"
         if label != ""
         else "board     never written to this board (no label)\n"
     )
