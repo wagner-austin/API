@@ -245,17 +245,14 @@ citation checkable at all.
 ## Conventions
 
 - **Per-package `make check`** (`check: lint | test`) — run it in the package
-  you touched. Read the OUTPUT, not the exit code, unless you appended
-  `; exit $LASTEXITCODE`: `powershell -Command "& { make check }"` exits 0
-  even when make fails.
-- **Every Makefile is in the portable grammar** (since 2026-09-20): it begins
-  `include <depth>scripts/make/shell.mk`, which picks PowerShell on Windows
-  and `/bin/sh -eu` elsewhere, and its recipes are one plain command per line
-  with the shared work in `tools/maketools` (`venv-check`, `guard`, `test`,
-  `env`, `fan-out`, ...). Anything only Windows can run sits inside the one
-  `ifeq ($(OS),Windows_NT)` fence with an `else` arm that says why. Gate:
-  `python tools/maketools/scripts/run.py lint-makefiles` from the root (also
-  `make lint-makefiles`); `make check` runs unchanged on a Linux node.
+  you touched, on a fleet node (`make check-fleet TASK=<uuid>`). Read the
+  OUTPUT, not the exit code.
+- **Every Makefile is in the recipe grammar**: it begins
+  `include <depth>scripts/make/shell.mk`, which sets `/bin/sh -eu -c` and
+  `PYTHON := python3`, and its recipes are one plain command per line with
+  the shared work in `tools/maketools` (`venv-check`, `guard`, `test`, `env`,
+  `fan-out`, ...). Gate: `python3 tools/maketools/scripts/run.py
+  lint-makefiles` from the root (also `make lint-makefiles`).
 - **`libs/monorepo_guards`** is the static-analysis framework — 34 rules,
   Python + Rust, configured centrally in `monorepo-guards.toml`. Guards apply
   to `src`, `scripts`, `tests`. `forbid_pyi = true`; `allow_print_in_tests =
