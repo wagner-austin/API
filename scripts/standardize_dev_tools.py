@@ -33,17 +33,18 @@ import sys
 
 #: The shared toolchain, and the single version every package should ask for.
 #:
-#: Read from PyPI on 2026-09-04 rather than assumed. Carets are kept rather
-#: than exact pins because the lock file is what actually fixes the version --
-#: the constraint's job is to say which major line a package is on, which is
-#: precisely the thing that was wrong before.
+#: Read from PyPI on 2026-11-15 rather than assumed: each is that day's newest
+#: release. Carets are kept rather than exact pins because the lock file is
+#: what actually fixes the version -- the constraint's job is to say which
+#: major line a package is on, which is precisely the thing that was wrong
+#: before.
 STANDARD = {
-    "mypy": "^2.3.1",
-    "ruff": "^0.16.6",
-    "pytest": "^9.1.1",
+    "mypy": "^2.4.1",
+    "ruff": "^0.17.5",
+    "pytest": "^9.2.0",
     "pytest-cov": "^7.1.0",
     "pytest-xdist": "^3.8.0",
-    "pytest-asyncio": "^1.4.0",
+    "pytest-asyncio": "^1.5.0",
     "pytest-timeout": "^2.4.0",
 }
 
