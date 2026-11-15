@@ -1,6 +1,6 @@
 """The files this package lifts from MCPs, pinned by hash (MCPs board task 1b152218).
 
-The lock's codec, the digest's line-ending rule, the check that fails a
+The lock's codec, the digest over the bytes as they are, the check that fails a
 hand-edited or missing lifted file by name, and the refresh, run against a
 real git repository standing in for MCPs, that writes each file from a
 commit's object store and re-pins the lock. The package's own lock is
@@ -9,6 +9,7 @@ checked for real, so a lifted file edited here fails this suite too.
 
 from __future__ import annotations
 
+import hashlib
 import subprocess
 from pathlib import Path
 
@@ -104,16 +105,26 @@ def test_a_lock_of_the_wrong_shape_is_refused() -> None:
         decode_lift_lock('{"remote": "r", "revision": "v", "entries": [{"path": 1}]}')
 
 
-def test_the_digest_is_taken_over_the_lf_form_so_a_windows_checkout_matches_its_blob() -> None:
-    assert pinned_digest(b"a\r\nb\r\n") == pinned_digest(b"a\nb\n")
+def test_the_digest_is_taken_over_the_bytes_as_they_are() -> None:
+    assert pinned_digest(b"a\nb\n") == hashlib.sha256(b"a\nb\n").hexdigest()
+    assert pinned_digest(b"a\r\nb\r\n") != pinned_digest(b"a\nb\n")
     assert pinned_digest(b"a\nb\n") != pinned_digest(b"a\nc\n")
 
 
 def test_a_file_holding_its_pinned_bytes_has_not_drifted(tmp_path: Path) -> None:
     lifted = tmp_path / "src" / "maketools" / "check_budget.py"
     lifted.parent.mkdir(parents=True)
-    lifted.write_bytes(RULE.replace(b"\n", b"\r\n"))
+    lifted.write_bytes(RULE)
     assert drifted_lifts(tmp_path, _lock(pinned_digest(RULE))) == []
+
+
+def test_a_carriage_return_added_to_a_lifted_file_is_a_drift(tmp_path: Path) -> None:
+    lifted = tmp_path / "src" / "maketools" / "check_budget.py"
+    lifted.parent.mkdir(parents=True)
+    lifted.write_bytes(RULE.replace(b"\n", b"\r\n"))
+    (drifted,) = drifted_lifts(tmp_path, _lock(pinned_digest(RULE)))
+    assert drifted.startswith("src/maketools/check_budget.py: ")
+    assert f"is not the pinned {pinned_digest(RULE)}" in drifted
 
 
 def test_an_edited_or_missing_lifted_file_is_named_with_its_pin(tmp_path: Path) -> None:

@@ -51,9 +51,9 @@ def test_the_deploy_asks_about_the_commit_it_ships_before_infra() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     assert (
         "\ncommit-tasks:\n\t$(PYTHON) .githooks/published_maketools.py "
-        "commit-tasks ../MCPs . HEAD^!\n" in makefile.replace("\r\n", "\n")
+        "commit-tasks ../MCPs . HEAD^!\n" in makefile
     )
-    assert "\ninfra: commit-tasks executed services-executed\n" in makefile.replace("\r\n", "\n")
+    assert "\ninfra: commit-tasks executed services-executed\n" in makefile
 
 
 def test_commit_msg_asks_before_the_commit_exists_reading_the_repository_and_its_python() -> None:
@@ -69,12 +69,9 @@ def test_commit_msg_asks_before_the_commit_exists_reading_the_repository_and_its
 def test_every_hook_launches_python_by_the_one_choice_python_sh_makes_before_it() -> None:
     # MCPs board task 6c0664bf: the hooks named `python`, which a Linux
     # session host does not have, so none could run there. The choice is
-    # MCPs' .husky/run-at-head.sh's, on the shell's own OSTYPE.
+    # MCPs' .husky/run-at-head.sh's.
     assert [line for line in _executable(".githooks/python.sh") if line.strip()] == [
-        'case "${OSTYPE:-}" in',
-        "  msys* | cygwin*) HOOK_PYTHON=python ;;",
-        "  *) HOOK_PYTHON=python3 ;;",
-        "esac",
+        "HOOK_PYTHON=python3",
     ]
     for hook in (".githooks/commit-msg", ".githooks/post-commit", ".githooks/pre-push"):
         lines = _executable(hook)
@@ -112,7 +109,7 @@ def test_published_maketools_runs_origin_main_reading_no_environment() -> None:
 
 
 def test_pre_push_asks_first_over_each_range_and_reads_only_what_git_hands_it() -> None:
-    text = (ROOT / ".githooks" / "pre-push").read_text(encoding="utf-8").replace("\r\n", "\n")
+    text = (ROOT / ".githooks" / "pre-push").read_text(encoding="utf-8")
     start = text.index("# EVERY COMMIT NAMES ITS TASK")
     end = text.index("\ndone\n", start)
     stanza = [line for line in text[start:end].split("\n") if not line.lstrip().startswith("#")]

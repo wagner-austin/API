@@ -17,11 +17,10 @@ hand-maintained duplicate of every Makefile's steps because the Linux
 runners could not call the Makefile. Board task `33bb86ce` carries the
 measurement and the decision; MCPs did the same a day earlier (`b835753b`).
 
-The fix is not a second Makefile per platform. Each platform keeps its
-native shell (`scripts/make/shell.mk` picks it: PowerShell on Windows,
-`/bin/sh -eu` elsewhere) and every recipe is written in the **intersection**
-of the two. Anything with logic moves into this package and is called by
-path with the **system** interpreter, so nothing has to be installed first:
+Every node now runs Linux, and every recipe runs under `/bin/sh -eu -c`
+(`scripts/make/shell.mk`) as one plain command per line. Anything with
+logic moves into this package and is called by path with the **system**
+interpreter, `python3`, so nothing has to be installed first:
 
 ```make
 test:
@@ -36,35 +35,25 @@ three `platform_core` modules used (`errors`, `error_codes_tooling`,
 ## The grammar
 
 A recipe line is one plain command. Allowed: the command and its arguments,
-`@echo "..."`, make's own `$(VAR)`, a plain `make -C <dir>`, single or double
-quotes around an argument. Banned, and refused by `lint-makefiles`:
+`@echo`, make's own `$(VAR)`, `make -C <dir>`, single or double quotes
+around an argument. Banned, and refused by `lint-makefiles`, because each
+is logic that belongs in a script a test can run:
 
 | banned | because |
 |---|---|
-| cmdlets (`Write-Host`, `Set-Location`, ...), `$env:`, `-ForegroundColor`, `.ps1`, backticks, `\` paths | PowerShell only |
-| `&&`, `\|\|`, `$$VAR`, `/dev/null`, `[ test ]`, `if`/`for` | sh only |
-| `;`, `>`, `<`, `\|`, `cd` | read differently by the two shells |
-| `$(MAKE)`, `${MAKE}` | an unquoted path that PowerShell splits at a space (`Program Files (x86)`) |
-| `echo` whose text is not in double quotes (`@echo 'x'`, `@echo x`) | GNU Make 3.81 on serendipity runs a line holding no `"` or other shell character as a program, and `echo` is not one |
-| `SHELL :=`, `.SHELLFLAGS`, `$(shell ...)` outside `shell.mk` | the platform shell leaking into a Makefile |
+| `&&`, `\|\|`, `;` | a chain of commands in one line |
+| `$$VAR`, `$$(...)`, backticks | shell variables and substitution |
+| `[ test ]`, `if`, `for`, `while`, `case`, `until` | a condition or a loop |
+| `>`, `<`, `\|` | a redirection or a pipe |
+| `cd` | a directory change (`make -C` or a script) |
+| `SHELL :=`, `.SHELLFLAGS`, `$(shell ...)` outside `shell.mk` | the shell chosen anywhere but `shell.mk`, or run while make parses |
 
-Conditional branches no longer exempt recipes or shell functions from the
-grammar. Both sides are checked, including historical Windows fences.
+Both arms of a conditional are checked, recipes and shell functions alike.
 
-## The Windows arms were loki's
-
-The remaining Windows launcher and process-table arms were retained for
-Loki's former Windows installation. Loki now runs Linux, and board task
-`11a47bc4` removes the job-object binding, PowerShell/CIM snapshot, Windows
-signal choice and executable-suffix normalization. The launcher always starts
-a new process session and reaps descendants on exit; the pre-run sweep handles
-wreckage left by an uncatchable launcher kill. Real Linux process and failure
-tests remain in the suite.
-
-Neither RustedWarfareBot nor grandma-api keeps a Windows Makefile fence, so
-the grammar's conditional exemption and its state machine are removed too.
-This package change does not claim retirement of API's remaining standalone
-Windows CI workflows or other callers of platform_core's Windows APIs.
+The launcher always starts a new process session and reaps descendants on
+exit; the pre-run sweep handles wreckage left by an uncatchable launcher
+kill (board task `11a47bc4` removed the Windows job-object, PowerShell/CIM
+snapshot and signal arms).
 
 ## The commands
 
@@ -73,11 +62,11 @@ Windows CI workflows or other callers of platform_core's Windows APIs.
 | `align --repo PATH --commit SHA [--drop SHA,SHA]` | move a main checkout (this one, or a peer such as a session host's `../corvis-stick`) to a commit its origin's default branch contains, read from `origin/HEAD`; the route `make align-commit [REPO=<path>]` takes because the hub's hook refuses hand-run git verbs that move a checkout with linked trees; a local commit the target carries (patch-equivalent, or every path's blob equal) is dropped and named, one it does not carry is refused unless `--drop` names it, and tracked dirt or an untracked path the target tracks refuses the move |
 | `venv-check` | remove `.venv` when `poetry run mypy --version` cannot answer, so the `poetry sync` that follows builds a fresh one |
 | `guard` | run `poetry run python -m scripts.guard` when the package has a shim; say "not applicable, 0 rules run" when it has none |
-| `test [--no-sweep] [pytest args...]` | the shared launcher, the port of `scripts/run-tests.ps1`: a new Linux session and a descendant reap, the pre-run sweep, `--max-worker-restart=0`, a per-run `COVERAGE_FILE` under `runs/` with a cleanup scoped to that token, and one BLAS thread per worker |
-| `reap-stale [--older-than-minutes N]` | the standalone sweep, the port of `scripts/reap-test-processes.ps1`: candidates older than N minutes whose ancestry names this project, reaped only when the whole set is idle across a 5-second CPU sample |
+| `test [--no-sweep] [pytest args...]` | the shared launcher: a new Linux session and a descendant reap, the pre-run sweep, `--max-worker-restart=0`, a per-run `COVERAGE_FILE` under `runs/` with a cleanup scoped to that token, and one BLAS thread per worker |
+| `reap-stale [--older-than-minutes N]` | the standalone sweep: candidates older than N minutes whose ancestry names this project, reaped only when the whole set is idle across a 5-second CPU sample |
 | `lint-makefiles` | the grammar, the pass-banner rule and the budget rule over every tracked Makefile |
 | `check-budget` | run this package's `_check-unbudgeted` and time it: print `CHECK BUDGET` with its seconds, or exit 3 with a `CHECK OVER BUDGET` block when it passed but took over 300 s (below) |
-| `concurrent TARGET TARGET...` | `make TARGET` for each target as concurrent children of one package, each child's output captured to its own file and printed as one block headed by its verdict and seconds, in the order named; exits with the first failed target's code, naming every failure. Portable where `make -j` is not: GNU Make 3.81 on pendragon and serendipity has no `--output-sync`. The targets must not depend on each other (below) |
+| `concurrent TARGET TARGET...` | `make TARGET` for each target as concurrent children of one package, each child's output captured to its own file and printed as one block headed by its verdict and seconds, in the order named; exits with the first failed target's code, naming every failure. Whether `make -j --output-sync` replaces it now that every node runs GNU Make 4.4.1 is board task `3bee27e8`. The targets must not depend on each other (below) |
 | `lift-check`, `lift-refresh MCPS REVISION` | hold each file `lift-lock.json` names to its pinned bytes from MCPs; re-lift them all from an MCPs commit and re-pin (below) |
 | `env [NAME=VALUE \| NAME?=VALUE \| NAME=]... [--draw NAME=LOW-HIGH]... [--then "cmd"] -- argv...` | run a command with variables set, defaulted, unset or drawn from a range, every assigned name substituted into the argv as `@NAME@`; `--then` runs a second command whatever the first's status and the first non-zero status of the two is the verdict |
 | `fan-out TARGET PARENT...` | `make -C <child> TARGET` in every child directory of each parent that has a Makefile, running all of them and naming every failure |

@@ -71,36 +71,26 @@ def test_the_recipe_body_drops_make_prefixes() -> None:
 @pytest.mark.parametrize(
     ("line", "rule"),
     [
-        ('Write-Host "done" -ForegroundColor Green', "cmdlet"),
-        ("Set-Location services/x", "cmdlet"),
-        ("Resolve-Path .", "cmdlet"),
-        ("$$env:GIT_COMMIT = (git rev-parse HEAD)", "$env: variable"),
-        ("powershell -NoProfile -File x", "powershell invocation"),
-        ("powershell -File scripts/x.ps1", "PowerShell script"),
-        ("if (-not $$?) { exit 1 }", "$? status variable"),
-        ("if (Test-Path x) { y }", "PowerShell control flow"),
-        ("$$args = @(1, 2)", "PowerShell array literal"),
-        ('& "..\\..\\scripts\\run-tests.ps1"', "backslash path separator"),
-        ("echo `n", "backtick"),
         ("npm run a && npm run b", "&& or || chaining"),
+        ("npm run a || true", "&& or || chaining"),
         ("echo $$HOME", "shell variable or substitution ($$)"),
-        ("cmd 2>/dev/null", "null device"),
+        ("echo `date`", "backtick"),
         ("[ -f x ]", "[ test"),
+        ("test -f x || [ -d y ]", "[ test"),
         ("if test -f x", "sh control flow"),
         ("for f in *", "sh control flow"),
+        ("case x in", "sh control flow"),
+        ("while true", "sh control flow"),
+        ("until false", "sh control flow"),
         ("a; b", "; separator (one command per line)"),
         ("cmd > out.txt", "redirection or pipe"),
+        ("cmd 2>/dev/null", "redirection or pipe"),
+        ("cmd < in.txt", "redirection or pipe"),
         ("cmd | tail", "redirection or pipe"),
         ("cd libs/platform_core", "cd (use make -C or a script)"),
-        ("$(MAKE) -C web test", "$(MAKE) (use plain make -C)"),
-        ("@${MAKE} -C ../fleet execution", "$(MAKE) (use plain make -C)"),
-        ("@echo 'left ran'", "echo without double-quoted text (make 3.81 runs it as a program)"),
-        ("@echo done", "echo without double-quoted text (make 3.81 runs it as a program)"),
-        ("@echo", "echo without double-quoted text (make 3.81 runs it as a program)"),
-        ("+echo 'left ran'", "echo without double-quoted text (make 3.81 runs it as a program)"),
-        ("@ -echo left", "echo without double-quoted text (make 3.81 runs it as a program)"),
-        ("-+@echo done", "echo without double-quoted text (make 3.81 runs it as a program)"),
         ("+cd libs/platform_core", "cd (use make -C or a script)"),
+        ("@ -cd libs/platform_core", "cd (use make -C or a script)"),
+        ("-+@cd libs/platform_core", "cd (use make -C or a script)"),
         ("+if test -f x", "sh control flow"),
     ],
 )
@@ -114,9 +104,15 @@ def test_each_banned_form_fires_its_rule(tmp_path: Path, line: str, rule: str) -
         "poetry run mypy src tests scripts",
         '@echo "=== ALL CHECKS PASSED ==="',
         '@echo ""',
+        "@echo done",
+        "@echo",
         '+echo "left ran"',
-        '@ -echo "left ran"',
+        "@ -echo 'left ran'",
+        "$(MAKE) -C web test",
         "@echoes-tool --flag",
+        "poetry run ruff check src \\",
+        'docker ps --format "table {{.Names}}\\t{{.Status}}"',
+        "iffy-tool --case",
         "$(PYTHON) ../../tools/maketools/scripts/run.py test",
         "poetry run pytest -n auto -v --cov-branch --cov=src",
         "make -C libs/platform_core check",
@@ -129,72 +125,21 @@ def test_the_portable_forms_pass(tmp_path: Path, line: str) -> None:
     assert rules_of(tmp_path / "Makefile", line) == []
 
 
-def test_a_line_continuation_backslash_is_not_a_path_separator(tmp_path: Path) -> None:
-    assert rules_of(tmp_path / "Makefile", "poetry run ruff check src \\") == []
-
-
-def test_a_backslash_escape_inside_a_docker_argument_is_not_a_path(tmp_path: Path) -> None:
-    line = 'docker ps --format "table {{.Names}}\\t{{.Status}}"'
-    assert rules_of(tmp_path / "Makefile", line) == []
-
-
-FENCED = (
-    PORTABLE
-    + """
-ifeq ($(OS),Windows_NT)
-register:
-\tpowershell -NoProfile -File scripts\\register.ps1
-\t@Write-Host "done" -ForegroundColor Green
-ifdef VERBOSE
-\t@Write-Host "verbose" -ForegroundColor Green
-endif
-else
-register:
-\t@echo "register is Windows-only"
-\t@exit 1
-endif
-"""
-)
-
-
-@pytest.mark.parametrize("condition", ["ifeq", "ifneq"])
-def test_platform_conditions_no_longer_exempt_recipes(repo: Path, condition: str) -> None:
-    text = FENCED.replace("ifeq", condition)
+@pytest.mark.parametrize("condition", ["ifdef VERBOSE", "ifeq ($(CI),1)", "ifneq ($(CI),1)"])
+def test_a_conditional_exempts_neither_arms_recipes(repo: Path, condition: str) -> None:
+    text = PORTABLE + f"{condition}\nx:\n\tnpm run a && npm run b\nelse\nx:\n\tcmd | tail\nendif\n"
     rules = [v["rule"] for v in check_makefile(repo, repo / "libs" / "Makefile", text)]
-    assert rules == [
-        "cmdlet parameter",
-        "powershell invocation",
-        "PowerShell script",
-        "backslash path separator",
-        "cmdlet",
-        "cmdlet parameter",
-        "cmdlet",
-        "cmdlet parameter",
-    ]
+    assert rules == ["&& or || chaining", "redirection or pipe"]
 
 
 def test_shell_functions_are_checked_in_both_conditional_arms(repo: Path) -> None:
-    text = PORTABLE + "ifeq ($(OS),Windows_NT)\nX := $(shell dir)\nelse\nX := $(shell ls)\nendif\n"
+    text = PORTABLE + "ifdef FAST\nX := $(shell pwd)\nelse\nX := $(shell ls)\nendif\n"
     violations = check_makefile(repo, repo / "libs" / "Makefile", text)
-    assert [v["text"] for v in violations] == ["X := $(shell dir)", "X := $(shell ls)"]
-
-
-def test_a_conditional_that_is_not_the_platform_fence_exempts_nothing(repo: Path) -> None:
-    text = PORTABLE + "ifdef FAST\nx:\n\t@Write-Host fast\nelse\nx:\n\t@Write-Host slow\nendif\n"
-    rules = [v["rule"] for v in check_makefile(repo, repo / "libs" / "Makefile", text)]
-    assert rules == ["cmdlet", "cmdlet"]
-
-
-def test_the_file_function_is_banned_inside_conditionals(repo: Path) -> None:
-    text = PORTABLE + "PIN := $(file <.githooks/mcps-harness.sha)\n"
-    fenced = PORTABLE + "ifeq ($(OS),Windows_NT)\nPIN := $(file <pin.sha)\nendif\n"
-    for case in (text, fenced):
-        (violation,) = check_makefile(repo, repo / "libs" / "Makefile", case)
-        assert violation["rule"] == "$(file ...) needs GNU make 4.0 (3.81 reads it as nothing)"
+    assert [v["text"] for v in violations] == ["X := $(shell pwd)", "X := $(shell ls)"]
 
 
 def test_the_shell_variable_stays_banned_inside_conditionals(repo: Path) -> None:
-    text = PORTABLE + "ifeq ($(OS),Windows_NT)\nSHELL := pwsh\nendif\n"
+    text = PORTABLE + "ifdef FAST\nSHELL := /bin/bash\nendif\n"
     (violation,) = check_makefile(repo, repo / "libs" / "Makefile", text)
     assert violation["rule"] == "SHELL is set only in scripts/make/shell.mk"
 
@@ -227,7 +172,7 @@ def test_an_empty_makefile_fires_on_line_one(repo: Path) -> None:
 
 
 def test_setting_the_shell_outside_the_prologue_fires(repo: Path) -> None:
-    text = PORTABLE + "SHELL := powershell.exe\n.SHELLFLAGS := -Command\n"
+    text = PORTABLE + "SHELL := /bin/bash\n.SHELLFLAGS := -c\n"
     rules = [v["rule"] for v in check_makefile(repo, repo / "libs" / "Makefile", text)]
     assert rules == [
         "SHELL is set only in scripts/make/shell.mk",
@@ -238,7 +183,7 @@ def test_setting_the_shell_outside_the_prologue_fires(repo: Path) -> None:
 def test_the_shell_function_fires_anywhere_in_the_file(repo: Path) -> None:
     text = PORTABLE + "FILE := $(shell ls)\n"
     (violation,) = check_makefile(repo, repo / "libs" / "Makefile", text)
-    assert violation["rule"] == "$(shell ...) runs the platform shell"
+    assert violation["rule"] == "$(shell ...) runs the shell while make parses"
     assert violation["text"] == "FILE := $(shell ls)"
 
 

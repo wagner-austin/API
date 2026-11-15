@@ -2,8 +2,8 @@
 
 MCPs board task 691b0067. THE SCRIPT IS EXECUTED, NOT READ: what can be
 wrong in it is the binding, which MCPs it finds, which commit of it runs,
-whether the command's exit status reaches the hook or recipe that called
-it, and whether it needs a program its callers do not have. So each case
+and whether the command's exit status reaches the hook or recipe that
+called it. So each case
 copies the shipped file byte for byte into a temporary layout, a repository
 beside a real MCPs git repository whose origin/main carries a maketools
 launcher that echoes its arguments and exits with the last one, and runs it
@@ -19,8 +19,6 @@ import sys
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Final
-
-import pytest
 
 from maketools import _test_hooks
 from maketools.cli import repository_root
@@ -129,43 +127,6 @@ def test_it_reads_mcps_inside_a_hook_where_git_exported_this_repositorys_git_dir
     finished = _run(repo, {"GIT_DIR": str(repo / ".git")}, "commit-message-tasks", "5")
     assert finished.stdout.strip() == "published commit-message-tasks 5"
     assert finished.returncode == 5
-
-
-def _path_without_sh(parent: Path) -> str:
-    """A PATH on which git resolves and sh does not.
-
-    A PowerShell-launched make on loki hands its recipes such a PATH. This
-    suite runs on Linux nodes only, where git sits in /usr/bin beside sh, so
-    the PATH is a directory holding only a link to git.
-
-    Args:
-        parent: Where a directory of links may be made.
-
-    Returns:
-        The PATH value.
-    """
-    git = shutil.which("git")
-    if git is None:
-        pytest.fail("the script runs git, and it is not on this machine's PATH")
-    link = parent / "bin" / "git"
-    link.parent.mkdir(parents=True)
-    link.symlink_to(git)
-    return str(link.parent)
-
-
-def test_it_runs_where_no_sh_is_on_the_path(tmp_path: Path) -> None:
-    """A PowerShell-launched make hands its recipes a PATH with no sh on it.
-
-    The sh script this replaced died there with ``sh`` not found (MCPs board
-    task 465689f5), so the PATH here holds git and nothing else: the script
-    must need no other program, since this interpreter runs it by path.
-    """
-    path = _path_without_sh(tmp_path / "path")
-    assert shutil.which("sh", path=path) is None
-    assert Path(str(shutil.which("git", path=path))).stem.lower() == "git"
-    finished = _run(_layout(tmp_path, published=True), {"PATH": path}, "publish-executed", "6")
-    assert finished.stdout.strip() == "published publish-executed 6"
-    assert finished.returncode == 6
 
 
 def test_it_refuses_naming_what_did_not_run_when_mcps_has_no_origin_main(

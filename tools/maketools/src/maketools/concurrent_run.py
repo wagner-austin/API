@@ -10,8 +10,9 @@ guard and mypy cost the check nothing while the suite is the longer.
 
 WHY NOT ``make -j``. GNU make runs prerequisites in parallel only under
 ``-j``, and reading its interleaved output needs ``--output-sync``, which
-GNU Make 3.81 does not have; pendragon and serendipity run 3.81, sedona,
-loki and the hub 4.4.1. This runs ``make TARGET`` once per target as
+GNU Make 3.81 lacked; every node runs 4.4.1 now (measured 2026-11-15), and
+whether ``-j --output-sync`` replaces this command is MCPs board task
+3bee27e8. This runs ``make TARGET`` once per target as
 concurrent children, through :data:`maketools._test_hooks.run_concurrently`,
 and prints each child's whole output as one block in the order the targets
 were named, headed by its verdict and its seconds, so a failure reads as the

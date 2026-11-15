@@ -34,7 +34,7 @@ def _stanza() -> list[str]:
     Returns:
         Its executable lines, from its header to the end of its loop.
     """
-    text = (ROOT / ".githooks" / "pre-push").read_text(encoding="utf-8").replace("\r\n", "\n")
+    text = (ROOT / ".githooks" / "pre-push").read_text(encoding="utf-8")
     start = text.index("# EVERY PUSH RUNS THE TESTS IT TOUCHES")
     end = text.index("\ndone\n", start)
     return [line for line in text[start:end].split("\n") if not line.lstrip().startswith("#")]
@@ -78,7 +78,7 @@ def test_each_range_is_checked_on_the_fleet_from_a_session_host_or_here_elsewher
 
 
 def test_the_tests_run_after_commit_tasks_and_before_any_remote_ends_the_hook() -> None:
-    text = (ROOT / ".githooks" / "pre-push").read_text(encoding="utf-8").replace("\r\n", "\n")
+    text = (ROOT / ".githooks" / "pre-push").read_text(encoding="utf-8")
     start = text.index("# EVERY PUSH RUNS THE TESTS IT TOUCHES")
     assert text.index("# EVERY COMMIT NAMES ITS TASK") < start < text.index('case "$NWO" in')
     assert "set -eu" in text.split("\n")
@@ -92,7 +92,7 @@ def test_a_push_that_only_stages_a_tip_ends_the_hook_before_any_check() -> None:
     maketools' push-staging over every update git hands the hook, read before
     the first check, and only its 0 ends the hook: 3 goes on, anything else
     refuses."""
-    text = (ROOT / ".githooks" / "pre-push").read_text(encoding="utf-8").replace("\r\n", "\n")
+    text = (ROOT / ".githooks" / "pre-push").read_text(encoding="utf-8")
     start = text.index("# A PUSH THAT ONLY STAGES A TIP FOR ITS FLEET RUN")
     end = text.index("\nfi\n", start)
     assert text.index('PUSH_INPUT="$(cat)"') < start < text.index("# EVERY COMMIT NAMES ITS TASK")

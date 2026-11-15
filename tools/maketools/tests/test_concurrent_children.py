@@ -25,9 +25,7 @@ PROBE_WALL_SECONDS = 120
 #: The repository's shell prologue, which the real-make case's Makefile
 #: includes as every tracked Makefile does, so its recipes run under the
 #: shell the prologue names rather than whichever one the environment hands
-#: make. Without it fleet c68f15c7 on loki failed with ``CreateProcess(NULL,
-#: echo left ran, ...) failed``: Windows make ran ``echo`` as a program
-#: (MCPs board task 90c135ac), which the same make on the hub never did.
+#: make (MCPs board task 90c135ac).
 SHELL_PROLOGUE = Path(__file__).resolve().parents[3] / SHELL_INCLUDE
 
 
@@ -93,10 +91,6 @@ def test_a_batch_past_its_wall_kills_the_children_still_running(tmp_path: Path) 
 def test_a_real_make_runs_each_target_and_reports_it(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    # The text is double-quoted, as the recipe grammar requires, so
-    # PowerShell's echo prints it as one line as /bin/sh's does, and so GNU
-    # make 3.81 on serendipity hands it to the shell instead of running
-    # ``echo`` as a program (fleet bdaed272 failed on single quotes).
     (tmp_path / "Makefile").write_text(
         f"include {SHELL_PROLOGUE.as_posix()}\n\n"
         '_left:\n\t@echo "left ran"\n\n_right:\n\t@echo "right ran"\n',

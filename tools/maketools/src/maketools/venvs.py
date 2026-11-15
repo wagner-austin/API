@@ -5,10 +5,7 @@ Three packages step outside the poetry template:
 * ``libs/cleargbm_rs`` is a maturin crate whose Python side lives in a
   ``uv`` venv. ``venv-exec`` runs an executable from the venv's ``bin``
   and ``uv-venv-check`` recreates the venv when it is missing or cannot
-  answer. Only the Linux layout is read: the crate and its one consumer
-  need ``rust``, which no Windows node carries (loki, the Windows node the
-  operator keeps, has no cargo, rustc or uv, measured 2026-10-21 for board
-  task 3d612cad), so a ``Scripts`` venv is never built here. Its Rust tests
+  answer. Every node is Linux, so the venv's layout is ``bin``. Its Rust tests
   embed Python through pyo3 and import numpy there, and an embedded
   interpreter is the installation pyo3 linked, never the venv: on
   serendipity, whose system Python had no numpy, 94 of 1680 failed with

@@ -1,23 +1,18 @@
-"""The portable recipe grammar, and the check that every Makefile keeps to it.
+"""The recipe grammar, and the check that every Makefile keeps to it.
 
-WHY THERE IS A GRAMMAR. A Makefile here runs under two shells: PowerShell
-on Windows, where ``sh.exe`` is not on the PATH a PowerShell-launched make
-inherits, and ``/bin/sh`` everywhere else. A recipe is therefore written in
-the INTERSECTION of the two -- one plain command per line, ``@echo`` for
-output, make's own ``$(VAR)`` for substitution -- and everything that needs
-logic lives in a script the recipe calls by path. Both shells' private
-syntax is banned outright, because a recipe that works on the machine it
-was written on and dies on the other is exactly how 55 Makefiles came to
-be Windows-only in the first place.
+WHY THERE IS A GRAMMAR. Every recipe runs under ``/bin/sh -eu -c``, one
+line at a time (``scripts/make/shell.mk``), and a recipe is written as one
+plain command per line: ``@echo`` for output, make's own ``$(VAR)`` for
+substitution. Everything that needs logic (a condition, a loop, a pipe, a
+chain of commands, a redirection) lives in a script the recipe calls by
+path, where it is linted and tested like any other code, rather than in a
+line of a Makefile that no test runs.
 
-The two halves of the ban are deliberately symmetric. ``Write-Host`` and
-``&&`` are the same defect: a line only one shell can read.
-
-The same grammar, rule for rule, is ``packages/maketools/src/maketools/
-makefile_grammar.py`` in ~/PROJECTS/MCPs, where it landed first (board task
-b835753b); the two repositories share no package, so this is a deliberate
-copy, with the frames written as TypedDicts because this monorepo bans
-dataclasses under ``src``.
+``packages/maketools/src/maketools/makefile_grammar.py`` in ~/PROJECTS/MCPs
+holds the same shell-logic and make-function rules (board task b835753b);
+the two repositories share no package. This one writes its frames as
+TypedDicts because this monorepo bans dataclasses under ``src``, and its
+poetry ``--no-cache`` rule is :mod:`maketools.makefile_poetry_cache_rule`.
 """
 
 from __future__ import annotations
@@ -35,72 +30,25 @@ SHELL_INCLUDE: Final[str] = "scripts/make/shell.mk"
 #: The git pathspec that finds every tracked Makefile.
 MAKEFILE_PATHSPEC: Final[str] = "*Makefile"
 
-#: PowerShell-only syntax. Each entry is a regular expression matched
-#: against a recipe line with its ``@`` and ``-`` prefixes stripped.
-POWERSHELL_ONLY: Final[Sequence[tuple[str, str]]] = (
-    (
-        r"\b(Write|Get|Set|Test|New|Remove|Select|ForEach|Where|Join|Out|Split|Start|Invoke"
-        r"|Resolve|Copy|Move|Add|Compare|Sort|Measure|Expand|Compress|Import|Export|Push|Pop)"
-        r"-[A-Z]\w*",
-        "cmdlet",
-    ),
-    (r"\$\$?env:", "$env: variable"),
-    (r"-ForegroundColor|-ErrorAction|-NoProfile|-ExecutionPolicy", "cmdlet parameter"),
-    (r"\bpowershell\b|\bpwsh\b", "powershell invocation"),
-    (r"\.ps1\b", "PowerShell script"),
-    (r"\$\$\?", "$? status variable"),
-    (r"^(if|foreach|while|try)\s*\(", "PowerShell control flow"),
-    (r"@\(", "PowerShell array literal"),
-    # A backslash BETWEEN path-ish characters: ``scripts\tests``,
-    # ``.\scripts``, ``backups\$(FILE)``. Not ``}}\t{{`` in a docker
-    # ``--format`` string, which both shells pass through literally for
-    # docker to expand, and not a trailing continuation backslash.
-    (r"(?<=[\w.])\\(?=[\w$.])", "backslash path separator"),
-    (r"`", "backtick"),
-)
-
-#: POSIX-shell-only syntax, matched the same way.
-SH_ONLY: Final[Sequence[tuple[str, str]]] = (
+#: Shell logic a recipe line may not hold. Each entry is a regular
+#: expression matched against a recipe line with make's prefixes stripped
+#: (:func:`recipe_body`).
+SHELL_LOGIC: Final[Sequence[tuple[str, str]]] = (
     (r"&&|\|\|", "&& or || chaining"),
     (r"\$\$", "shell variable or substitution ($$)"),
-    (r"/dev/null|\bNUL\b", "null device"),
+    (r"`", "backtick"),
     (r"(^|\s)\[\s", "[ test"),
     (r"^(if|for|while|case|until)\s", "sh control flow"),
-)
-
-#: Syntax the two shells read DIFFERENTLY, banned because it looks
-#: portable and is not: PowerShell continues after a failing native command
-#: inside ``a; b``, ``sh -e`` stops; ``>`` writes UTF-16 in PowerShell 5.1;
-#: ``cd`` failing is a non-terminating error in one and fatal in the other.
-#: ``$(MAKE)`` expands to the path make was started by, unquoted; where that
-#: path holds a space, as ``C:/Program Files (x86)/GnuWin32/bin/make`` does
-#: on serendipity, PowerShell reads it as several words and the recipe dies
-#: before running anything (tools/fleet-execution, 2026-09-27, MCPs board
-#: task 930f4c0c), while ``/bin/sh`` on a spaceless path never shows it.
-#: ``echo`` takes its text in double quotes because GNU make 3.81, the
-#: GnuWin32 make on serendipity, reads ``powershell.exe`` as a POSIX shell
-#: and hands a recipe line holding none of its shell characters straight to
-#: CreateProcess; ``"`` is one of them and ``'`` is not, so ``@echo 'left
-#: ran'`` and ``@echo left`` exit 2 with ``CreateProcess(NULL, echo ...)
-#: failed`` there while ``@echo "left ran"`` reaches the shell (measured on
-#: serendipity 2026-10-08, fleet job bdaed272, MCPs board task cc7222ca),
-#: and make 4.4.1 on loki and sedona runs all three.
-DIVERGENT: Final[Sequence[tuple[str, str]]] = (
     (r";", "; separator (one command per line)"),
     (r"[<>|]", "redirection or pipe"),
     (r"^cd\s", "cd (use make -C or a script)"),
-    (r"\$[({]MAKE[)}]", "$(MAKE) (use plain make -C)"),
-    (r'^echo\b(?!\s+")', "echo without double-quoted text (make 3.81 runs it as a program)"),
 )
 
-#: make functions that run the shell, banned anywhere in the file, and
-#: ``$(file ...)``, which GNU make added in 4.0: serendipity's GnuWin32 make
-#: 3.81 expanded it to nothing, so ``--ref $(file <.githooks/mcps-harness.sha)``
-#: handed the PowerShell harness's first fleet run (job 2d949933, MCPs board
-#: task 939ec5c7) an empty ref. A recipe that reads a file calls a script.
+#: Lines outside a recipe that reach the shell, banned anywhere in the file:
+#: ``$(shell ...)`` runs one while make parses the file, outside every
+#: recipe, and the shell is chosen in one place only.
 MAKE_SHELL_FUNCTIONS: Final[Sequence[tuple[str, str]]] = (
-    (r"\$\(shell\b", "$(shell ...) runs the platform shell"),
-    (r"\$\(file\b", "$(file ...) needs GNU make 4.0 (3.81 reads it as nothing)"),
+    (r"\$\(shell\b", "$(shell ...) runs the shell while make parses"),
     (r"^\s*SHELL\s*[:?]?=", "SHELL is set only in " + SHELL_INCLUDE),
     (r"^\s*\.SHELLFLAGS\s*[:?]?=", ".SHELLFLAGS is set only in " + SHELL_INCLUDE),
 )
@@ -164,11 +112,10 @@ def expected_include(depth: int) -> str:
 def recipe_body(line: str) -> str:
     """The command of a recipe line, without make's own prefixes.
 
-    GNU make, 3.81 and 4.4.1 alike, skips ``@``, ``-``, ``+`` and blanks in
-    any order before it reads the command, so ``+echo 'x'`` and
-    ``@ -echo x`` reach the shell, or 3.81's CreateProcess, as ``echo ...``;
-    stripping only ``@`` and ``-`` once let both past every ``^`` rule
-    (MCPs board task 97a9e387).
+    GNU make skips ``@``, ``-``, ``+`` and blanks in any order before it
+    reads the command, so ``+cd x`` and ``@ -cd x`` reach the shell as
+    ``cd x``; stripping only ``@`` and ``-`` once let both past every ``^``
+    rule (MCPs board task 97a9e387).
 
     Args:
         line: A line beginning with a tab.
@@ -196,7 +143,7 @@ def check_recipe_line(path: Path, line_number: int, line: str) -> list[Violation
         return []
     return [
         Violation(path=path, line_number=line_number, rule=rule, text=body)
-        for pattern, rule in (*POWERSHELL_ONLY, *SH_ONLY, *DIVERGENT)
+        for pattern, rule in SHELL_LOGIC
         if re.search(pattern, body)
     ]
 
@@ -286,12 +233,10 @@ def lint_grammar(repo_root: Path) -> tuple[int, list[Violation]]:
 
 
 __all__ = [
-    "DIVERGENT",
     "MAKEFILE_PATHSPEC",
     "MAKE_SHELL_FUNCTIONS",
-    "POWERSHELL_ONLY",
     "SHELL_INCLUDE",
-    "SH_ONLY",
+    "SHELL_LOGIC",
     "Violation",
     "check_makefile",
     "check_recipe_line",

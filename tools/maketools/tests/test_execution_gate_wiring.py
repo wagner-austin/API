@@ -39,7 +39,7 @@ def _recipe(path: str, target: str) -> list[str]:
         Each tab-indented line after the rule, tab removed, up to the first
         line that is not one.
     """
-    lines = (ROOT / path).read_text(encoding="utf-8").replace("\r\n", "\n").split("\n")
+    lines = (ROOT / path).read_text(encoding="utf-8").splitlines()
     opening = [index for index, line in enumerate(lines) if line.startswith(f"{target}:")]
     assert len(opening) == 1, f"{path} has {len(opening)} rules for {target}"
     recipe: list[str] = []
@@ -51,7 +51,7 @@ def _recipe(path: str, target: str) -> list[str]:
 
 
 def test_every_deploy_runs_the_gate_for_the_linux_execution_project() -> None:
-    makefile = (ROOT / "Makefile").read_text(encoding="utf-8").replace("\r\n", "\n")
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     assert "\ninfra: commit-tasks executed services-executed\n" in makefile
     assert _recipe("Makefile", "executed") == [
         "$(PYTHON) .githooks/published_maketools.py publish-executed ../MCPs "
@@ -60,7 +60,7 @@ def test_every_deploy_runs_the_gate_for_the_linux_execution_project() -> None:
 
 
 def test_a_fleet_roll_moves_the_ref_only_after_the_suite_passed_at_head() -> None:
-    makefile = (ROOT / "Makefile").read_text(encoding="utf-8").replace("\r\n", "\n")
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     assert "\nfleet-roll: commit-tasks executed\n" in makefile
     # MCPs' published fleet-roll-push pushes the ref into the API checkout of
     # the machine holding control, its home, and copies it to origin, so no
@@ -88,7 +88,7 @@ def test_every_scheduled_tick_runs_the_rolled_commit() -> None:
         in tick
     )
     rolled = (cli / "rolled.py").read_text(encoding="utf-8")
-    assert '\nNODE_AGENT: Final = "fleet-node-agent"\n' in rolled.replace("\r\n", "\n")
+    assert '\nNODE_AGENT: Final = "fleet-node-agent"\n' in rolled
     plans = ("module", "rolled_cli.NODE_AGENT")
     for agent in plans:
         assert len(list(re.finditer(rf"rolled_cli\.AGENT_FLAG,\s+{re.escape(agent)},", tick))) == 1
@@ -104,7 +104,7 @@ def test_every_service_deploy_asks_for_a_passed_deploy_run_at_head() -> None:
         "tools/maketools-execution .",
     ]
     makefile = (ROOT / "tools" / "maketools-execution" / "Makefile").read_text(encoding="utf-8")
-    assert "\n_check-unbudgeted: lint test\n" in makefile.replace("\r\n", "\n")
+    assert "\n_check-unbudgeted: lint test\n" in makefile
     assert _recipe("tools/maketools-execution/Makefile", "test") == [
         "make -C ../maketools execution"
     ]
@@ -116,7 +116,7 @@ def test_every_service_deploy_asks_for_a_passed_deploy_run_at_head() -> None:
 
 def test_the_execution_project_runs_tools_fleet_host_cases() -> None:
     makefile = (ROOT / "tools" / "fleet-execution" / "Makefile").read_text(encoding="utf-8")
-    assert "\n_check-unbudgeted: lint test\n" in makefile.replace("\r\n", "\n")
+    assert "\n_check-unbudgeted: lint test\n" in makefile
     assert _recipe("tools/fleet-execution/Makefile", "test") == ["make -C ../fleet execution"]
     assert _recipe("tools/fleet/Makefile", "execution") == [
         "poetry sync --no-cache --with dev",

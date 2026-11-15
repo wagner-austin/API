@@ -137,21 +137,20 @@ def encode_lift_lock(lock: LiftLock) -> str:
 
 
 def pinned_digest(data: bytes) -> str:
-    """The hex digest a pin records, over the file's LF form.
+    """The hex digest a pin records, over the file's bytes as they are.
 
-    THE LINE ENDINGS ARE NORMALISED, because the same commit checks out
-    differently: this repository has no ``.gitattributes`` and Windows
-    clones run ``core.autocrlf=true``, so a lifted file is CRLF in a
-    Windows working tree, LF in a Linux CI checkout, and LF as MCPs' blob.
-    Hashing the bytes as found would fail one of the three on every pin.
+    Every checkout is a Linux one, where git writes a blob's bytes
+    unchanged, so a lifted file's working-tree bytes and MCPs' blob are the
+    same bytes, and a carriage return added to either is a drift like any
+    other edit.
 
     Args:
         data: The file's bytes, from a working tree or a git blob.
 
     Returns:
-        The lower-case hex sha256 of ``data`` with every CRLF made LF.
+        The lower-case hex sha256 of ``data``.
     """
-    return hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest()
+    return hashlib.sha256(data).hexdigest()
 
 
 def read_lift_lock(package_root: Path) -> LiftLock:
