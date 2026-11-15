@@ -174,10 +174,10 @@ jobs:
           echo "uncacheable=$uncacheable" >> "$GITHUB_OUTPUT"
 
   # THE MAKEFILE GRAMMAR, ON EVERY PUSH, UNDER THE INTERPRETER THAT NEEDS NO
-  # VENV. Every package's `make lint` runs this same check, but a Makefile
-  # edit selects only its own package above, and a recipe that regressed to
-  # PowerShell-only syntax there would pass on this Linux runner only until
-  # the next Windows `make check` in that package. Running the whole-repo
+  # VENV. A Makefile edit selects only its own package above, and most
+  # packages' `make lint` does not run this check (the root's,
+  # tools/maketools' and the execution projects' Makefiles name it), while a recipe holding shell logic still runs
+  # under /bin/sh, so that package's check passes. Running the whole-repo
   # grammar here on every change is what makes the regression impossible to
   # land. It is the launcher's own `lint-makefiles` command, run the way a
   # Makefile runs it: the system python3, no poetry, no install.
@@ -430,7 +430,7 @@ jobs:
       # bare `mypy` here against `mypy src tests scripts` there, a `-n`
       # chosen here against a launcher that sweeps and caps threads there.
       # Every Makefile is now in the portable grammar (scripts/make/shell.mk
-      # picks /bin/sh on a Linux runner) and calls tools/maketools for the
+      # sets /bin/sh -eu -c) and calls tools/maketools for the
       # shared work, so the runner runs exactly what a developer runs, and a
       # gate that only CI knew about cannot exist.
       #
