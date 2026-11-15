@@ -11,7 +11,6 @@ roots they read are the ones this repository declares, the same file
 from __future__ import annotations
 
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -19,8 +18,7 @@ from typing import Final
 
 import pytest
 
-#: The repository root: tools/maketools/tests/ is three levels below it.
-ROOT: Final[Path] = Path(__file__).resolve().parents[3]
+from tests._ci_selection_world import ROOT, ci_repository, run_selection
 
 _VARIABLE: Final[re.Pattern[str]] = re.compile(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)")
 
@@ -163,19 +161,8 @@ def _select_in(
     Returns:
         The finished run, its output captured.
     """
-    (repo / "scripts" / "make").mkdir(parents=True, exist_ok=True)
-    script = repo / "scripts" / "ci_select_packages.py"
-    shutil.copyfile(ROOT / "scripts" / "ci_select_packages.py", script)
-    (repo / "scripts" / "make" / "project-roots.json").write_text(declaration, encoding="utf-8")
-    for package in ("apps/web", "clients/probe"):
-        (repo / package).mkdir(parents=True, exist_ok=True)
-        (repo / package / "Makefile").write_text("check:\n\ttrue\n", encoding="utf-8")
-    return subprocess.run(
-        [sys.executable, str(script), *changed],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    script = ci_repository(repo, declaration, {"apps/web": (), "clients/probe": ()})
+    return run_selection(script, changed)
 
 
 def test_ci_selects_by_the_roots_its_repository_declares_not_by_this_one_s(tmp_path: Path) -> None:
