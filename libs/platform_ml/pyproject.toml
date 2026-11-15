@@ -14,8 +14,13 @@ readme = "README.md"
 include = ["src/platform_ml/py.typed"]
 
 [[tool.poetry.source]]
-name = "pytorch-cuda"
-url = "https://download.pytorch.org/whl/cu128"
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+priority = "explicit"
+
+[[tool.poetry.source]]
+name = "pytorch-cu132"
+url = "https://download.pytorch.org/whl/cu132"
 priority = "explicit"
 
 [tool.poetry.dependencies]
@@ -24,17 +29,16 @@ platform-core = { path = "../platform_core", develop = true }
 numpy = "^2.3.5"
 sentencepiece = "^0.2.1"
 shap = "^0.51"
-# torch is an extra, as wandb is. Only torch_types' importer and the device
-# selector reach it, at call time; every consumer that calls them (Model-Trainer,
-# handwriting-ai, Art-Trainer, covenant_nn) declares torch itself. covenant_ml
-# never does, and as a main dependency here it installed the 2.87 GB cu128 wheel,
-# 4.3 GB unpacked, into every fresh fleet venv of that package (board task 2e880b79).
-torch = { version = "^2.5", source = "pytorch-cuda", optional = true }
+# torch is not a dependency here, not even an extra. Only torch_types' importer
+# and the device selector reach it, at call time, and every consumer that calls
+# them (Model-Trainer, covenant_nn) declares torch itself; covenant_ml never
+# does, and as a main dependency here it installed the 2.87 GB cu128 wheel into
+# every fresh fleet venv of that package (board task 2e880b79). The dev group
+# below installs it for this package's own tests.
 wandb = { version = "^0.18", optional = true }
 typing-extensions = "^4.12.0"
 
 [tool.poetry.extras]
-torch = ["torch"]
 wandb = ["wandb"]
 
 [tool.poetry.group.dev.dependencies]
@@ -44,7 +48,15 @@ pytest-cov = "^7.1.0"
 mypy = "^2.3.1"
 ruff = "^0.16.6"
 typing-extensions = "^4.12.0"
-torch = { version = "^2.5", source = "pytorch-cuda" }
+# torch's NCCL must be xgboost's: nvidia-nccl-cu12 and nvidia-nccl-cu13 both
+# install nvidia/nccl/lib/libnccl.so.2, so removing either deletes the library
+# the other loads. xgboost needs nccl-cu12 through 3.3 and nccl-cu13 from
+# 3.4.0, which needs Python 3.12, so each Python takes the newest torch built
+# against the same NCCL; CUDA 13.2 is the newest demure's 595 driver runs.
+torch = [
+  { version = "^2.14.1", source = "pytorch-cu126", python = "~3.11" },
+  { version = "^2.15.0", source = "pytorch-cu132", python = ">=3.12,<3.16" },
+]
 wandb = "^0.18"
 scikit-learn = "^1.8"
 xgboost = "^3.1"
