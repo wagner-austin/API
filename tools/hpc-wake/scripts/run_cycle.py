@@ -1,47 +1,29 @@
-"""The scheduled entry point: source the untracked credentials, run one cycle.
-
-Native-Python replacement for ``run-cycle.ps1``, written 2026-09-09 after the
-Windows-Update reboot proved the PowerShell form has TWO independent ways to
-die silently as a scheduled task on this box:
-
-* registered ``LogonType=Interactive``, Task Scheduler MISSES every trigger
-  while no desktop session exists (37 missed runs, ``Start-ScheduledTask`` a
-  silent no-op, measured 2026-09-09 10:29Z-12:23Z);
-* registered ``LogonType=S4U``, ``powershell.exe`` itself deadlocks before
-  reaching the script (measured on this box by the Docker-autostart work,
-  board 11:48Z post: stall at .NET assembly load, ~0.16s CPU across 157s,
-  repeatable; a NATIVE binary action does not).
+"""The scheduled entry point: read the untracked credentials, run one cycle.
 
 ``python -m scripts.run_cycle --package-root <dir> --workspace <MCPs>
---python <interpreter>`` is the native-binary action that pattern calls
-for. The root is an ARGUMENT, not derived from ``__file__``: the package
-tree holds untracked state (``runs/env.ps1``, ``runs/cycle.log``) that
-exists on the operating machine and not on a clean checkout, and an entry
-point that reaches for its own tree is untestable without that state —
-which is exactly how this job shipped red in CI while green locally (board,
-2026-09-09 20:39Z: five CI runs, five failures, zero passes, invisible
-because the job usually does not run).
+--python <interpreter>``. The root is an ARGUMENT, not derived from
+``__file__``: the package tree holds untracked state
+(``runs/credentials.env``, ``runs/cycle.log``) that exists on the operating
+machine and not on a clean checkout, and an entry point that reaches for its
+own tree is untestable without that state, which is exactly how this job
+shipped red in CI while green locally (board, 2026-09-09 20:39Z: five CI
+runs, five failures, zero passes, invisible because the job usually does not
+run).
 
 THE MACHINE IS AN ARGUMENT TOO (MCPs board task c39ee056). The MCPs hub
 runner's ``hpc-wake`` row runs this wherever the control duty is held,
 filling ``--workspace`` with that machine's MCPs checkout and ``--python``
-with its system interpreter, the one MCPs' maketools rows run under. The
-table spelled austinpc's ``C:\\Users\\Test`` paths and Windows separators
-until the duty moved to diphtheria on 2026-10-18, where its first tick
-looked for ``..\\ci-wake`` as one directory name; every path here is now
-built from those two arguments or written with ``/``, which both
-platforms read.
+with its system interpreter, the one MCPs' maketools rows run under; every
+path here is built from those two arguments.
 
-Behaviour is the PowerShell script's, deliberately: source ``runs/env.ps1``
-(still PowerShell syntax so interactive sessions can keep dot-sourcing it —
-parsed strictly by :mod:`platform_core.env_assignments`, the one parser the
-fleet ticks share, refusing any uncommented line that is not a plain
-``$env:NAME = 'value'`` assignment), truncate ``runs/cycle.log`` past ~1 MB,
-stamp a UTC header, append the cycle's output, exit with the cycle's own
-status so the hub runner's record of each run stays the health record: it
-ships every run's exit to MCPs ``hub_runner_runs``, which ``task_wake_bridges``
-reads with the publishers' ticks for every session's start banner (MCPs board
-task e6f2c511).
+One cycle: read ``runs/credentials.env``, ``KEY=VALUE`` lines read by
+:mod:`platform_core.env_file` as the fleet ticks read the same file,
+truncate ``runs/cycle.log`` past ~1 MB, stamp a UTC header, append the
+cycle's output, and exit with the cycle's own status so the hub runner's
+record of each run stays the health record: it ships every run's exit to
+MCPs ``hub_runner_runs``, which ``task_wake_bridges`` reads with the
+publishers' ticks for every session's start banner (MCPs board task
+e6f2c511).
 """
 
 from __future__ import annotations
@@ -53,7 +35,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from typing import Final, TextIO
 
-from platform_core.env_assignments import parse_env_assignments
+from platform_core.env_file import parse_env_file
 from typing_extensions import TypedDict
 
 from scripts import _test_hooks
@@ -149,7 +131,7 @@ def publishers(workspace: pathlib.Path, python: str) -> tuple[Publisher, ...]:
         },
         # ci-wake (board 21:02Z, bridge-ci-wake-0909): GitHub Actions -> board,
         # with the pre-push enrolment ledger supplying the @mention target the
-        # Actions API cannot know. Its standing task id rides runs/env.ps1 as
+        # Actions API cannot know. Its standing task id rides runs/credentials.env as
         # CI_WAKE_TASK_ID beside the pump's other credentials.
         {
             "name": "ci-wake",
@@ -171,7 +153,7 @@ def publishers(workspace: pathlib.Path, python: str) -> tuple[Publisher, ...]:
         # -> board, where every deploy takes its lock. One post per tick at
         # most, boundaries only, progress folded as counts; the journal's
         # 'agent' field (MCPs 66b85d32) supplies the mention target. Standing
-        # task id: LOCK_WAKE_TASK_ID in runs/env.ps1. The check journal beside
+        # task id: LOCK_WAKE_TASK_ID in runs/credentials.env. The check journal beside
         # it (MCPs board task ea2ea29c) carries the check lock's finished make
         # test runs, posted unaddressed in the same post; it is its own file
         # because older readers of the fleet journal refuse a kind they do not
@@ -199,7 +181,7 @@ def publishers(workspace: pathlib.Path, python: str) -> tuple[Publisher, ...]:
         # journal -> board. The audit appends one line per run whose outcome
         # changed, the note already rendered; this row posts the unread ones
         # as one note, unaddressed. Standing task id:
-        # FLEET_HEALTH_WAKE_TASK_ID in runs/env.ps1.
+        # FLEET_HEALTH_WAKE_TASK_ID in runs/credentials.env.
         {
             "name": "fleet-health-wake",
             "args": (
@@ -410,8 +392,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     Raises:
         ValueError: Propagated from :func:`arguments_from`.
         AppError: ``CONFIG_ERROR`` from
-            :func:`platform_core.env_assignments.parse_env_assignments` when
-            ``runs/env.ps1`` holds a line that is not a plain assignment.
+            :func:`platform_core.env_file.parse_env_file` when
+            ``runs/credentials.env`` holds a line with no ``=``.
         OSError: When the log or the package tree is unwritable/unreadable,
             or a publisher's command cannot be spawned — a spawn failure is
             a broken pump, not a publisher outcome, and the header already
@@ -424,10 +406,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     arguments = arguments_from(tokens)
     package_root = arguments["package_root"]
-    env_file = package_root / "runs" / "env.ps1"
-    environment = dict(
-        parse_env_assignments(env_file.read_text(encoding="utf-8"), source=str(env_file))
-    )
+    env_file = package_root / "runs" / "credentials.env"
+    environment = parse_env_file(env_file.read_text(encoding="utf-8"), source=str(env_file))
 
     log = package_root / "runs" / "cycle.log"
     if log.exists() and log.stat().st_size > _LOG_LIMIT_BYTES:

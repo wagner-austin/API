@@ -73,7 +73,7 @@ def staged_root(tmp_path: pathlib.Path, env_body: str) -> pathlib.Path:
     """Create a package-shaped tree holding one credentials file."""
     runs = tmp_path / "runs"
     runs.mkdir()
-    (runs / "env.ps1").write_text(env_body, encoding="utf-8")
+    (runs / "credentials.env").write_text(env_body, encoding="utf-8")
     return tmp_path
 
 
@@ -98,9 +98,9 @@ def cycle_argv(root: pathlib.Path) -> list[str]:
 GOOD_ENV = "\n".join(
     [
         "# hpc-wake credentials. UNTRACKED.",
-        "$env:TASKBOARD_MCP_API_KEY = 'key-value'",
+        "TASKBOARD_MCP_API_KEY=key-value",
         "",
-        "$env:CORVIS_TENANT_ID = 'tenant-value'",
-        "$env:HPC_WAKE_TASK_ID = 'task-value'",
+        "CORVIS_TENANT_ID=tenant-value",
+        "HPC_WAKE_TASK_ID=task-value",
     ]
 )

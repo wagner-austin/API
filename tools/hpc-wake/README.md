@@ -60,12 +60,10 @@ not mint identities.
 
 The entry point is `scripts/run_cycle.py`, plain Python, run every three
 minutes as the hub runner's `hpc-wake` job: one row of the MCPs repo's
-`scripts/fleet/hub-jobs.json` (MCPs board task b27bd34a), in place of the
-scheduled task `\corvis\hpc-wake` that ran it until 2026-10-16. The runner
-is itself an S4U task started at boot, so the pump runs with nobody logged
-on, which the Interactive registration of 2026-09-09 did not: 37
-consecutive missed runs after a Windows-Update reboot silenced every wake on
-the machine for two hours.
+`scripts/fleet/hub-jobs.json` (MCPs board task b27bd34a). It reads the
+machine's credentials from the untracked `runs/credentials.env`, `KEY=VALUE`
+lines read by `platform_core.env_file`, the parser the fleet ticks read the
+same file with.
 
 The row runs it wherever the control duty is held (diphtheria since
 2026-10-18, MCPs board task c39ee056), passing `--package-root` this
@@ -76,12 +74,12 @@ python on PATH; the row names it. `run_cycle.py` imports `platform_core`,
 and the venv holds it as the editable path dependency `pyproject.toml`
 declares, so the pump always runs the tree's `platform_core`. The system
 python held a copied, older one: when d46de80d0 (repo API) moved the env
-parser into `platform_core.env_assignments` on 2026-09-29, every tick from
-08:25Z died on `ModuleNotFoundError` and the pump published nothing for
-eight hours (board task 25306d98). Run `poetry install` here before the
-runner first starts the job.
+parser into `platform_core` on 2026-09-29, every tick from 08:25Z died on
+`ModuleNotFoundError` and the pump published nothing for eight hours (board
+task 25306d98). Run `poetry install` here before the runner first starts
+the job.
 
-One run at a time, as the task's `IgnoreNew` kept: a cycle still running
+One run at a time: a cycle still running
 when the next is due starts once it ends. The row's 30-minute deadline ends
 a hung cycle's whole process tree so the next is not silently skipped (the
 2026-09-08 outage mode). Health is read from `runs/cycle.log`: the LAST line must be

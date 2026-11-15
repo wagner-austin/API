@@ -45,14 +45,14 @@ class TestTheCredentialsFile:
     def test_a_line_the_shared_parser_refuses_stops_the_cycle_before_any_publisher(
         self, tmp_path: pathlib.Path
     ) -> None:
-        # The grammar is platform_core.env_assignments' and tested there;
-        # what this package owns is that main reads runs/env.ps1 through it
-        # and that a refusal lands before a publisher runs or a log is cut.
-        root = staged_root(tmp_path, GOOD_ENV + '\n$env:DOUBLE = "quoted"\n')
+        # The grammar is platform_core.env_file's and tested there; what
+        # this package owns is that main reads runs/credentials.env through
+        # it and that a refusal lands before a publisher runs or a log is cut.
+        root = staged_root(tmp_path, GOOD_ENV + "\nNO_SEPARATOR value\n")
         with pytest.raises(AppError) as caught:
             run_cycle.main(cycle_argv(root))
         assert caught.value.code is ErrorCode.CONFIG_ERROR
-        assert caught.value.message.startswith(f"line 6 of {root / 'runs' / 'env.ps1'} ")
+        assert caught.value.message.startswith(f"line 6 of {root / 'runs' / 'credentials.env'} ")
         assert not (root / "runs" / "cycle.log").exists()
 
 
@@ -123,8 +123,8 @@ class TestMain:
         run_cycle.main(cycle_argv(root))
 
         assert sorted(entry.name for entry in (root / "runs").iterdir()) == [
+            "credentials.env",
             "cycle.log",
-            "env.ps1",
         ]
 
     def test_hands_each_publisher_its_command_its_cwd_and_a_merged_env(
