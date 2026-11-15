@@ -13,7 +13,7 @@ import logging
 from types import TracebackType
 from typing import Protocol, TypedDict
 
-from platform_core.logging import LogLevel, _level_to_int
+from platform_core.logging import LogLevel, _level_to_int, _quiet_third_party_loggers
 
 
 class RichRenderableProtocol(Protocol):
@@ -279,13 +279,7 @@ def setup_rich_logging(
 
     # Store console reference for later access
     _rich_console = result["console"]
-
-    # Silence noisy third-party loggers
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("optuna").setLevel(logging.WARNING)
-
+    _quiet_third_party_loggers()
     return root
 
 

@@ -528,5 +528,5 @@ make check  # lint + test
 ## Requirements
 
 - Python 3.11+
-- FastAPI, httpx
+- FastAPI, httpx2, rich
 - 100% test coverage enforced

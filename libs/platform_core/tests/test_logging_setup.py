@@ -6,6 +6,7 @@ import io
 
 from platform_core.json_utils import load_json_str
 from platform_core.logging import (
+    QUIETED_LOGGERS,
     JsonFormatter,
     LogEventFields,
     LogFormat,
@@ -259,9 +260,9 @@ def test_setup_logging_silences_third_party() -> None:
         extra_fields=None,
     )
 
-    assert stdlib_logging.getLogger("urllib3").level == stdlib_logging.WARNING
-    assert stdlib_logging.getLogger("httpx").level == stdlib_logging.WARNING
-    assert stdlib_logging.getLogger("httpcore").level == stdlib_logging.WARNING
+    assert QUIETED_LOGGERS == ("urllib3", "httpx2", "httpcore2", "optuna")
+    for name in QUIETED_LOGGERS:
+        assert stdlib_logging.getLogger(name).level == stdlib_logging.WARNING
 
 
 def test_load_queue_handler_factory_returns_factory() -> None:

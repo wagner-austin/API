@@ -15,9 +15,9 @@ include = ["src/platform_core/py.typed"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-fastapi = "^0.124"
-httpx = "^0.28"
-rich = "^14.2"
+fastapi = "^0.163"
+httpx2 = "^2.16"
+rich = "^15.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.1.1"

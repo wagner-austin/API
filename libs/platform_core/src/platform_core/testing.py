@@ -56,7 +56,7 @@ def make_fake_env(env_vars: dict[str, str] | None = None) -> FakeEnv:
 
 
 class FakeTimeout:
-    """Protocol-compliant fake for httpx.Timeout."""
+    """Protocol-compliant fake for httpx2.Timeout."""
 
     __slots__ = ("_timeout",)
 
@@ -68,7 +68,7 @@ class FakeTimeout:
 
 
 class FakeHttpxResponse:
-    """Protocol-compliant fake for httpx.Response.
+    """Protocol-compliant fake for httpx2.Response.
 
     Satisfies HttpxResponse Protocol from platform_core.http_client.
     Supports initialization from JSON body, raw bytes, or text.
@@ -119,7 +119,7 @@ class FakeHttpxResponse:
 
 
 class FakeHttpxAsyncClient:
-    """Protocol-compliant fake for httpx.AsyncClient.
+    """Protocol-compliant fake for httpx2.AsyncClient.
 
     Satisfies HttpxAsyncClient Protocol from platform_core.http_client.
     Supports configurable responses and exception raising for testing.
@@ -220,7 +220,7 @@ class FakeHttpxAsyncClientRaises:
 
 
 class FakeHttpxClient:
-    """Protocol-compliant fake for httpx.Client (sync).
+    """Protocol-compliant fake for httpx2.Client (sync).
 
     Satisfies HttpxClient Protocol from platform_core.http_client.
     """
@@ -344,7 +344,7 @@ def make_client_ctor(response: HttpxResponse) -> ClientCtor:
 
 
 class FakeHttpxModule:
-    """Fake httpx module for test hook injection.
+    """Fake httpx2 module for test hook injection.
 
     Provides Timeout/AsyncClient/Client constructors that return fakes.
     """
@@ -363,7 +363,7 @@ class FakeHttpxModule:
 
 
 class FakeHttpxModuleSyncOnly:
-    """Fake httpx module with only sync Client (for sync-only code)."""
+    """Fake httpx2 module with only sync Client (for sync-only code)."""
 
     def __init__(self, response: HttpxResponse) -> None:
         object.__setattr__(self, "Timeout", make_timeout_ctor())

@@ -8,7 +8,7 @@ import sys
 import time
 from enum import StrEnum
 from types import TracebackType
-from typing import Protocol, TypedDict
+from typing import Final, Protocol, TypedDict
 
 from platform_core.json_utils import JSONValue, dump_json_str
 from platform_core.request_context import request_id_var
@@ -236,6 +236,17 @@ def _level_to_int(level: LogLevel) -> int:
     return level_map[level]
 
 
+#: Third-party loggers whose INFO lines drown a service's own. Both logging
+#: setups in this package quiet exactly these, from this one list.
+QUIETED_LOGGERS: Final[tuple[str, ...]] = ("urllib3", "httpx2", "httpcore2", "optuna")
+
+
+def _quiet_third_party_loggers() -> None:
+    """Raise every logger in :data:`QUIETED_LOGGERS` to WARNING."""
+    for name in QUIETED_LOGGERS:
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+
 def setup_logging(
     *,
     level: LogLevel,
@@ -299,12 +310,7 @@ def setup_logging(
         handler.setFormatter(TextFormatter(extra_fields=extra_field_names))
 
     root.addHandler(handler)
-
-    # Silence noisy third-party loggers
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-
+    _quiet_third_party_loggers()
     return root
 
 
@@ -436,6 +442,7 @@ def load_queue_listener_factory() -> QueueListenerFactory:
 
 
 __all__ = [
+    "QUIETED_LOGGERS",
     "JsonFormatter",
     "LogEventFields",
     "LogFormat",

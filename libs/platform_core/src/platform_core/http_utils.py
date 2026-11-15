@@ -27,7 +27,7 @@ def http_delete(url: str, headers: dict[str, str]) -> None:
 
     Written once here because ``platform_calendar`` and ``platform_email``
     each carried a byte-identical copy in their production hooks. Both used
-    urllib rather than this workspace's httpx client, which is the reason it
+    urllib rather than this workspace's httpx2 client, which is the reason it
     is worth keeping as its own function rather than folding into
     :mod:`platform_core.http_client`: it is the dependency-free path a
     production hook can take without pulling the async stack into a CLI.

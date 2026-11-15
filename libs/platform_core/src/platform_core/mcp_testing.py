@@ -10,7 +10,7 @@ server's SSE framing is a third place for that framing to go stale.
 
 A SEPARATE MODULE FROM :mod:`platform_core.testing`, which is 533 lines
 against this repository's 600-line ceiling, and which holds environment and
-httpx fakes that have nothing to do with this transport. Same split
+httpx2 fakes that have nothing to do with this transport. Same split
 ``oauth_testing`` already makes, and for the same reason.
 
 THESE ARE FAKES, NOT MOCKS. :class:`FakeHttpPost` implements

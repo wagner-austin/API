@@ -6,7 +6,7 @@ answers "what could this instrument have resolved". Keeping them apart is
 what lets a consumer check a published p-value against the same arithmetic
 that produced the MDE beside it, without importing the record types.
 
-WHY PURE STDLIB. ``platform_core``'s runtime dependencies are fastapi, httpx
+WHY PURE STDLIB. ``platform_core``'s runtime dependencies are fastapi, httpx2
 and rich -- numpy is dev-only, scipy absent. There is no
 ``scipy.stats.t.ppf``, and that absence is exactly why a hardcoded
 t-critical TABLE is the tempting shortcut. A table is a second source of

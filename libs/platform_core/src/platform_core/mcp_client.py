@@ -178,7 +178,7 @@ def urllib_mcp_post(
 ) -> McpHttpResponse:
     """Post with the standard library -- the production :class:`McpPostProtocol`.
 
-    ``urllib`` rather than ``httpx`` because an MCP call from a CLI is a single
+    ``urllib`` rather than ``httpx2`` because an MCP call from a CLI is a single
     short-lived POST, usually to loopback. :mod:`platform_core.http_client`
     exists for services that hold a client across many requests and need
     transports injected; borrowing it here would add a dependency to buy

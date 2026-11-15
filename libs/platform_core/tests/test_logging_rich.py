@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from platform_core.logging import (
+    QUIETED_LOGGERS,
     LogLevel,
     stdlib_logging,
 )
@@ -39,10 +40,8 @@ def test_setup_rich_logging_silences_third_party() -> None:
 
     setup_rich_logging(level=LogLevel.DEBUG)
 
-    assert stdlib_logging.getLogger("urllib3").level == stdlib_logging.WARNING
-    assert stdlib_logging.getLogger("httpx").level == stdlib_logging.WARNING
-    assert stdlib_logging.getLogger("httpcore").level == stdlib_logging.WARNING
-    assert stdlib_logging.getLogger("optuna").level == stdlib_logging.WARNING
+    for name in QUIETED_LOGGERS:
+        assert stdlib_logging.getLogger(name).level == stdlib_logging.WARNING
 
 
 def test_get_rich_console_after_setup() -> None:

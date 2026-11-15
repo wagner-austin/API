@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 
-import httpx
+import httpx2
 import pytest
 from fastapi import FastAPI
 from starlette.requests import Request
@@ -110,8 +110,8 @@ def test_register_json_error_handler_maps_invalid_json() -> None:
     app.add_api_route("/echo", _echo, methods=["POST"])
 
     async def _run() -> None:
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        transport = httpx2.ASGITransport(app=app)
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post("/echo", content=b"{")
             assert resp.status_code == 400
             body: JSONValue = load_json_bytes(resp.content)
@@ -133,8 +133,8 @@ def test_register_json_error_handler_raises_http_exception() -> None:
     app.add_api_route("/boom", _boom, methods=["GET"])
 
     async def _run() -> None:
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        transport = httpx2.ASGITransport(app=app)
+        async with httpx2.AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/boom")
             assert resp.status_code == 400
             body: JSONValue = load_json_bytes(resp.content)

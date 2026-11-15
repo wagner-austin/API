@@ -95,8 +95,8 @@ class _ClientCtor(Protocol):
     ) -> HttpxClient: ...
 
 
-def _load_httpx() -> tuple[_TimeoutCtor, _AsyncClientCtor, _ClientCtor]:
-    mod: ModuleType = __import__("httpx")
+def _load_httpx2() -> tuple[_TimeoutCtor, _AsyncClientCtor, _ClientCtor]:
+    mod: ModuleType = __import__("httpx2")
     timeout_ctor: _TimeoutCtor = object.__getattribute__(mod, "Timeout")
     async_ctor: _AsyncClientCtor = object.__getattribute__(mod, "AsyncClient")
     client_ctor: _ClientCtor = object.__getattribute__(mod, "Client")
@@ -106,7 +106,7 @@ def _load_httpx() -> tuple[_TimeoutCtor, _AsyncClientCtor, _ClientCtor]:
 def build_async_client(
     timeout_seconds: float, transport: AsyncTransport | None = None
 ) -> HttpxAsyncClient:
-    timeout_ctor, async_ctor, _ = _load_httpx()
+    timeout_ctor, async_ctor, _ = _load_httpx2()
     timeout_obj = timeout_ctor(float(timeout_seconds))
     if transport is None:
         return async_ctor(timeout=timeout_obj)
@@ -114,7 +114,7 @@ def build_async_client(
 
 
 def build_client(timeout_seconds: float, transport: SyncTransport | None = None) -> HttpxClient:
-    timeout_ctor, _, client_ctor = _load_httpx()
+    timeout_ctor, _, client_ctor = _load_httpx2()
     timeout_obj = timeout_ctor(float(timeout_seconds))
     if transport is None:
         return client_ctor(timeout=timeout_obj)

@@ -3,7 +3,7 @@
 Split from :mod:`platform_core.testing` when that module crossed the 600-line
 ceiling. The seam is by ROLE rather than by size: everything here fakes an
 effect a CLI performs -- an HTTP call, the clock, the filesystem, the console
--- while ``testing`` holds the httpx client doubles, environment and host
+-- while ``testing`` holds the httpx2 client doubles, environment and host
 probes that a service uses.
 
 platform_calendar and platform_email each had their own copy of every fake
