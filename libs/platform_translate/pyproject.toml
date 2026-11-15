@@ -16,8 +16,8 @@ include = ["src/platform_translate/py.typed"]
 [tool.poetry.dependencies]
 python = "^3.11"
 platform-core = { path = "../platform_core", develop = true }
-anthropic = "^0.44.0"
-openai = "^2.8.0"
+anthropic = "^2.8.0"
+openai = "^3.51.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.1.1"
