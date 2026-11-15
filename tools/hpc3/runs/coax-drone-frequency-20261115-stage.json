@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-frequency-20261115.tar",
+      "sha256": "0521bca18beb1ca75a7c3a2c147e992fd36acbdaeb2ddec65b5453e66a9d73fb",
+      "size_bytes": 79298560
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone candidate above base c828c56f1f2ce7f247e74f3754306f9b9f8d2f68",
+    "selection": "Deterministic tar of pyproject.toml, calc source/data, wiki/sources and per-file source-sha256.json; no compiled caches",
+    "why": "Recompute all 34568 uncertainty cases at 4096 samples with sourced motor poles and drive electrical-frequency constraints",
+    "note": "Uncommitted candidate identified by bytes. Fleet independent archive readback checked all 261 files against its tested tree. Publication must retain these exact calculation/input bytes."
+  }
+}
