@@ -23,7 +23,7 @@ platform-workers = { path = "../../libs/platform_workers", develop = true }
 platform-stt = { path = "../../libs/platform_stt", develop = true }
 redis = "^7.1"
 rq = "^2.3"
-openai = "^2.8.0"
+openai = "^3.51.0"
 youtube-transcript-api = { version = "^1.2.4", python = ">=3.11,<3.14" }
 yt-dlp = "^2025.11.12"
 
