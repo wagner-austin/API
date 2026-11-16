@@ -130,7 +130,15 @@ RUN pip install /workspace/dist/*.whl /workspace/libs/platform_core \
 # Chromium only, with its system deps. `--with-deps` runs apt itself, so
 # the browser and the libraries it dlopens stay in step; pinning that
 # list by hand is how a Playwright upgrade turns into a blank page.
-RUN playwright install --with-deps chromium \
+#
+# libatomic1 is the DRIVER's, not the browser's, so `--with-deps` never
+# installs it: Playwright 1.65's bundled node links libatomic.so.1, which
+# python's slim image lacks, and without it `playwright install` itself
+# exits 127 before it installs anything (release v0.1.0-fe8be0821's image
+# build on demure, 2026-11-16, MCPs board task 99194467).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libatomic1 \
+    && playwright install --with-deps chromium \
     && rm -rf /var/lib/apt/lists/* /root/.cache \
     && chmod -R a+rX /opt/playwright
 
