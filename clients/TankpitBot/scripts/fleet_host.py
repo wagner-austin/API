@@ -14,6 +14,16 @@ token), carried from host to host (demure's from the copy of colossus's
 kept on citrine under /srv/keep/colossus); ``up`` refuses a host that
 lacks one, naming it.
 
+THE CONTAINER AND THE HOST USER SHARE ``runs/`` AND ``data/``. The image
+runs as ``app`` (uid 100, gid 101), which writes runs and measured ranks,
+while ``up`` stages ``data/tank_registry.json`` as the host user. So both
+directories are the host user's and group 101's, mode 2770 (setgid keeps
+what the bots write in that group), their files 664, and ``accounts.json``
+and ``.env`` are group 101, mode 640. A copy carried from another host
+arrives as the host user's alone: on demure, 2026-11-16, the manager
+crash-looped on ``PermissionError: runs/bot`` until the modes were set
+(MCPs board task 99194467).
+
 WHAT ``up`` STAGES. ``data/tank_registry.json`` from the release only while
 the host has none, because the bots write measured ranks back into it at
 runtime and the host's copy is then the newer one; the compose file and
