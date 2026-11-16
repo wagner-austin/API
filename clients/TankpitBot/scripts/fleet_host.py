@@ -1,17 +1,18 @@
-"""Operate the fleet on the game host, colossus, over plain ssh.
+"""Operate the fleet on the game host, demure, over plain ssh.
 
 The game host owns the fleet and its public edge (MCPs board task 077204e8
-gave them to sedona on 2026-09-28; board task c481c259 moved them to
-colossus, a Linux machine, on 2026-10-18). ``make up`` and ``make down`` run
-this from any Linux checkout that can ssh to it.
+gave them to sedona on 2026-09-28, board task c481c259 moved them to
+colossus on 2026-10-18, and board task 99194467 to demure once colossus was
+reinstalled as a fleet worker). :mod:`scripts.fleet_remote` names the host.
+``make up`` and ``make down`` run this from any Linux checkout that can ssh
+to it.
 
 THE HOST HOLDS EVERYTHING. Its directory, :data:`HOST_DIR`, is the compose
 project and every mount. Three of its files are the host's own and no
 repository's: ``.env``, ``accounts.json`` and ``edge.env`` (the tunnel
-token), copied once from sedona; ``up`` refuses a host that lacks one,
-naming it. Nothing is read from the hub any more: austinpc, which held
-the release ladder, the token and the gitignored accounts, is being
-retired.
+token), carried from host to host (demure's from the copy of colossus's
+kept on citrine under /srv/keep/colossus); ``up`` refuses a host that
+lacks one, naming it.
 
 WHAT ``up`` STAGES. ``data/tank_registry.json`` from the release only while
 the host has none, because the bots write measured ranks back into it at

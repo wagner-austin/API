@@ -1,9 +1,10 @@
-"""Operate the sim server on the game host, colossus, over plain ssh.
+"""Operate the sim server on the game host, demure, over plain ssh.
 
 The game host owns every game server (MCPs board task 077204e8; the operator,
 2026-09-28: "sedona can own all the game servwrs. tankpit too"), and since
 MCPs board task ff035b0d that includes the sim server. Board task c481c259
-moved the game host from sedona to colossus, a Linux machine.
+moved the game host from sedona to colossus, and board task 99194467 to
+demure; :mod:`scripts.fleet_remote` names it.
 ``make sim-up`` and ``make sim-down`` run this from any Linux checkout that
 can ssh to it.
 

@@ -1,10 +1,13 @@
 """Reach the game host: its address, the remote command line and the checked runner.
 
-The game host is colossus, a Linux machine on the home network the TV is on
-(MCPs board task c481c259; the operator, 2026-10-18: "we dont rwally.plan on
-ising windows ever again tbh"). Until then it was sedona, where every command
-was a PowerShell line read first by cmd.exe and the fleet ran inside Docker
-Desktop's VM. :mod:`scripts.fleet_host`, :mod:`scripts.fleet_release`,
+The game host is demure, the stack server (MCPs board task 99194467). It was
+sedona until 2026-10-18 and colossus until colossus was reinstalled as a
+fleet worker on 2026-10-30, which left TankPit with no host and this module
+naming an account that no longer existed. So the host is named here and
+nothing else: its login user and tailnet address are read from API's fleet
+roster, ``tools/fleet/registry/machines/<host>.json``, the one place a
+machine's address is written, and its home directory is that user's.
+:mod:`scripts.fleet_host`, :mod:`scripts.fleet_release`,
 :mod:`scripts.fleet_gate` and :mod:`scripts.sim_host` send their commands
 through here, so a failed command is refused the same way, naming its code,
 the command, its exit code and its standard error.
@@ -16,13 +19,30 @@ import shlex
 from pathlib import Path
 from typing import Final
 
+from platform_core.json_utils import load_json_str, narrow_json_to_dict, require_str
+
 from scripts import _test_hooks as script_hooks
 
-#: The game host's ssh destination, on the tailnet.
-GAME_HOST_SSH: Final[str] = "user@100.111.149.33"
+#: The game host, by its name in API's fleet roster.
+GAME_HOST: Final[str] = "demure"
+
+#: API's fleet roster: one file per machine.
+ROSTER_DIR: Final[Path] = (
+    Path(__file__).resolve().parents[3] / "tools" / "fleet" / "registry" / "machines"
+)
+
+_MACHINE = narrow_json_to_dict(
+    load_json_str((ROSTER_DIR / f"{GAME_HOST}.json").read_text(encoding="utf-8"))
+)
+
+#: The game host's login user, from its roster file.
+GAME_HOST_USER: Final[str] = require_str(_MACHINE, "user")
+
+#: The game host's ssh destination: its user at its tailnet address.
+GAME_HOST_SSH: Final[str] = f"{GAME_HOST_USER}@{require_str(_MACHINE, 'tailnetIp')}"
 
 #: The game host's home directory, under which every TankPit path lives.
-GAME_HOST_HOME: Final[str] = "/home/user"
+GAME_HOST_HOME: Final[str] = f"/home/{GAME_HOST_USER}"
 
 
 class FleetHostError(Exception):
@@ -68,8 +88,11 @@ def on_host(argv: list[str]) -> list[str]:
 
 
 __all__ = [
+    "GAME_HOST",
     "GAME_HOST_HOME",
     "GAME_HOST_SSH",
+    "GAME_HOST_USER",
+    "ROSTER_DIR",
     "FleetHostError",
     "on_host",
     "run_checked",

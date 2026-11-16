@@ -6,7 +6,7 @@
 #
 # The FLEET (manager + N bot processes in ONE container — the spawner
 # forks `sys.executable -c` children, so it works unchanged inside)
-# runs on colossus, the game host, with its public edge beside it:
+# runs on demure, the game host, with its public edge beside it:
 #     make release              # freeze HEAD onto the host's release ladder
 #     make up                   # scripts/fleet_host.py: stage this file
 #                               # and edge/ on the host, build the

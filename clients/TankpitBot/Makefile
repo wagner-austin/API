@@ -440,9 +440,10 @@ analyze-viewport:
 
 # THE fleet lifecycle is ONE pair (operator order 2026-09-02: "one
 # single command we use to start this ish"): ``make up`` runs the
-# fleet CONTAINER from the newest release ON COLOSSUS, the game host
-# (sedona's from 2026-09-28, MCPs board task 077204e8; colossus's since
-# 2026-10-18, board task c481c259; scripts/fleet_host.py says what the
+# fleet CONTAINER from the newest release ON THE GAME HOST, demure
+# (sedona's from 2026-09-28, MCPs board task 077204e8; colossus's from
+# 2026-10-18, board task c481c259; demure's since board task 99194467,
+# named in scripts/fleet_remote.py; scripts/fleet_host.py says what the
 # host holds and what up stages) -- it resolves the release,
 # builds its image on the host if that exact tag does not exist yet
 # (tankpit-fleet:v<ver>-<sha>, built FROM the snapshot so the tag
@@ -465,14 +466,14 @@ analyze-viewport:
 # and live sessions run from the snapshot so hot-tree surgery can never
 # crash them (2026-08-28: deleting a runtime-read file killed a live
 # session). Versioning is the folder name on the host:
-# /home/user/tankpit-releases/v<version>-<short-sha>
+# <the game host's home>/tankpit-releases/v<version>-<short-sha>
 # (scripts/fleet_release.py).
 #
 # The retired host-mode targets (fleet / fleet-dev / up-docker /
 # down-docker / image, 2026-09-02): one system, not two.
 #
 # Each target drives the host over ssh, so it runs from any checkout that
-# can reach colossus; the host holds the tunnel token, the accounts and
+# can reach the game host; it holds the tunnel token, the accounts and
 # the registry, and no recipe here reads a secret.
 release:
 	@echo ""

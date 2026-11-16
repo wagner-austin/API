@@ -7,9 +7,35 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from scripts.fleet_remote import GAME_HOST_SSH, FleetHostError, on_host, run_checked
+from platform_core.json_utils import load_json_str, narrow_json_to_dict, require_str
+from scripts.fleet_remote import (
+    GAME_HOST,
+    GAME_HOST_HOME,
+    GAME_HOST_SSH,
+    ROSTER_DIR,
+    FleetHostError,
+    on_host,
+    run_checked,
+)
 
 from scripts import _test_hooks as script_hooks
+
+
+def test_the_game_host_is_reached_at_its_roster_user_and_tailnet_address() -> None:
+    """The ssh destination and home come from the host's own roster file.
+
+    colossus's account was typed here as an address until colossus was
+    reinstalled and the account was gone; the roster is where a machine's
+    address is kept, so the destination is read from demure's file.
+    """
+    assert GAME_HOST == "demure"
+    machine = narrow_json_to_dict(
+        load_json_str((ROSTER_DIR / "demure.json").read_text(encoding="utf-8"))
+    )
+    user = require_str(machine, "user")
+    assert GAME_HOST_SSH == f"{user}@{require_str(machine, 'tailnetIp')}"
+    assert GAME_HOST_HOME == f"/home/{user}"
+    assert ROSTER_DIR.parts[-4:] == ("tools", "fleet", "registry", "machines")
 
 
 @pytest.fixture(autouse=True)
@@ -30,10 +56,10 @@ def test_run_checked_returns_the_output_of_a_command_that_succeeds(tmp_path: Pat
 
     def _answer(argv: list[str], cwd: Path) -> script_hooks.CommandResult:
         seen.append((argv, cwd))
-        return script_hooks.CommandResult(returncode=0, stdout="colossus\n", stderr="ignored")
+        return script_hooks.CommandResult(returncode=0, stdout="demure\n", stderr="ignored")
 
     script_hooks.run_command = _answer
-    assert run_checked(["ssh", GAME_HOST_SSH, "hostname"], tmp_path, "UNUSED") == "colossus\n"
+    assert run_checked(["ssh", GAME_HOST_SSH, "hostname"], tmp_path, "UNUSED") == "demure\n"
     assert seen == [(["ssh", GAME_HOST_SSH, "hostname"], tmp_path)]
 
 
