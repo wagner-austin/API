@@ -73,3 +73,30 @@ b0806f60abfad14f47b879bf4138bfbca0819bd08dd0c10e5c50f39f2d20149b  coax-drone-unc
 # a3e7250 it is not yet on origin and is pushed with the shards it produces.
 
 385a03e98b5ca753877c6dd2b9038bd623f14752bd01a916c52d57d6cce1035e  coax-drone-uncertainty-payload-4042cae.tar
+
+# The redesign sweep toward 4:1 payload for board task eb6e37f0: one P45B pack
+# swept at 10S/12S and one to three strings, each design screened at both ends
+# of its pack's voltage window, the TG7142-P010 and moteus-x1 in the catalogs,
+# and 64 nominal-best candidates for each rotor head and payload ratio 2, 3 and
+# 4 (384 designs, 1,572 cases). Recorded 2026-11-15 from a git archive of
+# pyproject.toml, calc/budget and wiki/sources at coax-drone
+# 0d2c452247c6387d4892295ed5a1770c1e641944 (calc/budget tree
+# 3bf4359542b5e7939a52559fe9aa8faa63639cc7, documents identity
+# 19d135203580b2fa11f361b76bd806fa3074cca910928cf77151d001a6b4076c), which is
+# on origin branch redesign-4to1-1115.
+
+ba8bd85738bc636da0fe9d60a5e7209fb1743a4049bebd265bb4f4c9a7cc7a44  coax-drone-uncertainty-payload-0d2c452.tar
+
+# Array 59688116 completed all eight members on hpc3-l18-05 in 236-305 s at
+# zero billed service units; each shard's SHA-256 was read on the cluster and
+# again after download, identical, and coax-drone commits these bytes under
+# exports/uncertainty.
+
+9a10d1a244848afad613899d48781ed87674d22b583eeb8f60a5dc7acd4de08b  uncertainty/0d2c452/shard-0-of-8.json
+55dd632d35b53897b92027f3ce2a99a206fbe1361782091c53dc3ec0abc2a6cf  uncertainty/0d2c452/shard-1-of-8.json
+e49f71045fe0bb52b2668633702435d25272dc60dd3b13a20824e1b4bcb9ad59  uncertainty/0d2c452/shard-2-of-8.json
+060db9e3a0b88219376c3f4f01b797df806e58b29337e92c104035fb7302d2a9  uncertainty/0d2c452/shard-3-of-8.json
+4a4e2aab04acd72da9d73d5f7e9201fcc5c255c912111e0c3ccffe9280bde035  uncertainty/0d2c452/shard-4-of-8.json
+8f6d08c6bc8073ce682ebc1424f5981375202e8b3fba0c58a65b1347dad5de32  uncertainty/0d2c452/shard-5-of-8.json
+04bb1249ac6e8a4205f0b137bbcaa05a48964115a2fab2d22ce4d99ef14d5dc6  uncertainty/0d2c452/shard-6-of-8.json
+07dfa4a14d5afb166bb0d916583f6be3c3046f4d14208787125240607c7738fe  uncertainty/0d2c452/shard-7-of-8.json

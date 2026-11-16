@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-uncertainty-payload-0d2c452.tar",
+      "sha256": "ba8bd85738bc636da0fe9d60a5e7209fb1743a4049bebd265bb4f4c9a7cc7a44",
+      "size_bytes": 80486400
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone 0d2c452247c6387d4892295ed5a1770c1e641944, calc/budget tree 3bf4359542b5e7939a52559fe9aa8faa63639cc7",
+    "selection": "git archive --format=tar of pyproject.toml, calc/budget and wiki/sources",
+    "why": "the redesign uncertainty sweep toward 4:1 payload: 64 nominal-best candidates for each of two rotor heads and payload ratios 2, 3 and 4 (384 designs, each screened at both ends of its pack's voltage window) and 36 mission cases at 4096 draws; each member unpacks this archive into node-local TMPDIR and imports calc.budget from it",
+    "note": "board task eb6e37f0-29fe-463f-b4cc-92d5ce125f62; documents identity 19d135203580b2fa11f361b76bd806fa3074cca910928cf77151d001a6b4076c; the commit is on origin branch redesign-4to1-1115"
+  }
+}
