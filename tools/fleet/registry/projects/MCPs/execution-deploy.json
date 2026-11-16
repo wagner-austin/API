@@ -1,6 +1,8 @@
 {
   "worker_ram_gb": 1.5,
   "minimum_workers": 3,
+  "worker_cores": 2,
+  "worker_cores_measurement": "Fleet jobs f5d3fcb6 and 598276ca on pendragon at 5 workers and 41763ac2 on sedona at 7, each with no other fleet run on its node (2026-11-15), read dispatch=788s/94s, 887s/124s and 807s/90s: 1.7, 1.4 and 1.3 cores a worker, because each worker's cases start containers on the docker lane, which runs in the node's dispatch share since MCPs board task 34514037. Charged one core, fleet job aceacffa took 4 workers on lavender, 4 of its 8-core share, and the fleet placed MCPs/repo-contracts' 4 workers beside it: the share read dispatch=2834s/358s/throttled:2069s and repo-contracts timed out three 30 s cases (fleet job 156810dd, MCPs board task 34a9877f). Charged 2, lavender grants it 3 workers, 6 of its 8, and places no suite with a minimum of 3 workers beside it.",
   "expected_minutes": 90,
   "required_tags": [
     "linux",
