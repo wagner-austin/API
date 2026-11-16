@@ -33,8 +33,8 @@ def test_the_game_host_is_reached_at_its_roster_user_and_tailnet_address() -> No
         load_json_str((ROSTER_DIR / "demure.json").read_text(encoding="utf-8"))
     )
     user = require_str(machine, "user")
-    assert GAME_HOST_SSH == f"{user}@{require_str(machine, 'tailnetIp')}"
-    assert GAME_HOST_HOME == f"/home/{user}"
+    assert f"{user}@{require_str(machine, 'tailnetIp')}" == GAME_HOST_SSH
+    assert f"/home/{user}" == GAME_HOST_HOME
     assert ROSTER_DIR.parts[-4:] == ("tools", "fleet", "registry", "machines")
 
 
