@@ -257,7 +257,7 @@ class TestUnresolvedHost:
         [
             pytest.param("fatal: Connection reset by peer", id="another-refusal"),
             pytest.param("fatal: Could not resolve host: ", id="no-host-named"),
-            pytest.param("fatal: Could not resolve host: ;attempt 2", id="host-empty-before-semicolon"),
+            pytest.param("fatal: Could not resolve host: ;attempt 2", id="empty-before-semicolon"),
         ],
     )
     def test_names_none_when_git_named_no_host(self, refusal: str) -> None:
