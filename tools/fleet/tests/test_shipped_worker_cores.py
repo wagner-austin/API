@@ -25,7 +25,9 @@ cases start, run beside it in the dispatch share: 1.1 to 1.6 cores a worker
 in five passing runs. Charged one, it took 4 of lavender's 8 quota cores
 beside MCPs/sms-gateway's check (fleet job 5e3c7b7a), the share was
 throttled 367 s, and two CPU-bound 30 s cases timed out. Charged 2, lavender
-grants it its whole share, 4 workers, and places no suite beside it;
+grants it 3 workers, 6 of its 8, so what it books is what it uses: beside it
+MCPs/sms-gateway's minimum of 2 still fits the 2 left, about 6.5 cores of
+real use in an 8-core share, and a suite with a minimum of 3 does not;
 serendipity grants it 3 and lenovold affords it 1.
 """
 
@@ -62,8 +64,9 @@ SHARED_CORES_MEASUREMENT = (
     "dispatch=913s/150s/throttled:367s, the PDF-parsing files ran 3 to 7 times their sedona "
     "time, and two CPU-bound cases timed out at 30 s (MCPs board task 5cd7f739); colossus at "
     "4 workers read throttled 64 s and 108 s (49126f2e, 87aceade) and serendipity at 6 "
-    "throttled 75 s (26273051). Charged 2, lavender grants it 4 workers, its whole 8-core "
-    "share, and places no suite beside it."
+    "throttled 75 s (26273051). Charged 2, lavender grants it 3 workers, 6 of its 8, so a "
+    "check beside it is booked against what it uses: MCPs/sms-gateway's minimum of 2 still "
+    "fits the 2 left, and no suite with a minimum of 3 does."
 )
 
 
@@ -115,43 +118,52 @@ def test_lavender_places_no_three_worker_suite_beside_the_deploy_rehearsal() -> 
     )
 
 
-def test_lavender_gives_mcp_shared_its_whole_share_and_nothing_beside_it() -> None:
+def test_lavender_books_mcp_shared_at_the_cores_its_workers_use() -> None:
     """MCPs board task 5cd7f739: charged one core a worker, MCPs/mcp-shared took
     4 of lavender's 8 quota cores beside MCPs/sms-gateway (fleet job 5e3c7b7a),
-    the share was throttled 367 s and two 30 s cases timed out. Charged 2, its
-    4 workers fill the share, and neither suite fits beside the other."""
+    using about 6 of them, the share was throttled 367 s and two 30 s cases
+    timed out. Charged 2, it is granted 3 workers booked at 6 cores, so only a
+    suite whose minimum fits the 2 left is placed beside it."""
     workspace = shipped_workspace()
     shared = workspace["projects"]["MCPs/mcp-shared"]
     gateway = workspace["projects"]["MCPs/sms-gateway"]
+    contracts = workspace["projects"]["MCPs/repo-contracts"]
     node = workspace["nodes"]["lavender"]
     shared_tags = node_tags(node) | frozenset(shared["required_tags"])
     gateway_tags = node_tags(node) | frozenset(gateway["required_tags"])
+    contracts_tags = node_tags(node) | frozenset(contracts["required_tags"])
     state = idle_state(node)
     state["check_cpu_quota"] = 8.0
 
     assert shared["worker_cores"] == 2
     assert shared["worker_cores_measurement"] == SHARED_CORES_MEASUREMENT
-    assert gateway["worker_cores"] == 1
-    assert assess(node, state, shared, shared_tags) == {"workers": 4, "code": None, "reason": ""}
+    assert (gateway["worker_cores"], gateway["minimum_workers"]) == (1, 2)
+    assert (contracts["worker_cores"], contracts["minimum_workers"]) == (1, 3)
+    assert assess(node, state, shared, shared_tags) == {"workers": 3, "code": None, "reason": ""}
 
-    state["live"] = LiveLoad(runs=1, workers=4, cores=8, ram_gb=2.0)
-    beside_shared = assess(node, state, gateway, gateway_tags)
+    state["live"] = LiveLoad(runs=1, workers=3, cores=6, ram_gb=1.5)
+    assert assess(node, state, gateway, gateway_tags) == {
+        "workers": 2,
+        "code": None,
+        "reason": "",
+    }
+    beside_shared = assess(node, state, contracts, contracts_tags)
     assert (beside_shared["workers"], beside_shared["code"]) == (
         0,
         FleetErrorCode.NODE_OWNER_RESERVED,
     )
     assert beside_shared["reason"].startswith(
         "lavender's checks are held to 8.00 CPU(s) by the quota systemd keeps on their slice, "
-        "so 0 core(s) are left where the suite's minimum of 2 worker(s) occupies 2"
+        "so 2 core(s) are left where the suite's minimum of 3 worker(s) occupies 3"
     )
 
     state["live"] = LiveLoad(runs=1, workers=4, cores=4, ram_gb=2.0)
-    beside_gateway = assess(node, state, shared, shared_tags)
-    assert (beside_gateway["workers"], beside_gateway["code"]) == (
+    beside_contracts = assess(node, state, shared, shared_tags)
+    assert (beside_contracts["workers"], beside_contracts["code"]) == (
         0,
         FleetErrorCode.NODE_OWNER_RESERVED,
     )
-    assert beside_gateway["reason"].startswith(
+    assert beside_contracts["reason"].startswith(
         "lavender's checks are held to 8.00 CPU(s) by the quota systemd keeps on their slice, "
         "so 4 core(s) are left where the suite's minimum of 3 worker(s) occupies 6"
     )
