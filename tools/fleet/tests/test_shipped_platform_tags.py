@@ -23,19 +23,12 @@ the project's fleet check is what shows a node has it.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 from platform_core.json_utils import JSONValue, require_dict, require_list
 
-from fleet.contracts.node import LiveLoad, NodeConfig, NodeState
 from fleet.contracts.tags import TOOL_TAG, node_tags
-from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace
 from fleet.core.capacity import assess
-from fleet.core.workspace_files import read_workspace_document
-
-#: The registry this package ships.
-REGISTRY = Path(__file__).resolve().parents[1] / "registry"
+from tests._registry import idle_state, shipped_document, shipped_workspace
 
 #: The projects that required windows until board task e705f08c. Whether
 #: each one's check passes on Linux is its own fleet check's answer, and a
@@ -73,41 +66,6 @@ GRANTED_PROJECTS: tuple[str, ...] = (*FORMERLY_WINDOWS, *LINUX_PROJECTS)
 RETIRED_TAGS = ("windows", "elevated")
 
 
-def _shipped() -> FleetWorkspace:
-    """The registry this package ships, decoded.
-
-    Returns:
-        The decoded workspace.
-    """
-    return decode_fleet_workspace(read_workspace_document(REGISTRY))
-
-
-def _idle(node: NodeConfig) -> NodeState:
-    """A node with nothing of the fleet's on it and memory to spare.
-
-    Args:
-        node: The node's declaration.
-
-    Returns:
-        Its state with 24 GB free, no live run, no reservation and no
-        pressure.
-    """
-    return NodeState(
-        host=node["host"],
-        free_ram_gb=24.0,
-        free_disk_gb=100.0,
-        live=LiveLoad(runs=0, workers=0, cores=0, ram_gb=0.0),
-        ci_slice=None,
-        reserved_cores=0,
-        action_cache=None,
-        cpu_pressure_pct=0.0,
-        io_pressure_pct=0.0,
-        check_cpu_quota=None,
-        on_battery=False,
-        gpus=(),
-    )
-
-
 def _required(row: JSONValue) -> list[JSONValue]:
     """One raw project row's ``required_tags``.
 
@@ -121,7 +79,7 @@ def _required(row: JSONValue) -> list[JSONValue]:
 
 
 def test_no_project_row_requires_windows_or_elevated() -> None:
-    rows = require_dict(read_workspace_document(REGISTRY), "projects")
+    rows = require_dict(shipped_document(), "projects")
     naming = sorted(
         f"{name} requires {tag}"
         for name, row in rows.items()
@@ -134,7 +92,7 @@ def test_no_project_row_requires_windows_or_elevated() -> None:
 
 
 def test_every_machine_is_linux_and_loki_returned_as_linux() -> None:
-    machines = require_dict(read_workspace_document(REGISTRY), "machines")
+    machines = require_dict(shipped_document(), "machines")
     platforms = {name: require_dict(machines, name)["platform"] for name in machines}
 
     assert platforms["loki"] == "linux"
@@ -145,7 +103,7 @@ def test_every_machine_is_linux_and_loki_returned_as_linux() -> None:
 def test_an_enabled_node_grants_every_project_that_once_needed_windows(
     project_name: str,
 ) -> None:
-    workspace = _shipped()
+    workspace = shipped_workspace()
     project = workspace["projects"][project_name]
     detected = frozenset(project["required_tags"]) & frozenset(TOOL_TAG.values())
 
@@ -153,6 +111,6 @@ def test_an_enabled_node_grants_every_project_that_once_needed_windows(
         name
         for name, node in sorted(workspace["nodes"].items())
         if node["enabled"]
-        and assess(node, _idle(node), project, node_tags(node) | detected)["workers"] > 0
+        and assess(node, idle_state(node), project, node_tags(node) | detected)["workers"] > 0
     ]
     assert granted, f"no enabled node grants {project_name} workers"

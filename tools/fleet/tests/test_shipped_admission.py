@@ -92,16 +92,9 @@ be placed on keeps it: its jobs finished on loki, lavender and lacrymal, and
 serendipity, which started one (fleet job d7e8bd84) under the 8 GB
 declaration, has held no worker of it since the declaration became 16 GB.
 
-MCPs/execution-deploy is charged 2 cores a worker (MCPs board task
-34a9877f). Its cases start containers on the docker lane, which runs in the
-node's dispatch share since MCPs board task 34514037, so a worker costs more
-than its own process: 1.3 to 1.7 cores in its runs with nothing beside them.
-Charged one, it took 4 of lavender's 8 quota cores and the fleet placed
-MCPs/repo-contracts' 4 workers beside it, where three 30 s cases timed out on
-a share throttled 2069 s (fleet job 156810dd). Charged 2, lavender grants it
-3 workers and places no suite with a minimum of 3 beside it, and the same
-holds in the other order. serendipity's 6 spare cores grant it 3 workers, and
-lenovold's 2 afford it 1.
+MCPs/execution-deploy and MCPs/mcp-shared are charged 2 cores a worker,
+whose measurements and lavender's admission of them are
+``test_shipped_worker_cores.py``'s.
 
 Admission is exercised against the shipped registry, so removing a node's
 bound restores the second admission that was measured, and a node gaining or
@@ -110,18 +103,15 @@ losing one is a change this file has to be told about.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 from platform_core.errors import FleetErrorCode
 
 from fleet.contracts.budget import NodeBudget, admissible_workers
 from fleet.contracts.machine import MachineRole
-from fleet.contracts.node import LiveLoad, NodeConfig, NodeState
+from fleet.contracts.node import LiveLoad
 from fleet.contracts.tags import NodeTag, missing_tags, node_tags
-from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace
 from fleet.core.capacity import assess
-from fleet.core.workspace_files import read_workspace_document
+from tests._registry import idle_state, shipped_workspace
 
 #: Each bounded node, a project it checks, and the workers it grants that
 #: project alone: every core its owner leaves, since a node that carries one
@@ -136,7 +126,7 @@ from fleet.core.workspace_files import read_workspace_document
 BOUNDED_GRANTS = {
     "diphtheria": ("MCPs/doc-extract-api", 4),
     "lenovold": ("MCPs/sms-gateway", 2),
-    "serendipity": ("MCPs/mcp-shared", 6),
+    "serendipity": ("MCPs/mcp-shared", 3),
 }
 
 #: The run MCPs/fleet-nixos's registry row names beside its worker_cores 8.
@@ -150,19 +140,6 @@ FLAKE_CORES_MEASUREMENT = (
     "share, 8. Charged one core, fleet job 46eb328f shared that share with two checks the fleet "
     "placed beside it, a sampled 386.5 CPU-s beside its own 1463.8, and took 306 s (MCPs board "
     "task 51e3eac5)."
-)
-
-#: The runs MCPs/execution-deploy's registry row names beside its worker_cores 2.
-DEPLOY_CORES_MEASUREMENT = (
-    "Fleet jobs f5d3fcb6 and 598276ca on pendragon at 5 workers and 41763ac2 on sedona at 7, "
-    "each with no other fleet run on its node (2026-11-15), read dispatch=788s/94s, 887s/124s "
-    "and 807s/90s: 1.7, 1.4 and 1.3 cores a worker, because each worker's cases start "
-    "containers on the docker lane, which runs in the node's dispatch share since MCPs board "
-    "task 34514037. Charged one core, fleet job aceacffa took 4 workers on lavender, 4 of its "
-    "8-core share, and the fleet placed MCPs/repo-contracts' 4 workers beside it: the share "
-    "read dispatch=2834s/358s/throttled:2069s and repo-contracts timed out three 30 s cases "
-    "(fleet job 156810dd, MCPs board task 34a9877f). Charged 2, lavender grants it 3 "
-    "workers, 6 of its 8, and places no suite with a minimum of 3 workers beside it."
 )
 
 #: The suites that need diphtheria's production stack or read what only it
@@ -180,49 +157,10 @@ DIPHTHERIA_PINNED = (
 )
 
 
-def _shipped() -> FleetWorkspace:
-    """The registry this package ships.
-
-    Returns:
-        The decoded workspace.
-    """
-    return decode_fleet_workspace(
-        read_workspace_document(Path(__file__).resolve().parents[1] / "registry")
-    )
-
-
-def _idle(node: NodeConfig, *, free_ram_gb: float = 24.0) -> NodeState:
-    """A node with nothing of the fleet's on it.
-
-    Args:
-        node: The node's declaration.
-        free_ram_gb: Its free memory; 24 GB, memory to spare, unless a case
-            measures a node that has less.
-
-    Returns:
-        Its state with that memory free, no live run, no reservation and no
-        pressure.
-    """
-    return NodeState(
-        host=node["host"],
-        free_ram_gb=free_ram_gb,
-        free_disk_gb=100.0,
-        live=LiveLoad(runs=0, workers=0, cores=0, ram_gb=0.0),
-        ci_slice=None,
-        reserved_cores=0,
-        action_cache=None,
-        cpu_pressure_pct=0.0,
-        io_pressure_pct=0.0,
-        check_cpu_quota=None,
-        on_battery=False,
-        gpus=(),
-    )
-
-
 def test_the_measured_nodes_are_the_bounded_ones() -> None:
     bounds = {
         name: node["budget"]["checks_at_once"]
-        for name, node in _shipped()["nodes"].items()
+        for name, node in shipped_workspace()["nodes"].items()
         if node["budget"]["checks_at_once"] is not None
     }
 
@@ -234,10 +172,10 @@ def test_a_bounded_node_waits_for_the_whole_check_to_end(
     name: str, measured: tuple[str, int]
 ) -> None:
     project_name, grant = measured
-    workspace = _shipped()
+    workspace = shipped_workspace()
     node = workspace["nodes"][name]
     project = workspace["projects"][project_name]
-    state = _idle(node)
+    state = idle_state(node)
     assert assess(node, state, project, node_tags(node)) == {
         "workers": grant,
         "code": None,
@@ -270,11 +208,13 @@ def test_a_bounded_node_waits_for_the_whole_check_to_end(
 #: suite's row also names the workers lenovold's 2 spare cores afford it and
 #: the workers serendipity's 6 grant it: one core each, but 2 each for
 #: MCPs/execution-deploy, whose workers' containers run in the dispatch share
-#: (MCPs board task 34a9877f, the registry row's worker_cores_measurement).
+#: (MCPs board task 34a9877f), and for MCPs/mcp-shared, whose workers' PDF
+#: parsing and browsers do (MCPs board task 5cd7f739), each the registry row's
+#: worker_cores_measurement.
 LENOVOLD_REFUSED = {
     "MCPs/execution-deploy": (1, 3, ("diphtheria",)),
     "MCPs/execution-linux": (2, 6, ("demure", "diphtheria")),
-    "MCPs/mcp-shared": (2, 6, ("diphtheria",)),
+    "MCPs/mcp-shared": (1, 3, ("diphtheria",)),
     "MCPs/packages/db": (2, 6, ("diphtheria",)),
 }
 
@@ -284,11 +224,11 @@ def test_lenovold_refuses_the_suite_and_no_other_node_carrying_its_tags_does(
     project_name: str, measured: tuple[int, int, tuple[str, ...]]
 ) -> None:
     afforded, granted, unpinned = measured
-    workspace = _shipped()
+    workspace = shipped_workspace()
     project = workspace["projects"][project_name]
     lenovold = workspace["nodes"]["lenovold"]
 
-    assert assess(lenovold, _idle(lenovold), project, node_tags(lenovold)) == {
+    assert assess(lenovold, idle_state(lenovold), project, node_tags(lenovold)) == {
         "workers": 0,
         "code": FleetErrorCode.NODE_MEMORY_EXHAUSTED,
         "reason": (
@@ -304,7 +244,7 @@ def test_lenovold_refuses_the_suite_and_no_other_node_carrying_its_tags_does(
     # carries one check at once, grants every worker its 6 cores hold (MCPs
     # board task b96f9da1), at the cores each worker is charged.
     serendipity = workspace["nodes"]["serendipity"]
-    assert assess(serendipity, _idle(serendipity), project, node_tags(serendipity)) == {
+    assert assess(serendipity, idle_state(serendipity), project, node_tags(serendipity)) == {
         "workers": granted,
         "code": None,
         "reason": "",
@@ -323,7 +263,7 @@ def test_lenovold_refuses_the_suite_and_no_other_node_carrying_its_tags_does(
         if name != "lenovold"
         and node["enabled"]
         and not missing_tags(node_tags(node), project["required_tags"])
-        for verdict in (assess(node, _idle(node), project, node_tags(node)),)
+        for verdict in (assess(node, idle_state(node), project, node_tags(node)),)
         if verdict["code"] is not None
     }
     assert refused == dict.fromkeys(unpinned, FleetErrorCode.NODE_NOT_PINNED)
@@ -331,17 +271,17 @@ def test_lenovold_refuses_the_suite_and_no_other_node_carrying_its_tags_does(
 
 def test_only_the_stack_hosts_check_only_their_pinned_projects() -> None:
     declared = {
-        name for name, node in _shipped()["nodes"].items() if node["budget"]["pinned_checks_only"]
+        name for name, node in shipped_workspace()["nodes"].items() if node["budget"]["pinned_checks_only"]
     }
 
     assert declared == {"demure", "diphtheria"}
 
 
 def test_demure_checks_its_served_and_deployed_lanes_and_no_other_project() -> None:
-    workspace = _shipped()
+    workspace = shipped_workspace()
     node = workspace["nodes"]["demure"]
     codes = {
-        name: assess(node, _idle(node), project, node_tags(node))["code"]
+        name: assess(node, idle_state(node), project, node_tags(node))["code"]
         for name, project in workspace["projects"].items()
     }
 
@@ -355,7 +295,7 @@ def test_demure_checks_its_served_and_deployed_lanes_and_no_other_project() -> N
 
 
 def test_no_server_is_offered_a_check_not_pinned_to_it() -> None:
-    workspace = _shipped()
+    workspace = shipped_workspace()
     servers = sorted(
         name
         for name, machine in workspace["machines"].items()
@@ -368,7 +308,7 @@ def test_no_server_is_offered_a_check_not_pinned_to_it() -> None:
         if project["node"] != server
         and assess(
             workspace["nodes"][server],
-            _idle(workspace["nodes"][server]),
+            idle_state(workspace["nodes"][server]),
             project,
             node_tags(workspace["nodes"][server]),
         )["code"]
@@ -380,10 +320,10 @@ def test_no_server_is_offered_a_check_not_pinned_to_it() -> None:
 
 
 def test_the_control_served_lane_is_admitted_only_on_lacrymal() -> None:
-    workspace = _shipped()
+    workspace = shipped_workspace()
     project = workspace["projects"]["MCPs/execution-served-lacrymal"]
     codes = {
-        name: assess(node, _idle(node), project, node_tags(node))["code"]
+        name: assess(node, idle_state(node), project, node_tags(node))["code"]
         for name, node in workspace["nodes"].items()
     }
     assert codes == {
@@ -393,23 +333,23 @@ def test_the_control_served_lane_is_admitted_only_on_lacrymal() -> None:
 
 
 def test_diphtheria_checks_the_projects_pinned_to_it_and_no_other() -> None:
-    workspace = _shipped()
+    workspace = shipped_workspace()
     node = workspace["nodes"]["diphtheria"]
     taken = {
         name
         for name, project in workspace["projects"].items()
-        if assess(node, _idle(node), project, node_tags(node))["code"] is None
+        if assess(node, idle_state(node), project, node_tags(node))["code"] is None
     }
 
     assert taken == set(DIPHTHERIA_PINNED)
     for suite in ("MCPs/watcher", "MCPs/mcp-shared", "MCPs/packages/db"):
-        refused = assess(node, _idle(node), workspace["projects"][suite], node_tags(node))
+        refused = assess(node, idle_state(node), workspace["projects"][suite], node_tags(node))
         assert refused["code"] == FleetErrorCode.NODE_NOT_PINNED
 
 
 def test_any_pool_worker_whose_probe_found_nixos_test_checks_the_nixos_flake() -> None:
     """MCPs board task 3268afdf: the flake check names no node, only the tag."""
-    workspace = _shipped()
+    workspace = shipped_workspace()
     project = workspace["projects"]["MCPs/fleet-nixos"]
     enabled = {name: node for name, node in workspace["nodes"].items() if node["enabled"]}
     pool = {name for name, node in enabled.items() if not node["budget"]["pinned_checks_only"]}
@@ -417,11 +357,11 @@ def test_any_pool_worker_whose_probe_found_nixos_test_checks_the_nixos_flake() -
     assert project["node"] is None
     assert project["required_tags"] == (NodeTag.LINUX, NodeTag.NIXOS_TEST)
     with_tag = {
-        name: assess(node, _idle(node), project, node_tags(node) | {NodeTag.NIXOS_TEST})["code"]
+        name: assess(node, idle_state(node), project, node_tags(node) | {NodeTag.NIXOS_TEST})["code"]
         for name, node in enabled.items()
     }
     without_tag = {
-        name: assess(node, _idle(node), project, node_tags(node))["code"]
+        name: assess(node, idle_state(node), project, node_tags(node))["code"]
         for name, node in enabled.items()
     }
 
@@ -453,11 +393,11 @@ def test_the_nixos_flake_declares_the_dispatch_share_its_nix_daemon_fills() -> N
     """MCPs board task 51e3eac5: charged one core, its cold run 46eb328f on
     lavender shared the node's 8-core share with two checks placed beside it.
     Charged 8, lavender takes it idle and places nothing beside it."""
-    workspace = _shipped()
+    workspace = shipped_workspace()
     project = workspace["projects"]["MCPs/fleet-nixos"]
     node = workspace["nodes"]["lavender"]
     carried = node_tags(node) | {NodeTag.NIXOS_TEST}
-    state = _idle(node)
+    state = idle_state(node)
 
     assert project["worker_cores"] == 8
     assert project["worker_cores_measurement"] == FLAKE_CORES_MEASUREMENT
@@ -469,70 +409,22 @@ def test_the_nixos_flake_declares_the_dispatch_share_its_nix_daemon_fills() -> N
     assert "its 1 live fleet run(s) hold 1 worker(s) on 8 core(s) and 16.0 GB" in beside["reason"]
 
 
-def test_lavender_places_no_three_worker_suite_beside_the_deploy_rehearsal() -> None:
-    """MCPs board task 34a9877f: charged one core a worker, MCPs/execution-deploy
-    took 4 of lavender's 8 quota cores (fleet job aceacffa) and MCPs/repo-contracts
-    the other 4 (156810dd), while the rehearsal's containers ran in the same
-    share; the share was throttled 2069 s and three 30 s cases timed out.
-    Charged 2, neither suite fits beside the other in either order."""
-    workspace = _shipped()
-    deploy = workspace["projects"]["MCPs/execution-deploy"]
-    contracts = workspace["projects"]["MCPs/repo-contracts"]
-    node = workspace["nodes"]["lavender"]
-    deploy_tags = node_tags(node) | frozenset(deploy["required_tags"])
-    contracts_tags = node_tags(node) | frozenset(contracts["required_tags"])
-    state = _idle(node)
-    state["check_cpu_quota"] = 8.0
-
-    assert deploy["worker_cores"] == 2
-    assert deploy["worker_cores_measurement"] == DEPLOY_CORES_MEASUREMENT
-    assert contracts["worker_cores"] == 1
-    assert assess(node, state, deploy, deploy_tags) == {"workers": 3, "code": None, "reason": ""}
-    assert assess(node, state, contracts, contracts_tags) == {
-        "workers": 4,
-        "code": None,
-        "reason": "",
-    }
-
-    state["live"] = LiveLoad(runs=1, workers=3, cores=6, ram_gb=4.5)
-    beside_deploy = assess(node, state, contracts, contracts_tags)
-    assert (beside_deploy["workers"], beside_deploy["code"]) == (
-        0,
-        FleetErrorCode.NODE_OWNER_RESERVED,
-    )
-    assert beside_deploy["reason"].startswith(
-        "lavender's checks are held to 8.00 CPU(s) by the quota systemd keeps on their slice, "
-        "so 2 core(s) are left where the suite's minimum of 3 worker(s) occupies 3"
-    )
-
-    state["live"] = LiveLoad(runs=1, workers=4, cores=4, ram_gb=2.0)
-    beside_contracts = assess(node, state, deploy, deploy_tags)
-    assert (beside_contracts["workers"], beside_contracts["code"]) == (
-        0,
-        FleetErrorCode.NODE_OWNER_RESERVED,
-    )
-    assert beside_contracts["reason"].startswith(
-        "lavender's checks are held to 8.00 CPU(s) by the quota systemd keeps on their slice, "
-        "so 4 core(s) are left where the suite's minimum of 3 worker(s) occupies 6"
-    )
-
-
 def test_a_node_without_the_flake_check_s_memory_refuses_it_before_it_starts() -> None:
     """Fleet job d7e8bd84 (MCPs board task 3268afdf): serendipity, 13 GB free,
     took the flake check under an 8 GB declaration and was OOM-killed after
     6 min 50 s; loki's passing run peaked at 15.3 GB."""
-    workspace = _shipped()
+    workspace = shipped_workspace()
     project = workspace["projects"]["MCPs/fleet-nixos"]
     node = workspace["nodes"]["serendipity"]
     carried = node_tags(node) | {NodeTag.NIXOS_TEST}
 
     assert project["worker_ram_gb"] == 16.0
-    refused = assess(node, _idle(node, free_ram_gb=13.0), project, carried)
+    refused = assess(node, idle_state(node, free_ram_gb=13.0), project, carried)
     assert (refused["workers"], refused["code"]) == (0, FleetErrorCode.NODE_OWNER_RESERVED)
     assert refused["reason"].startswith("serendipity has 13.0 GB free against a reservation")
     # With memory to spare its owner's 2 reserved cores leave 6, fewer than
     # the 8 the flake's one worker occupies (MCPs board task 51e3eac5).
-    roomy = assess(node, _idle(node), project, carried)
+    roomy = assess(node, idle_state(node), project, carried)
     assert (roomy["workers"], roomy["code"]) == (0, FleetErrorCode.NODE_OWNER_RESERVED)
     assert roomy["reason"].endswith(
         "one worker of this project occupies 8 cores and its owner's reservation leaves 6, so "
@@ -546,7 +438,7 @@ def test_serendipity_left_the_flake_s_placement_with_its_memory_not_its_cores() 
     declaration. Since the declaration became 16 GB its whole 15.4 GB holds
     no worker, even charged one core, so declaring the worker's 8 cores
     drops no node the project could still be placed on."""
-    workspace = _shipped()
+    workspace = shipped_workspace()
     project = workspace["projects"]["MCPs/fleet-nixos"]
     node = workspace["nodes"]["serendipity"]
     budget: NodeBudget = {**node["budget"], "worker_ram_gb": project["worker_ram_gb"]}
