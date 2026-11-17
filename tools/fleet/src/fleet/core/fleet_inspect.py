@@ -31,6 +31,7 @@ JSON object is ``refused``, naming why its answer was not taken.
 from __future__ import annotations
 
 import pathlib
+from enum import IntEnum
 from typing import Final, TypedDict
 
 from platform_core.json_utils import (
@@ -60,8 +61,16 @@ PROJECT_PREFIX: Final = "probes/"
 #: before that, inside the runner's lease and the tick's wall.
 INSPECT_TIMEOUT_SECONDS: Final[int] = 180
 
-#: The status the CLI exits with when it refused before copying anything.
-CLI_EXIT_REFUSED: Final[int] = 2
+
+class CliExit(IntEnum):
+    """The CLI's exits this runner reads, as fleet-mcp's inspect-cli.ts
+    exports them; any other status is a run that was never answered."""
+
+    #: It printed the inspection.
+    ANSWERED = 0
+    #: It refused before copying anything.
+    REFUSED = 2
+
 
 #: Detail prefix when a runner without the inspect lane's flags claims one.
 NO_RELEASE_CODE: Final = "INSPECT_NO_RELEASE"
@@ -174,13 +183,14 @@ def answered_inspection(result: _test_hooks.CommandResult) -> JSONObject | None:
         line, passed on unread for the queue to validate; None for any
         other run, which :func:`inspect_outcome` closes.
     """
-    lines = result["stdout"].splitlines()
-    if result["returncode"] != 0 or len(lines) != 1:
-        return None
-    try:
-        return narrow_json_to_dict(load_json_str(lines[0]))
-    except (InvalidJsonError, JSONTypeError):
-        return None
+    match result["returncode"], result["stdout"].splitlines():
+        case CliExit.ANSWERED, [line]:
+            try:
+                return narrow_json_to_dict(load_json_str(line))
+            except (InvalidJsonError, JSONTypeError):
+                return None
+        case _:
+            return None
 
 
 def inspect_outcome(
@@ -203,39 +213,40 @@ def inspect_outcome(
         f"fleet-inspect {target['probe']} of {target['node']} from sealed release "
         f"{release['release']} (revision {release['revision']})"
     )
-    returncode = result["returncode"]
-    if returncode == 0:
-        return ReleaseCliOutcome(
-            status=ClosingStatus.REFUSED,
-            exit_code=None,
-            detail=(
-                f"{ANSWER_MALFORMED_CODE}: {opening} exited 0 and printed "
-                f"{len(result['stdout'].splitlines())} line(s) where it prints one JSON object, "
-                "so this runner reports no inspection"
-            ),
-        )
-    if returncode == CLI_EXIT_REFUSED:
-        return ReleaseCliOutcome(
-            status=ClosingStatus.REFUSED,
-            exit_code=None,
-            detail=f"{opening} refused: {result['stderr'].strip()}",
-        )
-    return ReleaseCliOutcome(
-        status=ClosingStatus.FAILED,
-        exit_code=returncode,
-        detail=f"{opening} exited {returncode}: {output_tail(result)}",
-    )
+    match result["returncode"]:
+        case CliExit.ANSWERED:
+            return ReleaseCliOutcome(
+                status=ClosingStatus.REFUSED,
+                exit_code=None,
+                detail=(
+                    f"{ANSWER_MALFORMED_CODE}: {opening} exited 0 and printed "
+                    f"{len(result['stdout'].splitlines())} line(s) where it prints one JSON "
+                    "object, so this runner reports no inspection"
+                ),
+            )
+        case CliExit.REFUSED:
+            return ReleaseCliOutcome(
+                status=ClosingStatus.REFUSED,
+                exit_code=None,
+                detail=f"{opening} refused: {result['stderr'].strip()}",
+            )
+        case returncode:
+            return ReleaseCliOutcome(
+                status=ClosingStatus.FAILED,
+                exit_code=returncode,
+                detail=f"{opening} exited {returncode}: {output_tail(result)}",
+            )
 
 
 __all__ = [
     "ANSWER_MALFORMED_CODE",
     "CLI",
-    "CLI_EXIT_REFUSED",
     "INSPECT_TIMEOUT_SECONDS",
     "JOB_MALFORMED_CODE",
     "KIND",
     "NO_RELEASE_CODE",
     "PROJECT_PREFIX",
+    "CliExit",
     "InspectPlace",
     "InspectTarget",
     "answered_inspection",

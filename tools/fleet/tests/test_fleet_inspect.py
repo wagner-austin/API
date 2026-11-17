@@ -145,6 +145,10 @@ class TestTheAnswer:
             ok("not json\n"),
             ok('["an", "array"]\n'),
             failed(1, f"{ANSWER}\n"),
+            # Killed by a signal after printing: a status below 0 is no answer.
+            _test_hooks.CommandResult(
+                returncode=-9, stdout=f"{ANSWER}\n", stderr="", timed_out=False
+            ),
         ],
     )
     def test_any_other_run_answers_nothing(self, result: _test_hooks.CommandResult) -> None:
@@ -179,7 +183,7 @@ class TestTheClose:
                 status=ClosingStatus.REFUSED, exit_code=None, detail=f"{OPENING} refused: {refusal}"
             )
         )
-        assert fleet_inspect.CLI_EXIT_REFUSED == 2
+        assert (fleet_inspect.CliExit.ANSWERED, fleet_inspect.CliExit.REFUSED) == (0, 2)
 
     def test_a_run_that_never_answered_fails_with_its_output_s_tail(self) -> None:
         unanswered = "INSPECT_RUN_UNANSWERED: pendragon: copy exited 255: Connection refused"

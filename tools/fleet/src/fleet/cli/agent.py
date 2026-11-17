@@ -229,57 +229,59 @@ def claim_pass(
         return None
     _log.info("claimed %s", encode_job_line(job))
     run_id = tick_run.encode_run_id(run)
-    if job["command"] is DispatchCommand.BUILD_BASES:
-        # The verbs that run on the hub itself, synchronously —
-        # fleet.core.rebuild's module docstring carries the why.
-        if mcps_root is None:
-            return job_close.refuse(
-                credentials,
-                job,
-                identity,
-                detail=(
-                    f"{rebuild.ROOT_MISSING_CODE}: this runner was started "
-                    f"without {MCPS_ROOT_FLAG}, so it has no MCPs checkout to "
-                    "rebuild in; resubmit once a rebuild-capable runner is "
-                    "scheduled"
-                ),
+    match job["command"]:
+        case DispatchCommand.BUILD_BASES:
+            # The verbs that run on the hub itself, synchronously —
+            # fleet.core.rebuild's module docstring carries the why.
+            if mcps_root is None:
+                return job_close.refuse(
+                    credentials,
+                    job,
+                    identity,
+                    detail=(
+                        f"{rebuild.ROOT_MISSING_CODE}: this runner was started "
+                        f"without {MCPS_ROOT_FLAG}, so it has no MCPs checkout to "
+                        "rebuild in; resubmit once a rebuild-capable runner is "
+                        "scheduled"
+                    ),
+                )
+            return hub_jobs.rebuild_job(
+                credentials, job, identity, mcps_root=mcps_root, node=host, run_id=run_id
             )
-        return hub_jobs.rebuild_job(
-            credentials, job, identity, mcps_root=mcps_root, node=host, run_id=run_id
-        )
-    if job["command"] in (DispatchCommand.NETBOOT_ARM, DispatchCommand.NETBOOT_RETIRE):
-        if netboot is None:
-            return job_close.refuse(
-                credentials,
-                job,
-                identity,
-                detail=(
-                    f"{netboot_arm.NO_RELEASE_CODE}: this runner was started without "
-                    f"{', '.join(agent_lanes.NETBOOT_FLAGS)}, so it has no netboot release "
-                    f"to run {job['command']} from; the netboot duty's fleet-netboot runner claims "
-                    "the netboot lane"
-                ),
+        case DispatchCommand.NETBOOT_ARM | DispatchCommand.NETBOOT_RETIRE:
+            if netboot is None:
+                return job_close.refuse(
+                    credentials,
+                    job,
+                    identity,
+                    detail=(
+                        f"{netboot_arm.NO_RELEASE_CODE}: this runner was started without "
+                        f"{', '.join(agent_lanes.NETBOOT_FLAGS)}, so it has no netboot "
+                        f"release to run {job['command']} from; the netboot duty's "
+                        "fleet-netboot runner claims the netboot lane"
+                    ),
+                )
+            return hub_jobs.netboot_job(
+                credentials, job, identity, place=netboot, node=host, run_id=run_id
             )
-        return hub_jobs.netboot_job(
-            credentials, job, identity, place=netboot, node=host, run_id=run_id
-        )
-    if job["command"] is DispatchCommand.INSPECT:
-        if inspect is None:
-            return job_close.refuse(
-                credentials,
-                job,
-                identity,
-                detail=(
-                    f"{fleet_inspect.NO_RELEASE_CODE}: this runner was started without "
-                    f"{', '.join(agent_lanes.INSPECT_FLAGS)}, so it has no fleet-audit release "
-                    "to inspect "
-                    "from; the control duty's fleet-inspect runner claims the inspect lane"
-                ),
+        case DispatchCommand.INSPECT:
+            if inspect is None:
+                return job_close.refuse(
+                    credentials,
+                    job,
+                    identity,
+                    detail=(
+                        f"{fleet_inspect.NO_RELEASE_CODE}: this runner was started without "
+                        f"{', '.join(agent_lanes.INSPECT_FLAGS)}, so it has no fleet-audit "
+                        "release to inspect from; the control duty's fleet-inspect runner "
+                        "claims the inspect lane"
+                    ),
+                )
+            return hub_jobs.inspect_job(
+                credentials, job, identity, place=inspect, node=host, run_id=run_id
             )
-        return hub_jobs.inspect_job(
-            credentials, job, identity, place=inspect, node=host, run_id=run_id
-        )
-    return hub_jobs.session_job(credentials, job, identity, node=host, run_id=run_id)
+        case _:
+            return hub_jobs.session_job(credentials, job, identity, node=host, run_id=run_id)
 
 
 #: What each lane's check-in says the runner claims.
@@ -356,9 +358,10 @@ def lane_host(parsed: Mapping[str, str], lane: DispatchLane) -> str:
         _refuse_flags(parsed, lane, _HUB_ONLY_FLAGS, "only a hub tick rebuilds the bases")
     placed = agent_lanes.LANE_PLACES.get(lane)
     own = () if placed is None else placed[0]
-    for other, (flags, why, _) in agent_lanes.LANE_PLACES.items():
-        if other is not lane:
-            _refuse_flags(parsed, lane, [flag for flag in flags if flag not in own], why)
+    # The lane's own entry leaves nothing once its own flags are taken out,
+    # so every entry is read alike.
+    for flags, why, _ in agent_lanes.LANE_PLACES.values():
+        _refuse_flags(parsed, lane, [flag for flag in flags if flag not in own], why)
     if lane is DispatchLane.SESSIONS:
         return cli_args.require_flag(parsed, NODE_FLAG)
     if placed is not None:
@@ -439,10 +442,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     raw_mcps_root = parsed.get(MCPS_ROOT_FLAG)
     mcps_root = pathlib.Path(raw_mcps_root).resolve() if raw_mcps_root is not None else None
 
-    netboot = (
-        agent_lanes.netboot_place(parsed, loaded.registry) if lane is DispatchLane.NETBOOT else None
-    )
-    inspect = agent_lanes.inspect_place(parsed) if lane is DispatchLane.INSPECT else None
+    netboot: netboot_arm.NetbootPlace | None = None
+    inspect: fleet_inspect.InspectPlace | None = None
+    match lane:
+        case DispatchLane.NETBOOT:
+            netboot = agent_lanes.netboot_place(parsed, loaded.registry)
+        case DispatchLane.INSPECT:
+            inspect = agent_lanes.inspect_place(parsed)
     claimed = claim_pass(
         credentials,
         identity,

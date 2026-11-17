@@ -258,9 +258,11 @@ def _place_arguments(lane: Lane, given: Mapping[str, str]) -> tuple[str, ...]:
     """
     placed = _PLACED_LANES.get(lane)
     own = () if placed is None else agent_lanes.LANE_PLACES[placed][0]
-    for other, (flags, why, _) in agent_lanes.LANE_PLACES.items():
+    # The lane's own entry leaves nothing once its own flags are taken out,
+    # so every entry is read alike.
+    for flags, why, _ in agent_lanes.LANE_PLACES.values():
         foreign = [flag for flag in flags if flag in given and flag not in own]
-        if other is not placed and foreign:
+        if foreign:
             raise ValueError(
                 f"FLEET_TICK_USAGE: the {lane.value} lane takes no {', '.join(foreign)}; {why}"
             )
