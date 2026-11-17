@@ -253,14 +253,13 @@ def session_invocation(
             guessing.
     """
     root = release["root"]
-    registry_dir = release["registry_dir"]
     release_id = release["release"]
     revision = release["revision"]
     if command is DispatchCommand.RESTART_SESSION:
         return SessionInvocation(
             verb="restart",
             mode="rollover",
-            argv=restart_argv(root, registry_dir, host, session_target),
+            argv=restart_argv(root, host, session_target),
             types_requester=False,
             release=release_id,
             revision=revision,
@@ -269,7 +268,7 @@ def session_invocation(
         return SessionInvocation(
             verb="revive",
             mode="revive",
-            argv=revive_argv(root, registry_dir, host, session_target, requested_by),
+            argv=revive_argv(root, host, session_target, requested_by),
             types_requester=True,
             release=release_id,
             revision=revision,
@@ -280,7 +279,6 @@ def session_invocation(
             mode="kill",
             argv=kill_argv(
                 root,
-                registry_dir,
                 host,
                 session_target,
                 requested_by,
@@ -294,7 +292,7 @@ def session_invocation(
         return SessionInvocation(
             verb="compact",
             mode="compact",
-            argv=compact_argv(root, registry_dir, host, session_target, requested_by),
+            argv=compact_argv(root, host, session_target, requested_by),
             types_requester=True,
             release=release_id,
             revision=revision,
@@ -308,9 +306,7 @@ def session_invocation(
         return SessionInvocation(
             verb="exit",
             mode="kill",
-            argv=kill_argv(
-                root, registry_dir, host, session_target, requested_by, hard=False, exiting=True
-            ),
+            argv=kill_argv(root, host, session_target, requested_by, hard=False, exiting=True),
             types_requester=True,
             release=release_id,
             revision=revision,
@@ -319,7 +315,7 @@ def session_invocation(
         return SessionInvocation(
             verb="move",
             mode="move",
-            argv=move_argv(root, registry_dir, host, session_target, requested_by),
+            argv=move_argv(root, host, session_target, requested_by),
             types_requester=True,
             release=release_id,
             revision=revision,
@@ -333,7 +329,7 @@ def session_invocation(
         return SessionInvocation(
             verb="handoff",
             mode="handoff",
-            argv=handoff_argv(root, registry_dir, host, session_target, task_id, requested_by),
+            argv=handoff_argv(root, host, session_target, task_id, requested_by),
             types_requester=True,
             release=release_id,
             revision=revision,

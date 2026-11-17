@@ -4,9 +4,12 @@ Split from :mod:`fleet.core.restart` by concern (MCPs board task 553cc92f):
 that module decides whether a session job may run and maps its verb to an
 invocation; this one composes the argv itself, one function per verb, every
 one through :func:`session_audit_argv`, so each verb's line is the release's
-own session-audit against the release's own register on the session's host.
-Every value that reaches an argv element here was grammar-checked by
-:mod:`fleet.core.restart` first.
+own session-audit on the session's host. That session-audit reads the board
+register its own release carries, which MCPs alone locates
+(``session_audit.registry_paths``): no path to it is passed from here, since
+the copy this module once passed outlived the register's move (MCPs board
+task ebd671be). Every value that reaches an argv element here was
+grammar-checked by :mod:`fleet.core.restart` first.
 """
 
 from __future__ import annotations
@@ -18,27 +21,25 @@ from typing import Final
 SESSION_AUDIT_DIR: Final = pathlib.PurePosixPath("packages/session-audit")
 
 
-def session_audit_argv(
-    release_root: pathlib.Path, registry_dir: str, host: str, *arguments: str
-) -> tuple[str, ...]:
-    """Compose one session-audit invocation against a release's register.
+def session_audit_argv(release_root: pathlib.Path, host: str, *arguments: str) -> tuple[str, ...]:
+    """Compose one session-audit invocation from a release.
 
     Args:
         release_root: The verified release's checkout
             (:class:`~fleet.core.session_release.SessionRelease`), whose
             sealed session-audit environment the invocation runs in.
-        registry_dir: The release's register, so the window a kill
-            re-checks is the sealed one.
         host: The node the target session runs on, the claiming tick's
             ``--node``, which session-audit acts on.
         arguments: The mode and its arguments.
 
     Returns:
         ``poetry -C <release>/packages/session-audit run session-audit
-        <arguments> --host <node> --registry-dir <dir>``. Through poetry,
-        the same way the supervisor's runner invokes the package, so the
-        invocation resolves the release's own in-project venv, whose
-        editable install is the release's source, rather than this runner's.
+        <arguments> --host <node>``. Through poetry, the same way the
+        supervisor's runner invokes the package, so the invocation resolves
+        the release's own in-project venv, whose editable install is the
+        release's source, rather than this runner's; that install's default
+        register is the release's own, so the window a kill re-checks and the
+        room a handoff joins are the sealed ones.
     """
     return (
         "poetry",
@@ -49,19 +50,14 @@ def session_audit_argv(
         *arguments,
         "--host",
         host,
-        "--registry-dir",
-        registry_dir,
     )
 
 
-def restart_argv(
-    release_root: pathlib.Path, registry_dir: str, host: str, session_target: str
-) -> tuple[str, ...]:
+def restart_argv(release_root: pathlib.Path, host: str, session_target: str) -> tuple[str, ...]:
     """Compose the session-audit invocation for one restart job.
 
     Args:
         release_root: The verified release's checkout.
-        registry_dir: The release's register.
         host: The node the session runs on.
         session_target: The session UUID (already grammar-checked).
 
@@ -70,22 +66,17 @@ def restart_argv(
         through :func:`session_audit_argv`.
     """
     return session_audit_argv(
-        release_root, registry_dir, host, "rollover", "--apply", "--session", session_target
+        release_root, host, "rollover", "--apply", "--session", session_target
     )
 
 
 def revive_argv(
-    release_root: pathlib.Path,
-    registry_dir: str,
-    host: str,
-    session_target: str,
-    requested_by: str,
+    release_root: pathlib.Path, host: str, session_target: str, requested_by: str
 ) -> tuple[str, ...]:
     """Compose the session-audit invocation for one revive job.
 
     Args:
         release_root: The verified release's checkout.
-        registry_dir: The release's register.
         host: The node the session runs on.
         session_target: The session UUID (already grammar-checked).
         requested_by: The label that enqueued the revive (already
@@ -96,20 +87,12 @@ def revive_argv(
         <label>`` through :func:`session_audit_argv`.
     """
     return session_audit_argv(
-        release_root,
-        registry_dir,
-        host,
-        "revive",
-        "--session",
-        session_target,
-        "--requested-by",
-        requested_by,
+        release_root, host, "revive", "--session", session_target, "--requested-by", requested_by
     )
 
 
 def kill_argv(
     release_root: pathlib.Path,
-    registry_dir: str,
     host: str,
     session_target: str,
     requested_by: str,
@@ -120,9 +103,9 @@ def kill_argv(
     """Compose the session-audit invocation for one kill job.
 
     Args:
-        release_root: The verified release's checkout.
-        registry_dir: The release's register, which carries the idle window
-            the graceful kill re-checks its premise against.
+        release_root: The verified release's checkout, whose register
+            carries the idle window the graceful kill re-checks its premise
+            against.
         host: The node the session runs on.
         session_target: The session UUID (already grammar-checked).
         requested_by: The label that enqueued the kill (already
@@ -141,21 +124,16 @@ def kill_argv(
     base = ("kill", "--session", session_target, "--requested-by", requested_by)
     hard_flag: tuple[str, ...] = ("--hard",) if hard else ()
     exit_flag: tuple[str, ...] = ("--exit",) if exiting else ()
-    return session_audit_argv(release_root, registry_dir, host, *base, *hard_flag, *exit_flag)
+    return session_audit_argv(release_root, host, *base, *hard_flag, *exit_flag)
 
 
 def compact_argv(
-    release_root: pathlib.Path,
-    registry_dir: str,
-    host: str,
-    session_target: str,
-    requested_by: str,
+    release_root: pathlib.Path, host: str, session_target: str, requested_by: str
 ) -> tuple[str, ...]:
     """Compose the session-audit invocation for one compact job.
 
     Args:
         release_root: The verified release's checkout.
-        registry_dir: The release's register.
         host: The node the session runs on.
         session_target: The session UUID (already grammar-checked).
         requested_by: The label that enqueued the compact (already
@@ -166,29 +144,17 @@ def compact_argv(
         <label>`` through :func:`session_audit_argv`.
     """
     return session_audit_argv(
-        release_root,
-        registry_dir,
-        host,
-        "compact",
-        "--session",
-        session_target,
-        "--requested-by",
-        requested_by,
+        release_root, host, "compact", "--session", session_target, "--requested-by", requested_by
     )
 
 
 def move_argv(
-    release_root: pathlib.Path,
-    registry_dir: str,
-    host: str,
-    session_target: str,
-    requested_by: str,
+    release_root: pathlib.Path, host: str, session_target: str, requested_by: str
 ) -> tuple[str, ...]:
     """Compose the session-audit invocation for one move job.
 
     Args:
         release_root: The verified release's checkout.
-        registry_dir: The release's register.
         host: The node the session runs on.
         session_target: The session UUID (already grammar-checked).
         requested_by: The label that enqueued the move (already
@@ -200,20 +166,12 @@ def move_argv(
         <label>`` through :func:`session_audit_argv`.
     """
     return session_audit_argv(
-        release_root,
-        registry_dir,
-        host,
-        "move",
-        "--session",
-        session_target,
-        "--requested-by",
-        requested_by,
+        release_root, host, "move", "--session", session_target, "--requested-by", requested_by
     )
 
 
 def handoff_argv(
     release_root: pathlib.Path,
-    registry_dir: str,
     host: str,
     session_target: str,
     task_id: str,
@@ -222,9 +180,9 @@ def handoff_argv(
     """Compose the session-audit invocation for one handoff job.
 
     Args:
-        release_root: The verified release's checkout.
-        registry_dir: The release's register, whose supervision table names
-            the model and slots of the room the fresh worker joins.
+        release_root: The verified release's checkout, whose register's
+            supervision table names the model and slots of the room the
+            fresh worker joins.
         host: The node the predecessor session runs on, where its tree is
             and the fresh worker starts.
         session_target: The predecessor's session UUID (already
@@ -240,7 +198,6 @@ def handoff_argv(
     """
     return session_audit_argv(
         release_root,
-        registry_dir,
         host,
         "handoff",
         "--session",

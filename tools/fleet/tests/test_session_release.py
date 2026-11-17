@@ -61,9 +61,9 @@ class TestActiveRelease:
         assert session_release.active_session_release() == expected
         assert expected["release"] == RELEASE_ID
         assert expected["revision"] == REVISION
-        assert expected["registry_dir"] == str(
-            expected["root"] / "mcp-shared" / "src" / "source-registry"
-        )
+        # The record names no register: the release's session-audit reads
+        # its own (MCPs board task ebd671be).
+        assert tuple(expected) == ("release", "revision", "root")
         assert runner.calls == [verify_call(tmp_path)]
         assert runner.timeouts == [sealed_release.VERIFY_TIMEOUT_SECONDS] == [300]
         assert runner.unset_env == [()]

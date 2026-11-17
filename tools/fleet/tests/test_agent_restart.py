@@ -180,7 +180,7 @@ class TestRestartLane:
         # release's session-audit against its register (MCPs c7c2527d).
         assert runner.calls == [
             verify_call(tmp_path),
-            session_argv.restart_argv(release["root"], release["registry_dir"], HUB_HOST, TARGET),
+            session_argv.restart_argv(release["root"], HUB_HOST, TARGET),
             *unrolled_calls(repo),
         ]
         # The child inherits neither this agent's poetry venv nor any
@@ -241,7 +241,7 @@ class TestRestartLane:
         # board task 78a1eca7).
         assert runner.calls == [
             verify_call(tmp_path),
-            session_argv.restart_argv(release["root"], release["registry_dir"], "ziggurat", TARGET),
+            session_argv.restart_argv(release["root"], "ziggurat", TARGET),
         ]
 
     def test_a_claimed_revive_runs_session_audits_revive_mode_with_the_submitter(
@@ -270,9 +270,7 @@ class TestRestartLane:
 
         assert runner.calls == [
             verify_call(tmp_path),
-            session_argv.revive_argv(
-                release["root"], release["registry_dir"], HUB_HOST, TARGET, SUBMITTER
-            ),
+            session_argv.revive_argv(release["root"], HUB_HOST, TARGET, SUBMITTER),
             *unrolled_calls(repo),
         ]
         assert runner.unset_env[1] == restart.SESSION_ENVIRONMENT_EXCLUDED
@@ -332,14 +330,7 @@ class TestRestartLane:
 
         assert runner.calls == [
             verify_call(tmp_path),
-            session_argv.kill_argv(
-                release["root"],
-                release["registry_dir"],
-                HUB_HOST,
-                TARGET,
-                SUBMITTER,
-                hard=hard,
-            ),
+            session_argv.kill_argv(release["root"], HUB_HOST, TARGET, SUBMITTER, hard=hard),
             *unrolled_calls(repo),
         ]
         assert runner.set_env[1] == restart.SESSION_ENVIRONMENT_SET
@@ -367,9 +358,7 @@ class TestRestartLane:
 
         assert runner.calls == [
             verify_call(tmp_path),
-            session_argv.compact_argv(
-                release["root"], release["registry_dir"], HUB_HOST, TARGET, SUBMITTER
-            ),
+            session_argv.compact_argv(release["root"], HUB_HOST, TARGET, SUBMITTER),
             *unrolled_calls(repo),
         ]
         assert endpoint.arguments[2]["runId"] == tick_run_id()
@@ -395,9 +384,7 @@ class TestRestartLane:
 
         assert runner.calls == [
             verify_call(tmp_path),
-            session_argv.move_argv(
-                release["root"], release["registry_dir"], HUB_HOST, TARGET, SUBMITTER
-            ),
+            session_argv.move_argv(release["root"], HUB_HOST, TARGET, SUBMITTER),
             *unrolled_calls(repo),
         ]
         assert endpoint.arguments[2]["runId"] == tick_run_id()
@@ -430,9 +417,7 @@ class TestRestartLane:
 
         assert runner.calls == [
             verify_call(tmp_path),
-            session_argv.handoff_argv(
-                release["root"], release["registry_dir"], HUB_HOST, TARGET, HANDOFF_TASK, SUBMITTER
-            ),
+            session_argv.handoff_argv(release["root"], HUB_HOST, TARGET, HANDOFF_TASK, SUBMITTER),
             *unrolled_calls(repo),
         ]
         assert endpoint.arguments[2]["runId"] == tick_run_id()
@@ -454,9 +439,8 @@ class TestRestartLane:
 
         assert agent.main(agent_argv(config_path, repo)) == 0
 
-        root, registry = release["root"], release["registry_dir"]
         assert runner.calls[1] == session_argv.kill_argv(
-            root, registry, HUB_HOST, TARGET, SUBMITTER, hard=False, exiting=True
+            release["root"], HUB_HOST, TARGET, SUBMITTER, hard=False, exiting=True
         )
         assert endpoint.arguments[2]["runId"] == tick_run_id()
         assert narrow_json_to_str(endpoint.arguments[3]["detail"]) == (

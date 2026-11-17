@@ -71,9 +71,6 @@ POINTER_NAME: Final = "active.json"
 #: The pointer's keys, in the order MCPs writes them.
 POINTER_KEYS: Final[tuple[str, ...]] = ("kind", "release", "revision", "root")
 
-#: The source registry inside a release, passed to every verb.
-REGISTRY_DIR: Final = pathlib.PurePosixPath("mcp-shared/src/source-registry")
-
 #: Detail prefix when the environment names no root for the store.
 NO_STORE_BASE_CODE: Final = "SESSION_RELEASE_NO_STORE_BASE"
 
@@ -90,17 +87,21 @@ POINTER_MISMATCH_CODE: Final = "SESSION_RELEASE_POINTER_MISMATCH"
 class SessionRelease(TypedDict):
     """The verified release one session verb runs.
 
+    Its board register is not named here: session-audit, installed from
+    the release's own source, reads the register that release carries, and
+    MCPs alone says where that sits (``session_audit.registry_paths``), so
+    a move of it cannot strand a copy of its path here (board task
+    ebd671be).
+
     Attributes:
         release: The release id, the candidate directory MCPs created.
         revision: The full commit the release was checked out at.
         root: The release's checkout.
-        registry_dir: Its source registry, passed as ``--registry-dir``.
     """
 
     release: str
     revision: str
     root: pathlib.Path
-    registry_dir: str
 
 
 def pointer_path() -> pathlib.Path | str:
@@ -151,13 +152,7 @@ def _pointed(path: pathlib.Path) -> SessionRelease | str:
             f"{POINTER_INVALID_CODE}: {path} names kind {kind!r}, release {release!r} and "
             f"revision {revision!r}; a {KIND} release with an id and a full commit is required"
         )
-    checkout = pathlib.Path(root)
-    return SessionRelease(
-        release=release,
-        revision=revision,
-        root=checkout,
-        registry_dir=str(checkout / REGISTRY_DIR),
-    )
+    return SessionRelease(release=release, revision=revision, root=pathlib.Path(root))
 
 
 def active_session_release() -> SessionRelease | str:
@@ -195,7 +190,6 @@ __all__ = [
     "POINTER_KEYS",
     "POINTER_MISMATCH_CODE",
     "POINTER_NAME",
-    "REGISTRY_DIR",
     "STORE",
     "STORE_BASE",
     "STORE_ROOT_VARIABLE",

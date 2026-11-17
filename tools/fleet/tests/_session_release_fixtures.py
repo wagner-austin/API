@@ -136,13 +136,7 @@ def plant_release(tmp_path: pathlib.Path) -> SessionRelease:
         returns once its verifier answers :func:`verify_reply`.
     """
     write_pointer(tmp_path, pointer_record(tmp_path))
-    root = release_root(tmp_path)
-    return SessionRelease(
-        release=RELEASE_ID,
-        revision=REVISION,
-        root=root,
-        registry_dir=str(root / "mcp-shared" / "src" / "source-registry"),
-    )
+    return SessionRelease(release=RELEASE_ID, revision=REVISION, root=release_root(tmp_path))
 
 
 def verifier(tmp_path: pathlib.Path) -> pathlib.Path:
