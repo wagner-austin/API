@@ -42,7 +42,7 @@ from platform_core.json_utils import (
 from platform_core.members import find_member, require_member
 from typing_extensions import TypedDict
 
-from fleet.contracts.queue_answer import malformed
+from fleet.contracts.queue_answer import malformed, require_count
 from fleet.contracts.queue_answer import require_str as require_answer_str
 
 
@@ -251,26 +251,6 @@ def encode_node_models(models: NodeModels | None) -> JSONValue:
     }
 
 
-def _require_count(row: dict[str, JSONValue], key: str, *, answer: str) -> int:
-    """Read a catalog field that must be a positive whole number.
-
-    Args:
-        row: The ``model`` object.
-        key: The field.
-        answer: The whole answer, for the error message.
-
-    Returns:
-        The number.
-
-    Raises:
-        AppError: ``QUEUE_ANSWER_MALFORMED`` when it is not one.
-    """
-    value = row.get(key)
-    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        raise malformed(f"model field {key!r} is {value!r}, not a positive integer", answer=answer)
-    return value
-
-
 def _require_server(row: dict[str, JSONValue], *, answer: str) -> ModelServer:
     """Read the server a catalog row names.
 
@@ -309,7 +289,7 @@ def _require_context(row: dict[str, JSONValue], server: ModelServer, *, answer: 
         AppError: ``QUEUE_ANSWER_MALFORMED`` when it is not that.
     """
     if server is ModelServer.LLAMA:
-        return _require_count(row, "contextTokens", answer=answer)
+        return require_count(row, "contextTokens", least=1, answer=answer)
     if "contextTokens" not in row or row["contextTokens"] is not None:
         raise malformed(
             f"model field 'contextTokens' is {row.get('contextTokens')!r}, not null, "
@@ -374,8 +354,8 @@ def decode_catalog_model(value: JSONValue, *, answer: str) -> CatalogModel:
         server=server,
         file=file,
         sha256=sha256,
-        size_bytes=_require_count(value, "sizeBytes", answer=answer),
-        gpu_bytes=_require_count(value, "gpuBytes", answer=answer),
+        size_bytes=require_count(value, "sizeBytes", least=1, answer=answer),
+        gpu_bytes=require_count(value, "gpuBytes", least=1, answer=answer),
         context_tokens=context_tokens,
         backends=tuple(backends),
     )

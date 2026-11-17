@@ -106,9 +106,7 @@ def orphan_pass(
         detail = lost_detail(job, own)
         if detail is None:
             continue
-        answered = queue_lost.report_lost(
-            credentials, job_id=job["job_id"], detail=detail, identity=identity
-        )
+        answered = queue_lost.report_lost(credentials, job=job, detail=detail, identity=identity)
         _log.info("reported lost: %s; the queue left it %s", detail, encode_job_line(answered))
         reported.append(answered)
     return tuple(reported)

@@ -33,6 +33,7 @@ from fleet.contracts.model_host import CatalogModel, decode_catalog_model
 from fleet.contracts.queue_answer import (
     envelope,
     malformed,
+    require_count,
     require_optional_instant,
     require_optional_str,
     require_str,
@@ -183,6 +184,14 @@ class DispatchJob(TypedDict):
         run_id: The fleet ledger's run id, empty until the runner mints one.
             This is the join between the queue and this machine's own records.
         claimed_by: The runner holding it, or None.
+        claim_generation: How many times the queue has handed the job out,
+            0 before its first claim (MCPs mig 986, board task 6da5e0cc).
+            Every report names it, read from the same answer as the
+            ``run_id`` the report is about (MCPs board task 8f130298): a
+            claim clears ``run_id`` (MCPs board task dd71f858), so a job's
+            run is always its current generation's, and a report built from
+            an answer older than the job's latest claim names the older
+            generation and is refused rather than taken for the new claim's.
         submitted_by: The agent label that enqueued it, and
         session_id: that session's UUID. Carried because the LEDGER row this
             runner writes must name who asked for the work -- a dispatch
@@ -234,6 +243,7 @@ class DispatchJob(TypedDict):
     node: str | None
     run_id: str
     claimed_by: str | None
+    claim_generation: int
     submitted_by: str
     session_id: str
     session_target: str | None
@@ -346,6 +356,7 @@ def decode_job(value: JSONValue, *, answer: str) -> DispatchJob:
         node=require_optional_str(value, "node", answer=answer),
         run_id=require_str(value, "runId", answer=answer),
         claimed_by=require_optional_str(value, "claimedBy", answer=answer),
+        claim_generation=require_count(value, "claimGeneration", least=0, answer=answer),
         submitted_by=require_str(value, "submittedBy", answer=answer),
         session_id=require_str(value, "sessionId", answer=answer),
         session_target=require_optional_str(value, "sessionTarget", answer=answer),

@@ -217,7 +217,7 @@ def collect_one_job(
                 )
             queue.report_progress(
                 credentials,
-                job_id=job["job_id"],
+                job=job,
                 note=f"still running on {row['node']} as {row['run_id']}",
                 lease_seconds=CLAIM_LEASE_SECONDS,
                 identity=identity,
@@ -340,7 +340,7 @@ def reconcile_claim(
         # Before the queue's give-back, so a report that fails leaves the job
         # claimed for the next tick, which finds the lane already free.
         lease = give_back_lease(loaded, job, alias=alias, detail=detail)
-        answered = report_lost(credentials, job_id=job["job_id"], detail=detail, identity=identity)
+        answered = report_lost(credentials, job=job, detail=detail, identity=identity)
         # The launch that would have removed its host claim never ended: its
         # tick was killed (MCPs board task 3f7d40fe), so the claim is removed
         # here, or it charges the host until its lease lapses an hour later.
@@ -355,7 +355,7 @@ def reconcile_claim(
         )
     queue.report_start(
         credentials,
-        job_id=job["job_id"],
+        job=job,
         node=alias,
         run_id=row["run_id"],
         workers=row["workers"],
@@ -370,7 +370,7 @@ def reconcile_claim(
     )
     queue.report_progress(
         credentials,
-        job_id=job["job_id"],
+        job=job,
         note=adopted,
         lease_seconds=CLAIM_LEASE_SECONDS,
         identity=identity,

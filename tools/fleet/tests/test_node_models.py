@@ -186,12 +186,14 @@ class TestModelsPass:
         assert _report(queue, 1) == {
             "action": "start",
             "jobId": JOB,
+            "claimGeneration": 1,
             "node": "colossus",
             "runId": "fleet-model-ornith-1.5-9b.service",
             "leaseSeconds": MODEL_LEASE_SECONDS,
         }
         loaded = _report(queue, 2)
         assert (loaded["action"], loaded["endpoint"]) == ("loaded", "http://100.111.149.33:8091")
+        assert loaded["claimGeneration"] == 1
         assert str(loaded["detail"]).startswith("llama-server serves ornith-1.5-9b")
 
     def test_a_file_that_is_not_the_catalog_s_is_refused_by_name(self) -> None:
@@ -202,6 +204,7 @@ class TestModelsPass:
         assert _report(queue, 2) == {
             "action": "close",
             "jobId": JOB,
+            "claimGeneration": 1,
             "status": "refused",
             "detail": (
                 f"MODEL_FILE_MISMATCH: {FILE} on colossus hashes to sha256 {digest}, not the "
@@ -258,6 +261,7 @@ class TestModelsPass:
         assert _report(queue, 2) == {
             "action": "close",
             "jobId": JOB,
+            "claimGeneration": 1,
             "status": "refused",
             "detail": (
                 "MODEL_SERVER_ABSENT: whisper-large-v3-turbo runs in whisper-server, which "
@@ -290,6 +294,7 @@ class TestModelsPass:
         assert _report(queue, 2) == {
             "action": "close",
             "jobId": JOB,
+            "claimGeneration": 1,
             "status": "passed",
             "exitCode": 0,
             "detail": (

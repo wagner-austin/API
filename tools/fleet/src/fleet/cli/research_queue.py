@@ -126,7 +126,7 @@ def reconcile(
         if job["status"] is DispatchStatus.CLAIMED:
             job = queue.report_start(
                 credentials,
-                job_id=job["job_id"],
+                job=job,
                 node=worker["node"],
                 run_id=run_id,
                 workers=None,
@@ -150,7 +150,7 @@ def reconcile(
             )
             return queue.report_progress(
                 credentials,
-                job_id=job["job_id"],
+                job=job,
                 identity=identity,
                 lease_seconds=QUEUE_LEASE_SECONDS,
                 note=(
@@ -165,7 +165,7 @@ def reconcile(
         if observation["state"] is ResearchState.RUNNING:
             return queue.report_progress(
                 credentials,
-                job_id=job["job_id"],
+                job=job,
                 note=detail,
                 lease_seconds=QUEUE_LEASE_SECONDS,
                 identity=identity,

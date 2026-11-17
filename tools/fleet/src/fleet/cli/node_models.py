@@ -229,7 +229,7 @@ def _load(
     if endpoint is not None:
         queue_models.report_loaded(
             credentials,
-            job_id=job["job_id"],
+            job=job,
             endpoint=endpoint,
             detail=outcome["detail"],
             identity=identity,
@@ -285,7 +285,7 @@ def models_pass(
         _log.info("claimed %s", encode_job_line(job))
         queue.report_start(
             credentials,
-            job_id=job["job_id"],
+            job=job,
             node=alias,
             run_id=model_unit(model["model_id"]),
             workers=None,

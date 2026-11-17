@@ -224,9 +224,9 @@ class TestCatalogModel:
             ("backends", "vulkan", "model backends is 'vulkan', not a non-empty array"),
             ("backends", ["sycl"], "model backend 'sycl' is not one of cuda, vulkan"),
             ("backends", [7], "model backend 7 is not one of cuda, vulkan"),
-            ("sizeBytes", 0, "model field 'sizeBytes' is 0, not a positive integer"),
-            ("gpuBytes", True, "model field 'gpuBytes' is True, not a positive integer"),
-            ("contextTokens", "32768", "model field 'contextTokens' is '32768', not a positive"),
+            ("sizeBytes", 0, "field 'sizeBytes' is 0, not a whole number of at least 1"),
+            ("gpuBytes", True, "field 'gpuBytes' is True, not a whole number of at least 1"),
+            ("contextTokens", "32768", "field 'contextTokens' is '32768', not a whole number of at"),
         ],
     )
     def test_a_field_the_catalog_cannot_hold_is_malformed(

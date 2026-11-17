@@ -508,7 +508,7 @@ class Launcher:
             # on a tunnel stall and each one's submitter had to resubmit).
             answered = report_lost(
                 self._credentials,
-                job_id=job["job_id"],
+                job=job,
                 detail=(
                     f"{launched['detail']}; nothing ran on {self._alias}, so the job is given back"
                 ),

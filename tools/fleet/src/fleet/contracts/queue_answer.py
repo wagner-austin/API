@@ -95,6 +95,33 @@ def require_optional_str(row: dict[str, JSONValue], key: str, *, answer: str) ->
     return value
 
 
+def require_count(row: dict[str, JSONValue], key: str, *, least: int, answer: str) -> int:
+    """Read one whole-number field no smaller than ``least``.
+
+    A JSON ``true`` is refused although Python counts it an ``int``: the tool
+    never writes a boolean where it means a number.
+
+    Args:
+        row: The decoded object.
+        key: The field name.
+        least: The smallest value it may hold.
+        answer: The whole answer, for the error message.
+
+    Returns:
+        The value.
+
+    Raises:
+        AppError: ``QUEUE_ANSWER_MALFORMED`` when absent, not a whole number,
+            or below ``least``.
+    """
+    value = row.get(key)
+    if isinstance(value, bool) or not isinstance(value, int) or value < least:
+        raise malformed(
+            f"field {key!r} is {value!r}, not a whole number of at least {least}", answer=answer
+        )
+    return value
+
+
 def require_optional_instant(row: dict[str, JSONValue], key: str, *, answer: str) -> int | None:
     """Read one nullable instant field as whole seconds since the epoch.
 

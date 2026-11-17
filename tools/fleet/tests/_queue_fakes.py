@@ -254,6 +254,7 @@ def queue_job(**overrides: JSONValue) -> JSONObject:
         "node": None,
         "runId": "",
         "claimedBy": None,
+        "claimGeneration": 1,
         "submittedBy": "opus-dispatch-0905",
         "sessionId": "11111111-aaaa-4aaa-8aaa-111111111111",
         "sessionTarget": None,

@@ -179,10 +179,27 @@ def claim_next(
     )
 
 
+def report_target(job: DispatchJob) -> JSONObject:
+    """Name the job a report is about, and the claim it reports under.
+
+    Every report verb but a model load's ``ended`` sends both, from the one
+    answer the runner acts on (MCPs board task 8f130298): the generation
+    beside the job id is what lets the queue refuse a report about an earlier
+    claim's run, DISPATCH_CLAIM_STALE.
+
+    Args:
+        job: The job as the queue last answered it to this runner.
+
+    Returns:
+        The ``jobId`` and ``claimGeneration`` arguments.
+    """
+    return {"jobId": job["job_id"], "claimGeneration": job["claim_generation"]}
+
+
 def report_start(
     credentials: McpCredentials,
     *,
-    job_id: str,
+    job: DispatchJob,
     node: str,
     run_id: str,
     workers: int | None,
@@ -193,7 +210,7 @@ def report_start(
 
     Args:
         credentials: Endpoint and headers.
-        job_id: The claimed job.
+        job: The claimed job, as the claim answered it.
         node: The node this run committed to.
         run_id: The fleet ledger's run id, so the queue row and this
             machine's own records name the same run.
@@ -212,7 +229,7 @@ def report_start(
     """
     arguments: JSONObject = {
         "action": "start",
-        "jobId": job_id,
+        **report_target(job),
         "node": node,
         "runId": run_id,
         "leaseSeconds": lease_seconds,
@@ -228,7 +245,7 @@ def report_start(
 def report_progress(
     credentials: McpCredentials,
     *,
-    job_id: str,
+    job: DispatchJob,
     note: str,
     lease_seconds: int,
     identity: JSONObject,
@@ -243,7 +260,7 @@ def report_progress(
 
     Args:
         credentials: Endpoint and headers.
-        job_id: The running job.
+        job: The running job, as the queue last answered it.
         note: One line of progress for the trail.
         lease_seconds: Renewed lease.
         identity: From :func:`identity_arguments`.
@@ -256,7 +273,7 @@ def report_progress(
     """
     arguments: JSONObject = {
         "action": "progress",
-        "jobId": job_id,
+        **report_target(job),
         "note": note,
         "leaseSeconds": lease_seconds,
         **identity,
@@ -269,7 +286,7 @@ def report_progress(
 def report_close(
     credentials: McpCredentials,
     *,
-    job_id: str,
+    job: DispatchJob,
     status: ClosingStatus,
     exit_code: int | None,
     detail: str,
@@ -289,7 +306,7 @@ def report_close(
 
     Args:
         credentials: Endpoint and headers.
-        job_id: The claimed job.
+        job: The claimed job, as the queue last answered it.
         status: ``passed``, ``failed`` or ``refused``.
         exit_code: The command's exit code, or None when it never ran.
         detail: One line the submitter will read.
@@ -307,7 +324,7 @@ def report_close(
     """
     arguments: JSONObject = {
         "action": "close",
-        "jobId": job_id,
+        **report_target(job),
         "status": status.value,
         "detail": detail,
         **identity,
@@ -502,5 +519,6 @@ __all__ = [
     "report_inspected",
     "report_progress",
     "report_start",
+    "report_target",
     "trail_claims",
 ]

@@ -67,7 +67,7 @@ def report_started(
     try:
         queue.report_start(
             credentials,
-            job_id=job["job_id"],
+            job=job,
             node=alias,
             run_id=row["run_id"],
             workers=row["workers"],

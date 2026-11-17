@@ -54,7 +54,7 @@ def refuse(
     """
     queue.report_close(
         credentials,
-        job_id=job["job_id"],
+        job=job,
         status=ClosingStatus.REFUSED,
         exit_code=None,
         detail=detail,
@@ -97,7 +97,7 @@ def close(
     """
     queue.report_close(
         credentials,
-        job_id=job["job_id"],
+        job=job,
         status=status,
         exit_code=exit_code,
         detail=detail,
@@ -131,9 +131,7 @@ def give_back(
     Raises:
         AppError: Only from the queue call itself.
     """
-    answered = queue_lost.report_lost(
-        credentials, job_id=job["job_id"], detail=detail, identity=identity
-    )
+    answered = queue_lost.report_lost(credentials, job=job, detail=detail, identity=identity)
     _log.info(
         "%s: given back, the queue answered %s: %s",
         encode_job_line(job),

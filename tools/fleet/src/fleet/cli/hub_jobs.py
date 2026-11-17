@@ -86,7 +86,7 @@ def _start(
     """
     queue.report_start(
         credentials,
-        job_id=job["job_id"],
+        job=job,
         node=node,
         run_id=run_id,
         workers=None,

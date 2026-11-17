@@ -16,16 +16,17 @@ from platform_core.mcp_client import McpCredentials, call_mcp_tool
 
 from fleet.contracts.dispatch import DispatchJob, decode_reported
 from fleet.core import _test_hooks
+from fleet.core.queue import report_target
 
 
 def report_lost(
-    credentials: McpCredentials, *, job_id: str, detail: str, identity: JSONObject
+    credentials: McpCredentials, *, job: DispatchJob, detail: str, identity: JSONObject
 ) -> DispatchJob:
     """Report that the run of a held job is gone.
 
     Args:
         credentials: Endpoint and headers.
-        job_id: The held job.
+        job: The held job, as the queue last answered it.
         detail: The run that is gone and how it was found gone, in one line.
         identity: From :func:`fleet.core.queue.identity_arguments`.
 
@@ -34,9 +35,15 @@ def report_lost(
 
     Raises:
         AppError: Any transport or contract failure from the underlying call,
-            including the queue refusing a runner that does not hold the job.
+            including the queue refusing a runner that does not hold the job,
+            or a job claimed again since that answer (DISPATCH_CLAIM_STALE).
     """
-    arguments: JSONObject = {"action": "lost", "jobId": job_id, "detail": detail, **identity}
+    arguments: JSONObject = {
+        "action": "lost",
+        **report_target(job),
+        "detail": detail,
+        **identity,
+    }
     return decode_reported(
         call_mcp_tool(_test_hooks.http_post, credentials, "dispatch_report", arguments)
     )

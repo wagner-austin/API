@@ -160,6 +160,44 @@ class TestMalformedAnswers:
 
         assert "field 'project' is NoneType, not a string" in raised.value.message
 
+    def test_the_claim_generation_is_read_as_the_queue_counts_it(self) -> None:
+        """MCPs mig 986, board task 8f130298: the generation a run reports under."""
+        job = decode_claim(answer({"claimed": queue_job(claimGeneration=0)}))
+        assert job is not None
+        assert job["claim_generation"] == 0
+        again = decode_claim(answer({"claimed": queue_job(claimGeneration=7)}))
+        assert again is not None
+        assert again["claim_generation"] == 7
+
+    @pytest.mark.parametrize(
+        ("value", "message"),
+        [
+            (-1, "field 'claimGeneration' is -1, not a whole number of at least 0"),
+            (True, "field 'claimGeneration' is True, not a whole number of at least 0"),
+            ("1", "field 'claimGeneration' is '1', not a whole number of at least 0"),
+        ],
+    )
+    def test_a_claim_generation_the_queue_cannot_hold_is_refused(
+        self, value: JSONValue, message: str
+    ) -> None:
+        with pytest.raises(AppError) as raised:
+            decode_claim(answer({"claimed": queue_job(claimGeneration=value)}))
+
+        assert raised.value.code is FleetErrorCode.QUEUE_ANSWER_MALFORMED
+        assert message in raised.value.message
+
+    def test_a_missing_claim_generation_is_refused_by_name(self) -> None:
+        """A queue rolled before mig 986 sends none; the roll waits for it."""
+        row = queue_job()
+        del row["claimGeneration"]
+
+        with pytest.raises(AppError) as raised:
+            decode_claim(answer({"claimed": row}))
+
+        assert "field 'claimGeneration' is None, not a whole number of at least 0" in (
+            raised.value.message
+        )
+
     def test_a_missing_nullable_field_is_refused_rather_than_read_as_null(self) -> None:
         """The difference this checks is real: the tool renders every absent
         value as an explicit null precisely so a consumer can tell "no node

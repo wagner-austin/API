@@ -220,6 +220,7 @@ class TestTheNextTick:
         )
         assert endpoint.arguments[1] == {
             "jobId": DEFAULT_JOB_ID,
+            "claimGeneration": 1,
             "action": "start",
             "node": "lavender",
             "runId": DEMO_RUN_ID,

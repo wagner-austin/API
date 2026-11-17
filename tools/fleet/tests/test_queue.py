@@ -15,7 +15,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, dump_json_str
 from platform_core.mcp_testing import DECLARED_FLEET_URL, stack_endpoint_files
 
-from fleet.contracts.dispatch import ClosingStatus, DispatchLane
+from fleet.contracts.dispatch import ClosingStatus, DispatchLane, decode_job
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.width_offer import WidthOffer
 from fleet.core import _test_hooks, queue
@@ -150,6 +150,7 @@ class TestClaim:
             "node": None,
             "run_id": "",
             "claimed_by": None,
+            "claim_generation": 1,
             "submitted_by": "opus-dispatch-0905",
             "session_id": "11111111-aaaa-4aaa-8aaa-111111111111",
             "session_target": None,
@@ -218,7 +219,19 @@ class TestClaim:
         assert "widths" not in endpoint.arguments[0]
 
 
+#: A job this runner holds, under its third claim.
+HELD = decode_job(queue_job(status="claimed", claimGeneration=3), answer="a test's job")
+
+
 class TestReport:
+    def test_every_report_names_the_job_and_the_generation_it_was_read_under(self) -> None:
+        """MCPs board task 8f130298: the queue refuses a report about an
+        earlier claim's run by the generation, DISPATCH_CLAIM_STALE."""
+        assert queue.report_target(HELD) == {
+            "jobId": "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+            "claimGeneration": 3,
+        }
+
     def test_start_names_the_node_and_the_ledger_run_id(self) -> None:
         """The run id is the JOIN between the queue row and this machine's own
         records. A start that omitted it would leave the two unlinkable."""
@@ -227,7 +240,7 @@ class TestReport:
 
         job = queue.report_start(
             QUEUE_CREDENTIALS,
-            job_id="aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+            job=HELD,
             node="lavender",
             run_id="libs-demo-lavender-1757000000",
             workers=4,
@@ -238,6 +251,8 @@ class TestReport:
         assert job["status"] == "running"
         assert endpoint.tools == ["dispatch_report"]
         assert endpoint.arguments[0]["action"] == "start"
+        assert endpoint.arguments[0]["jobId"] == "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa"
+        assert endpoint.arguments[0]["claimGeneration"] == 3
         assert endpoint.arguments[0]["runId"] == "libs-demo-lavender-1757000000"
         assert endpoint.arguments[0]["node"] == "lavender"
         # MCPs board task 1964fc15: the grant the queue's claim fit reads.
@@ -249,7 +264,7 @@ class TestReport:
 
         queue.report_close(
             QUEUE_CREDENTIALS,
-            job_id="aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+            job=HELD,
             status=ClosingStatus.FAILED,
             exit_code=1,
             detail="make check exited 1",
@@ -257,6 +272,7 @@ class TestReport:
             identity=RUNNER_IDENTITY,
         )
 
+        assert endpoint.arguments[0]["claimGeneration"] == 3
         assert endpoint.arguments[0]["exitCode"] == 1
         assert endpoint.arguments[0]["status"] == "failed"
         assert "result" not in endpoint.arguments[0]
@@ -273,7 +289,7 @@ class TestReport:
 
         queue.report_close(
             QUEUE_CREDENTIALS,
-            job_id="aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+            job=HELD,
             status=ClosingStatus.FAILED,
             exit_code=1,
             detail="make check exited 1",
@@ -292,7 +308,7 @@ class TestReport:
 
         queue.report_close(
             QUEUE_CREDENTIALS,
-            job_id="aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+            job=HELD,
             status=ClosingStatus.REFUSED,
             exit_code=None,
             detail="no node had capacity",
@@ -314,7 +330,7 @@ class TestReport:
         with pytest.raises(AppError) as raised:
             queue.report_close(
                 QUEUE_CREDENTIALS,
-                job_id="aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+                job=HELD,
                 status=ClosingStatus.PASSED,
                 exit_code=0,
                 detail="green",

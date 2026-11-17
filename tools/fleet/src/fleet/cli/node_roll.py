@@ -158,7 +158,7 @@ def give_back(
     """
     answered = report_lost(
         credentials,
-        job_id=job["job_id"],
+        job=job,
         detail=(
             f"{MOVED_CODE}: {alias}'s serve was handed {job['job_id']} after {moved}; "
             "nothing was staged, so the job is given back for a serve on the rolled commit"
