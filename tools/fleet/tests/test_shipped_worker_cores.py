@@ -29,6 +29,15 @@ grants it 3 workers, 6 of its 8, so what it books is what it uses: beside it
 MCPs/sms-gateway's minimum of 2 still fits the 2 left, about 6.5 cores of
 real use in an 8-core share, and a suite with a minimum of 3 does not;
 serendipity grants it 3 and lenovold affords it 1.
+
+MCPs/execution-twin is charged 8 cores a worker (MCPs board task d198701c).
+Its cases start Keycloak and browser containers, so a run costs about 415
+CPU-seconds whatever its workers: 8.5 and 5.6 cores at one worker, 8.6 at
+two. Charged one, it took 4 of lavender's 8 quota cores, MCPs/repo-contracts
+was placed beside it, the share was throttled 1042 s and a 30 s case timed
+out (fleet job c4df04fb). Charged 8, a node grants it one worker, lavender
+places nothing beside it, and serendipity, whose spare cores are 6, refuses
+it.
 """
 
 from __future__ import annotations
@@ -67,6 +76,21 @@ SHARED_CORES_MEASUREMENT = (
     "throttled 75 s (26273051). Charged 2, lavender grants it 3 workers, 6 of its 8, so a "
     "check beside it is booked against what it uses: MCPs/sms-gateway's minimum of 2 still "
     "fits the 2 left, and no suite with a minimum of 3 does."
+)
+
+#: The runs MCPs/execution-twin's registry row names beside its worker_cores 8.
+TWIN_CORES_MEASUREMENT = (
+    "Fleet jobs 7c1a25c9 and 75d1c95c on sedona at 1 worker and 6f257615 there at 2 "
+    "(2026-11-17), each running every one of its 20 or 21 cases, read dispatch=416s/49s, "
+    "418s/75s and 413s/48s: 8.5, 5.6 and 8.6 cores for the run, about 415 CPU-seconds "
+    "whatever the workers, because its twin cases start Keycloak and browser containers on "
+    "the docker lane, which runs in the node's dispatch share since MCPs board task 34514037. "
+    "Charged one core, fleet job 94ebe31d took 4 workers on lavender, 4 of its 8-core share, "
+    "and the fleet placed MCPs/repo-contracts' check c4df04fb beside it: the share read "
+    "dispatch=1389s/184s/throttled:1042s and a 30 s repo-contracts case timed out at 40 s "
+    "(MCPs board task d198701c); 6b46dfff at 4 workers there read throttled:531s. Charged 8, "
+    "a node grants it 1 worker, lavender places nothing beside it, and a node whose spare "
+    "cores are fewer than 8 (serendipity's 6) refuses it."
 )
 
 
@@ -166,4 +190,70 @@ def test_lavender_books_mcp_shared_at_the_cores_its_workers_use() -> None:
     assert beside_contracts["reason"].startswith(
         "lavender's checks are held to 8.00 CPU(s) by the quota systemd keeps on their slice, "
         "so 4 core(s) are left where the suite's minimum of 3 worker(s) occupies 6"
+    )
+
+
+def test_execution_twin_takes_lavenders_whole_share_and_one_worker_anywhere() -> None:
+    """MCPs board task d198701c: charged one core a worker, MCPs/execution-twin
+    took 4 of lavender's 8 quota cores (fleet job 94ebe31d) while its
+    containers used the whole share, and MCPs/repo-contracts' check placed
+    beside it (c4df04fb) timed out a 30 s case on a share throttled 1042 s.
+    A run costs about 415 CPU-seconds at any worker count, so charged 8 it is
+    granted one worker, nothing is placed beside it on lavender, it is placed
+    beside nothing there, and a node with 6 spare cores refuses it."""
+    workspace = shipped_workspace()
+    twin = workspace["projects"]["MCPs/execution-twin"]
+    contracts = workspace["projects"]["MCPs/repo-contracts"]
+    probe = workspace["projects"]["MCPs/login-probe"]
+    lavender = workspace["nodes"]["lavender"]
+    twin_tags = node_tags(lavender) | frozenset(twin["required_tags"])
+    contracts_tags = node_tags(lavender) | frozenset(contracts["required_tags"])
+    probe_tags = node_tags(lavender) | frozenset(probe["required_tags"])
+    state = idle_state(lavender)
+    state["check_cpu_quota"] = 8.0
+
+    assert (twin["worker_cores"], twin["minimum_workers"]) == (8, 1)
+    assert twin["worker_cores_measurement"] == TWIN_CORES_MEASUREMENT
+    assert (contracts["worker_cores"], contracts["minimum_workers"]) == (1, 3)
+    assert (probe["worker_cores"], probe["minimum_workers"]) == (1, 2)
+    assert assess(lavender, state, twin, twin_tags) == {"workers": 1, "code": None, "reason": ""}
+
+    state["live"] = LiveLoad(runs=1, workers=1, cores=8, ram_gb=4.5)
+    for suite, tags, minimum in ((contracts, contracts_tags, 3), (probe, probe_tags, 2)):
+        beside_twin = assess(lavender, state, suite, tags)
+        assert (beside_twin["workers"], beside_twin["code"]) == (
+            0,
+            FleetErrorCode.NODE_OWNER_RESERVED,
+        )
+        assert beside_twin["reason"].startswith(
+            "lavender's checks are held to 8.00 CPU(s) by the quota systemd keeps on their "
+            f"slice, so 0 core(s) are left where the suite's minimum of {minimum} worker(s) "
+            f"occupies {minimum}"
+        )
+
+    state["live"] = LiveLoad(runs=1, workers=4, cores=4, ram_gb=2.0)
+    beside_contracts = assess(lavender, state, twin, twin_tags)
+    assert (beside_contracts["workers"], beside_contracts["code"]) == (
+        0,
+        FleetErrorCode.NODE_OWNER_RESERVED,
+    )
+    assert beside_contracts["reason"].startswith(
+        "lavender's checks are held to 8.00 CPU(s) by the quota systemd keeps on their slice, "
+        "so 4 core(s) are left where the suite's minimum of 1 worker(s) occupies 8"
+    )
+
+    sedona = workspace["nodes"]["sedona"]
+    sedona_tags = node_tags(sedona) | frozenset(twin["required_tags"])
+    assert assess(sedona, idle_state(sedona), twin, sedona_tags) == {
+        "workers": 1,
+        "code": None,
+        "reason": "",
+    }
+    serendipity = workspace["nodes"]["serendipity"]
+    serendipity_tags = node_tags(serendipity) | frozenset(twin["required_tags"])
+    refused = assess(serendipity, idle_state(serendipity), twin, serendipity_tags)
+    assert (refused["workers"], refused["code"]) == (0, FleetErrorCode.NODE_OWNER_RESERVED)
+    assert refused["reason"].startswith(
+        "serendipity has 24.0 GB free against a reservation of 1.5 GB for whoever is using it, "
+        "and 8 cores against 2 reserved. Nothing is left for a dispatch"
     )
