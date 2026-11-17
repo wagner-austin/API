@@ -259,6 +259,30 @@ class TestMalformedAnswers:
         assert "retire netboot arm @pendragon" in line
         assert "make" not in line
 
+    def test_an_inspect_decodes_naming_the_node_it_reads_and_logs_as_an_inspect(self) -> None:
+        """The queue admits inspect only after every runner can read it (MCPs
+        mig 987, board tasks dcf8b536 and 13d112bb); its line names the
+        catalog probe and the node it reads, never a make target."""
+        job = claimed_job(
+            answer(
+                {
+                    "claimed": queue_job(
+                        command="inspect", project="probes/os", requestedNode="pendragon", sha=None
+                    )
+                }
+            )
+        )
+
+        assert job["command"] is DispatchCommand.INSPECT
+        assert job["project"] == "probes/os"
+        assert job["requested_node"] == "pendragon"
+        assert job["sha"] is None
+        assert job["model"] is None
+        assert job["research_request"] is None
+        line = encode_job_line(job)
+        assert line.endswith(" inspect probes/os @pendragon")
+        assert "make" not in line
+
     def test_a_missing_reason_key_is_a_changed_contract_not_an_absent_reason(self) -> None:
         row = queue_job()
         del row["sessionReason"]

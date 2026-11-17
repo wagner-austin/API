@@ -108,6 +108,13 @@ class DispatchCommand(StrEnum):
     # command this reader does not know fails every listing.
     MODEL_LOAD = "model-load"
     MODEL_UNLOAD = "model-unload"
+    # MCPs mig 987, board task dcf8b536: read one read-only probe of the
+    # committed catalog from the roster node in requestedNode, named as
+    # project probes/<catalog id> and run by the control-duty holder on the
+    # queue's inspect lane, which no runner of this package claims. Decoded
+    # before the queue admits one, since a command this reader does not know
+    # fails every listing (MCPs board task 13d112bb).
+    INSPECT = "inspect"
 
 
 #: The commands that name a catalog model rather than a registry project.
@@ -541,6 +548,10 @@ def encode_job_line(job: DispatchJob) -> str:
     elif job["command"] in MODEL_COMMANDS:
         # A model job names a catalog model, not a make target or a commit.
         verb = f"{job['command']} {job['project']}"
+    elif job["command"] is DispatchCommand.INSPECT:
+        # Nor is an inspect: it names a catalog probe, and @where is the
+        # node it reads, not the machine that runs it.
+        verb = f"inspect {job['project']}"
     else:
         verb = f"make {job['command']} {job['project']}{at}"
     return f"{job['job_id']} {job['status']} {verb} @{where}{run}"
