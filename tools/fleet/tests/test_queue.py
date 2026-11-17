@@ -258,6 +258,30 @@ class TestReport:
         # MCPs board task 1964fc15: the grant the queue's claim fit reads.
         assert endpoint.arguments[0]["workers"] == 4
 
+    def test_progress_names_the_job_and_its_generation_beside_the_note(self) -> None:
+        """MCPs board task 6f26aeb5: every argument, so a progress report that
+        dropped the generation would no longer pass."""
+        endpoint = FakeQueue([dump_json_str({"job": queue_job(status="running")})])
+        _test_hooks.http_post = endpoint
+
+        queue.report_progress(
+            QUEUE_CREDENTIALS,
+            job=HELD,
+            note="phase: test",
+            lease_seconds=900,
+            identity=RUNNER_IDENTITY,
+        )
+
+        assert endpoint.tools == ["dispatch_report"]
+        assert endpoint.arguments[0] == {
+            "action": "progress",
+            "jobId": "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+            "claimGeneration": 3,
+            "note": "phase: test",
+            "leaseSeconds": 900,
+            **RUNNER_IDENTITY,
+        }
+
     def test_close_sends_an_exit_code_when_there_is_one(self) -> None:
         endpoint = FakeQueue([dump_json_str({"job": queue_job(status="failed")})])
         _test_hooks.http_post = endpoint
