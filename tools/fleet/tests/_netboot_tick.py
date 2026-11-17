@@ -8,7 +8,7 @@ from __future__ import annotations
 import pathlib
 from typing import Final
 
-from fleet.cli import agent
+from fleet.cli import agent_lanes
 from fleet.core import _test_hooks, netboot_adopt, netboot_arm, sealed_release
 from tests.conftest import ok
 
@@ -52,9 +52,9 @@ def place(tmp_path: pathlib.Path) -> dict[str, pathlib.Path]:
         encoding="utf-8",
     )
     return {
-        agent.NETBOOT_RELEASE_FLAG: release,
-        agent.SERVED_ROOT_FLAG: tmp_path / "srv" / "corvis-netboot",
-        agent.ENV_FILE_FLAG: env_file,
+        agent_lanes.NETBOOT_RELEASE_FLAG: release,
+        agent_lanes.SERVED_ROOT_FLAG: tmp_path / "srv" / "corvis-netboot",
+        agent_lanes.ENV_FILE_FLAG: env_file,
     }
 
 
@@ -83,10 +83,10 @@ def netboot_place(
         The place, with ``node`` as the node binary.
     """
     return netboot_arm.NetbootPlace(
-        release=paths[agent.NETBOOT_RELEASE_FLAG],
+        release=paths[agent_lanes.NETBOOT_RELEASE_FLAG],
         nodejs="node",
-        served_root=paths[agent.SERVED_ROOT_FLAG],
-        env_file=paths[agent.ENV_FILE_FLAG],
+        served_root=paths[agent_lanes.SERVED_ROOT_FLAG],
+        env_file=paths[agent_lanes.ENV_FILE_FLAG],
         registry=registry,
     )
 
@@ -101,7 +101,7 @@ def sealed(paths: dict[str, pathlib.Path]) -> sealed_release.SealedRelease:
         The release, its revision and its checkout.
     """
     return sealed_release.SealedRelease(
-        release=RELEASE_ID, revision=REVISION, root=paths[agent.NETBOOT_RELEASE_FLAG]
+        release=RELEASE_ID, revision=REVISION, root=paths[agent_lanes.NETBOOT_RELEASE_FLAG]
     )
 
 
@@ -117,7 +117,7 @@ def adopt_replies(
     Returns:
         The verifier's reply and ``adopt``'s.
     """
-    return [verify_reply(paths[agent.NETBOOT_RELEASE_FLAG]), ok(f"{printed}\n")]
+    return [verify_reply(paths[agent_lanes.NETBOOT_RELEASE_FLAG]), ok(f"{printed}\n")]
 
 
 def adopt_calls(paths: dict[str, pathlib.Path], registry: pathlib.Path) -> list[tuple[str, ...]]:
@@ -131,6 +131,6 @@ def adopt_calls(paths: dict[str, pathlib.Path], registry: pathlib.Path) -> list[
         Both argvs, in order.
     """
     return [
-        sealed_release.verify_argv(paths[agent.NETBOOT_RELEASE_FLAG], "netboot"),
+        sealed_release.verify_argv(paths[agent_lanes.NETBOOT_RELEASE_FLAG], "netboot"),
         netboot_adopt.adopt_argv(netboot_place(paths, registry), sealed(paths)),
     ]

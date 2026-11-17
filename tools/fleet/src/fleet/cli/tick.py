@@ -14,6 +14,9 @@ Usage:
     poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
         --lane netboot --netboot-release <release>/MCPs --nodejs /usr/bin/node \\
         --served-root /srv/corvis-netboot --env-file <workspace>/.env
+    poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
+        --lane inspect --inspect-release <release>/MCPs --nodejs /usr/bin/node \\
+        --workspace <workspace>
 
 The command behind every fleet job of the MCPs hub runner (MCPs board task
 b27bd34a, ``scripts/fleet/hub-jobs.json``): its ``fleet-hub`` job runs the
@@ -32,8 +35,14 @@ lane for that machine as ``fleet-sessions-<alias>``, with
 the ``netboot`` lane as ``fleet-netboot-<that machine's name>``, with
 ``netboot-announce`` its check-in (MCPs board task 83102d9d): the row names
 the installed netboot release it arms from, the node binary, the served root
-and the workspace env file, and the tick hands them to the agent. The row runs
-this module with ``poetry run`` in the fleet package's own environment.
+and the workspace env file, and the tick hands them to the agent. The
+``fleet-inspect`` job, placed on the machine holding the control duty, runs
+the ``inspect`` lane as ``fleet-inspect-<that machine's name>``, with
+``inspect-announce`` its check-in (MCPs board task 3e9c99af): the row names
+the installed fleet-audit release it inspects from, the node binary and the
+workspace whose registry names the roster, each lane's flags read from
+:data:`fleet.cli.agent_lanes.LANE_PLACES`. Each row runs this module with
+``poetry run`` in the fleet package's own environment.
 
 WHAT A TICK DOES:
 
@@ -79,7 +88,7 @@ from platform_core.env_file import parse_env_file
 from platform_core.members import find_member
 from platform_core.report_line import emit_error_line, emit_line
 
-from fleet.cli import agent as agent_cli
+from fleet.cli import agent_lanes
 from fleet.cli import rolled as rolled_cli
 from fleet.contracts.dispatch import DispatchLane
 from fleet.core import _test_hooks, names
@@ -93,7 +102,7 @@ _FLAGS: Final = (
     LOG_DIRECTORY_FLAG,
     LANE_FLAG,
     NODE_FLAG,
-    *agent_cli.NETBOOT_FLAGS,
+    *agent_lanes.PLACE_FLAGS,
 )
 
 
@@ -106,6 +115,8 @@ class Lane(StrEnum):
     SESSIONS_ANNOUNCE = "sessions-announce"
     NETBOOT = "netboot"
     NETBOOT_ANNOUNCE = "netboot-announce"
+    INSPECT = "inspect"
+    INSPECT_ANNOUNCE = "inspect-announce"
     NODE = "node"
     ANNOUNCE = "announce"
     RESEARCH = "research"
@@ -113,9 +124,10 @@ class Lane(StrEnum):
 
 
 #: The ticks ``fleet-agent`` runs, each a duty's tick or its one-time
-#: check-in, by the queue lane that duty claims: the control duty's hub, the
-#: sessions duty's and the netboot duty's. One table, so the three runners
-#: are planned by one function and named by one (MCPs board task af8b5662).
+#: check-in, by the queue lane that duty claims: the control duty's hub and
+#: inspections (MCPs board task 3e9c99af), the sessions duty's and the
+#: netboot duty's. One table, so the runners are planned by one function and
+#: named by one (MCPs board task af8b5662).
 _AGENT_LANES: Final[Mapping[Lane, DispatchLane]] = {
     Lane.HUB: DispatchLane.HUB,
     Lane.HUB_ANNOUNCE: DispatchLane.HUB,
@@ -123,6 +135,8 @@ _AGENT_LANES: Final[Mapping[Lane, DispatchLane]] = {
     Lane.SESSIONS_ANNOUNCE: DispatchLane.SESSIONS,
     Lane.NETBOOT: DispatchLane.NETBOOT,
     Lane.NETBOOT_ANNOUNCE: DispatchLane.NETBOOT,
+    Lane.INSPECT: DispatchLane.INSPECT,
+    Lane.INSPECT_ANNOUNCE: DispatchLane.INSPECT,
     Lane.RESEARCH: DispatchLane.RESEARCH,
     Lane.RESEARCH_ANNOUNCE: DispatchLane.RESEARCH,
 }
@@ -133,6 +147,7 @@ _ANNOUNCE_LANES: Final[frozenset[Lane]] = frozenset(
         Lane.HUB_ANNOUNCE,
         Lane.SESSIONS_ANNOUNCE,
         Lane.NETBOOT_ANNOUNCE,
+        Lane.INSPECT_ANNOUNCE,
         Lane.ANNOUNCE,
         Lane.RESEARCH_ANNOUNCE,
     }
@@ -216,32 +231,43 @@ class TickPlan(TypedDict):
     header: str
 
 
-def _netboot_arguments(lane: Lane, netboot: Mapping[str, str]) -> tuple[str, ...]:
-    """The flags a netboot tick hands the agent, and nothing for any other.
+#: The ticks that place their commands, by the queue lane whose flags they
+#: hand the agent (:data:`fleet.cli.agent_lanes.LANE_PLACES`); their
+#: check-ins place nothing.
+_PLACED_LANES: Final[Mapping[Lane, DispatchLane]] = {
+    Lane.NETBOOT: DispatchLane.NETBOOT,
+    Lane.INSPECT: DispatchLane.INSPECT,
+}
+
+
+def _place_arguments(lane: Lane, given: Mapping[str, str]) -> tuple[str, ...]:
+    """The flags a placed lane's tick hands the agent, and nothing for any other.
 
     Args:
         lane: Which tick this is.
-        netboot: The tick's own values of :data:`fleet.cli.agent.NETBOOT_FLAGS`.
+        given: The tick's own values of
+            :data:`fleet.cli.agent_lanes.PLACE_FLAGS`.
 
     Returns:
-        Each flag and its value, in that order, for the netboot lane; an
-        empty tuple for every other lane.
+        Each of the lane's own flags and its value, in that order, for a
+        placed lane; an empty tuple for every other lane.
 
     Raises:
-        ValueError: ``FLEET_TICK_USAGE`` when the netboot lane lacks one of
-            them or any other lane is given one.
+        ValueError: ``FLEET_TICK_USAGE`` when a placed lane lacks one of its
+            flags, or any lane is given a flag only another reads.
     """
-    if lane is Lane.NETBOOT:
-        missing = [flag for flag in agent_cli.NETBOOT_FLAGS if flag not in netboot]
-        if missing:
-            raise ValueError(f"FLEET_TICK_USAGE: the {lane.value} lane needs {', '.join(missing)}")
-        return tuple(token for flag in agent_cli.NETBOOT_FLAGS for token in (flag, netboot[flag]))
-    if netboot:
-        raise ValueError(
-            f"FLEET_TICK_USAGE: the {lane.value} lane takes no {', '.join(netboot)}; "
-            f"only the {Lane.NETBOOT.value} lane arms"
-        )
-    return ()
+    placed = _PLACED_LANES.get(lane)
+    own = () if placed is None else agent_lanes.LANE_PLACES[placed][0]
+    for other, (flags, why, _) in agent_lanes.LANE_PLACES.items():
+        foreign = [flag for flag in flags if flag in given and flag not in own]
+        if other is not placed and foreign:
+            raise ValueError(
+                f"FLEET_TICK_USAGE: the {lane.value} lane takes no {', '.join(foreign)}; {why}"
+            )
+    missing = [flag for flag in own if flag not in given]
+    if missing:
+        raise ValueError(f"FLEET_TICK_USAGE: the {lane.value} lane needs {', '.join(missing)}")
+    return tuple(token for flag in own for token in (flag, given[flag]))
 
 
 def _agent_plan(
@@ -311,7 +337,7 @@ def _agent_plan(
 
 
 def plan_tick(
-    api_root: pathlib.Path, lane: Lane, node: str | None, netboot: Mapping[str, str]
+    api_root: pathlib.Path, lane: Lane, node: str | None, places: Mapping[str, str]
 ) -> TickPlan:
     """Plan one lane's tick.
 
@@ -319,21 +345,22 @@ def plan_tick(
         api_root: The API checkout.
         lane: Which tick this is.
         node: The machine's alias for the node and sessions lanes; None for
-            the hub and netboot lanes.
-        netboot: The tick's own values of :data:`fleet.cli.agent.NETBOOT_FLAGS`,
-            which the netboot lane hands the agent and every other refuses.
+            the hub, netboot and inspect lanes.
+        places: The tick's own values of
+            :data:`fleet.cli.agent_lanes.PLACE_FLAGS`, which a placed lane
+            hands the agent its own of and every lane refuses another's.
 
     Returns:
         The launcher's command line, the log stem and the record's header.
 
     Raises:
-        ValueError: ``FLEET_TICK_USAGE`` when a hub or netboot lane names a
-            node, a node or sessions lane names none, or the netboot flags
-            are missing from the netboot lane or given to another.
+        ValueError: ``FLEET_TICK_USAGE`` when a hub, netboot or inspect lane
+            names a node, a node or sessions lane names none, or a placed
+            lane's flags are missing from it or given to another.
     """
     repo = str(api_root)
     announce = ("--announce",) if lane in _ANNOUNCE_LANES else ()
-    arms = _netboot_arguments(lane, netboot)
+    arms = _place_arguments(lane, places)
     agent_lane = _AGENT_LANES.get(lane)
     if agent_lane is not None:
         return _agent_plan(api_root, lane, agent_lane, node, (*arms, *announce))
@@ -395,8 +422,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     api_root = pathlib.Path(cli_args.require_flag(parsed, API_ROOT_FLAG))
     log_directory = pathlib.Path(cli_args.require_flag(parsed, LOG_DIRECTORY_FLAG))
     lane = require_lane(cli_args.require_flag(parsed, LANE_FLAG))
-    netboot = {flag: parsed[flag] for flag in agent_cli.NETBOOT_FLAGS if flag in parsed}
-    plan = plan_tick(api_root, lane, parsed.get(NODE_FLAG), netboot)
+    places = {flag: parsed[flag] for flag in agent_lanes.PLACE_FLAGS if flag in parsed}
+    plan = plan_tick(api_root, lane, parsed.get(NODE_FLAG), places)
     env_file = api_root / ENV_FILE
     credentials = tuple(
         parse_env_file(_test_hooks.read_text(env_file), source=str(env_file)).items()

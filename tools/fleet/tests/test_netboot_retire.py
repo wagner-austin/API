@@ -10,6 +10,7 @@ from typing import Final
 
 from fleet.contracts.dispatch import ClosingStatus
 from fleet.core import _test_hooks, netboot_arm, netboot_retire
+from fleet.core.release_cli import ReleaseCliOutcome, release_cli_argv
 from fleet.core.sealed_release import SealedRelease
 from tests.conftest import failed, ok, timed_out
 
@@ -31,7 +32,7 @@ RETIRED: Final = (
 )
 
 
-def outcome(result: _test_hooks.CommandResult) -> netboot_arm.ArmOutcome:
+def outcome(result: _test_hooks.CommandResult) -> ReleaseCliOutcome:
     """Read a retirement of pendragon's arm from :data:`RELEASE`.
 
     Args:
@@ -58,9 +59,10 @@ class TestTheCommandLine:
 
         argv = netboot_retire.retire_argv(place, RELEASE, "pendragon", reason)
 
-        assert argv == netboot_arm.cli_argv(
-            place,
-            RELEASE,
+        assert argv == release_cli_argv(
+            "/usr/bin/node",
+            RELEASE["root"] / netboot_arm.CLI,
+            (),
             "retire",
             "--root",
             "/srv/corvis-netboot",
@@ -77,7 +79,7 @@ class TestTheCommandLine:
 
 class TestTheOutcome:
     def test_a_retirement_that_printed_its_line_passes_with_it(self) -> None:
-        assert outcome(ok(f"{RETIRED}\n")) == netboot_arm.ArmOutcome(
+        assert outcome(ok(f"{RETIRED}\n")) == ReleaseCliOutcome(
             status=ClosingStatus.PASSED, exit_code=0, detail=f"{OPENING}: {RETIRED}"
         )
 
@@ -90,7 +92,7 @@ class TestTheOutcome:
         assert closed["detail"] == f"{OPENING}: {RETIRED}; {second}"
 
     def test_an_exit_0_without_a_retired_line_is_not_reported_retired(self) -> None:
-        assert outcome(ok("nothing to see\n")) == netboot_arm.ArmOutcome(
+        assert outcome(ok("nothing to see\n")) == ReleaseCliOutcome(
             status=ClosingStatus.REFUSED,
             exit_code=None,
             detail=(
@@ -114,21 +116,21 @@ class TestTheOutcome:
     def test_a_refusal_raised_before_tailscale_closes_refused_with_the_commands_text(self) -> None:
         for code in netboot_retire.RETIRE_REFUSALS:
             refusal = f"{code}: pendragon (d8:5e:d3:84:53:d4) has no waiting or installing arm"
-            assert outcome(failed(1, f"fleet-netboot: {refusal}\n")) == netboot_arm.ArmOutcome(
+            assert outcome(failed(1, f"fleet-netboot: {refusal}\n")) == ReleaseCliOutcome(
                 status=ClosingStatus.REFUSED, exit_code=None, detail=refusal
             )
 
     def test_any_other_failure_closes_failed_with_the_outputs_tail(self) -> None:
         error = "fleet-netboot: TAILNET_KEY_REVOKE_FAILED: DELETE answered HTTP 403\n"
 
-        assert outcome(failed(1, error)) == netboot_arm.ArmOutcome(
+        assert outcome(failed(1, error)) == ReleaseCliOutcome(
             status=ClosingStatus.FAILED,
             exit_code=1,
             detail=f"{OPENING} exited 1: {error.strip()}",
         )
 
     def test_a_retirement_ended_at_its_deadline_closes_failed_saying_so(self) -> None:
-        assert outcome(timed_out(netboot_retire.RETIRE_TIMEOUT_SECONDS)) == netboot_arm.ArmOutcome(
+        assert outcome(timed_out(netboot_retire.RETIRE_TIMEOUT_SECONDS)) == ReleaseCliOutcome(
             status=ClosingStatus.FAILED,
             exit_code=_test_hooks.TIMED_OUT_RETURNCODE,
             detail=f"{OPENING} exited {_test_hooks.TIMED_OUT_RETURNCODE}: timed out after 300 s",

@@ -15,6 +15,8 @@ import pathlib
 from platform_core.json_utils import dump_json_str
 
 from fleet.cli import agent as agent_cli
+from fleet.cli import agent_lanes
+from fleet.contracts.dispatch import DispatchLane
 from fleet.core import _test_hooks, tick_run
 from tests._queue_fakes import queue_env
 
@@ -153,32 +155,36 @@ def sessions_argv(config_path: pathlib.Path, repo: pathlib.Path, node: str) -> l
     ]
 
 
-def netboot_argv(
-    config_path: pathlib.Path, repo: pathlib.Path, place: dict[str, pathlib.Path]
+def placed_argv(
+    lane: DispatchLane,
+    config_path: pathlib.Path,
+    repo: pathlib.Path,
+    place: dict[str, pathlib.Path],
 ) -> list[str]:
-    """Build the agent CLI's argument list for one netboot tick.
+    """Build the agent CLI's argument list for one tick of a placed lane.
 
     Args:
+        lane: The netboot or the inspect lane (``fleet.cli.agent_lanes``).
         config_path: The workspace document.
         repo: The monorepo root on this machine.
-        place: The release, served root and env file, keyed by flag; the
-            node binary is always ``node``.
+        place: The lane's place flags but the node binary, keyed by flag;
+            the node binary is always ``node``.
 
     Returns:
-        The argument list, with the netboot runner's identity.
+        The argument list, with that lane's runner's identity.
     """
     return [
         "--config",
         str(config_path),
         agent_cli.AGENT_FLAG,
-        f"fleet-netboot-{HUB_HOST}",
+        f"fleet-{lane.value}-{HUB_HOST}",
         agent_cli.SESSION_FLAG,
         "55555555-eeee-4eee-8eee-555555555555",
         agent_cli.ROOT_FLAG,
         str(repo),
         agent_cli.LANE_FLAG,
-        "netboot",
-        agent_cli.NODEJS_FLAG,
+        lane.value,
+        agent_lanes.NODEJS_FLAG,
         "node",
         *(token for flag, path in place.items() for token in (flag, str(path))),
     ]
@@ -193,7 +199,7 @@ __all__ = [
     "agent_argv",
     "bind_hub_tick",
     "hub_host",
-    "netboot_argv",
+    "placed_argv",
     "sessions_argv",
     "tick_run_id",
 ]

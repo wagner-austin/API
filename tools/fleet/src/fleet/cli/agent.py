@@ -1,5 +1,5 @@
 """CLI: one tick of the runner that serves the corvis dispatch queue's hub
-lane, its sessions lane or its netboot lane.
+lane, its sessions lane, its netboot lane or its inspect lane.
 
 Usage:
     fleet-agent --config registry --repo-root /home/corvis/PROJECTS/API \\
@@ -11,6 +11,10 @@ Usage:
         --agent fleet-netboot-diphtheria --session <uuid> --lane netboot \\
         --netboot-release <release>/MCPs --nodejs /usr/bin/node \\
         --served-root /srv/corvis-netboot --env-file <workspace>/.env [--announce]
+    fleet-agent --config registry --repo-root /home/corvis/PROJECTS/API \\
+        --agent fleet-inspect-lacrymal --session <uuid> --lane inspect \\
+        --inspect-release <release>/MCPs --nodejs /usr/bin/node \\
+        --workspace <workspace> [--announce]
 
 THIS IS THE OTHER HALF OF QUEUE INVERSION. ``fleet-mcp``'s ``dispatch_*``
 tools hold a queue that any session can enqueue onto -- from a phone, from
@@ -24,14 +28,15 @@ ONE TICK, NO LOOP. The interval belongs to whatever schedules this -- the
 MCPs hub runner, a shell loop, a Monitor -- where it is visible and changeable without
 editing code. Same decision ``tools/board-watch`` made next door.
 
-THE HUB, SESSIONS AND NETBOOT LANES ONLY (MCPs board tasks fd5cabfa, A5,
-c39ee056 and 83102d9d). With ``--lane hub`` this runner claims the
-``build-bases`` rebuild, the control duty's verb; with ``--lane sessions``
-it claims the session verbs (restart, revive, the two kills, the compact
-and the exit), the sessions duty's, on the machine whose sessions they are;
-with ``--lane netboot`` it claims the arms, the netboot duty's, whatever
-machine each names, since the machine an arm names is its target and never
-where it runs. Every one runs where it was claimed and closes in the tick
+THE HUB, SESSIONS, NETBOOT AND INSPECT LANES ONLY (MCPs board tasks
+fd5cabfa, A5, c39ee056, 83102d9d and 3e9c99af). With ``--lane hub`` this
+runner claims the ``build-bases`` rebuild, the control duty's verb; with
+``--lane sessions`` it claims the session verbs (restart, revive, the two
+kills, the compact and the exit), the sessions duty's, on the machine whose
+sessions they are; with ``--lane netboot`` it claims the arms, the netboot
+duty's, and with ``--lane inspect`` the inspections, the control duty's,
+each whatever machine it names, since the machine a job names is its
+target and never where it runs. Every one runs where it was claimed and closes in the tick
 that claimed it (:mod:`fleet.cli.hub_jobs`). The MCPs hub runner places
 each lane's row by the duty the node registry gives its machine, so the
 queue names no node for a session verb: holding the duty is the placement.
@@ -108,14 +113,23 @@ from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.mcp_client import McpCredentials
 from platform_core.report_line import emit_error_line, emit_line
 
-from fleet.cli import _config, hub_jobs, hub_passes, job_close, orphans
+from fleet.cli import _config, agent_lanes, hub_jobs, hub_passes, job_close, orphans
 from fleet.contracts.dispatch import (
     DispatchCommand,
     DispatchJob,
     DispatchLane,
     encode_job_line,
 )
-from fleet.core import _test_hooks, declared, netboot_adopt, netboot_arm, queue, rebuild, tick_run
+from fleet.core import (
+    _test_hooks,
+    declared,
+    fleet_inspect,
+    netboot_adopt,
+    netboot_arm,
+    queue,
+    rebuild,
+    tick_run,
+)
 
 _log = get_logger(__name__)
 
@@ -125,18 +139,10 @@ ROOT_FLAG = "--repo-root"
 NODE_FLAG = "--node"
 MCPS_ROOT_FLAG = "--mcps-root"
 LANE_FLAG = "--lane"
-NETBOOT_RELEASE_FLAG = "--netboot-release"
-NODEJS_FLAG = "--nodejs"
-SERVED_ROOT_FLAG = "--served-root"
-ENV_FILE_FLAG = "--env-file"
 
 #: The flag only a hub tick's base rebuilds read, which a sessions or
 #: netboot tick refuses rather than ignores.
 _HUB_ONLY_FLAGS = (MCPS_ROOT_FLAG,)
-
-#: The flags a netboot tick places its arms with, which every other lane
-#: refuses rather than ignores.
-NETBOOT_FLAGS = (NETBOOT_RELEASE_FLAG, NODEJS_FLAG, SERVED_ROOT_FLAG, ENV_FILE_FLAG)
 
 _FLAGS = (
     _config.CONFIG_FLAG,
@@ -147,7 +153,7 @@ _FLAGS = (
     NODE_FLAG,
     MCPS_ROOT_FLAG,
     LANE_FLAG,
-    *NETBOOT_FLAGS,
+    *agent_lanes.PLACE_FLAGS,
 )
 
 
@@ -162,6 +168,7 @@ def claim_pass(
     host: str,
     mcps_root: pathlib.Path | None,
     netboot: netboot_arm.NetbootPlace | None,
+    inspect: fleet_inspect.InspectPlace | None,
 ) -> DispatchJob | None:
     """Give back every held job whose run is gone, then take one job of this
     runner's lane and run it to its close.
@@ -191,6 +198,8 @@ def claim_pass(
             and arms never use it: they run a sealed release.
         netboot: Where an arm runs from and writes to, or None when the
             runner is not a netboot tick.
+        inspect: Where an inspection runs from, or None when the runner is
+            not an inspect tick.
 
     Returns:
         The job that was claimed, whatever became of it, or None when the
@@ -246,13 +255,29 @@ def claim_pass(
                 identity,
                 detail=(
                     f"{netboot_arm.NO_RELEASE_CODE}: this runner was started without "
-                    f"{', '.join(NETBOOT_FLAGS)}, so it has no netboot release to run "
-                    f"{job['command']} from; the netboot duty's fleet-netboot runner claims "
+                    f"{', '.join(agent_lanes.NETBOOT_FLAGS)}, so it has no netboot release "
+                    f"to run {job['command']} from; the netboot duty's fleet-netboot runner claims "
                     "the netboot lane"
                 ),
             )
         return hub_jobs.netboot_job(
             credentials, job, identity, place=netboot, node=host, run_id=run_id
+        )
+    if job["command"] is DispatchCommand.INSPECT:
+        if inspect is None:
+            return job_close.refuse(
+                credentials,
+                job,
+                identity,
+                detail=(
+                    f"{fleet_inspect.NO_RELEASE_CODE}: this runner was started without "
+                    f"{', '.join(agent_lanes.INSPECT_FLAGS)}, so it has no fleet-audit release "
+                    "to inspect "
+                    "from; the control duty's fleet-inspect runner claims the inspect lane"
+                ),
+            )
+        return hub_jobs.inspect_job(
+            credentials, job, identity, place=inspect, node=host, run_id=run_id
         )
     return hub_jobs.session_job(credentials, job, identity, node=host, run_id=run_id)
 
@@ -262,6 +287,7 @@ _LANE_CLAIMS = {
     DispatchLane.HUB: "the queue's hub lane (build-bases)",
     DispatchLane.SESSIONS: "the queue's sessions lane (the session verbs)",
     DispatchLane.NETBOOT: "the queue's netboot lane (netboot-arm, netboot-retire)",
+    DispatchLane.INSPECT: "the queue's inspect lane (inspect)",
 }
 
 
@@ -328,43 +354,16 @@ def lane_host(parsed: Mapping[str, str], lane: DispatchLane) -> str:
     """
     if lane is not DispatchLane.HUB:
         _refuse_flags(parsed, lane, _HUB_ONLY_FLAGS, "only a hub tick rebuilds the bases")
-    if lane is not DispatchLane.NETBOOT:
-        _refuse_flags(parsed, lane, NETBOOT_FLAGS, "only a netboot tick arms")
+    placed = agent_lanes.LANE_PLACES.get(lane)
+    own = () if placed is None else placed[0]
+    for other, (flags, why, _) in agent_lanes.LANE_PLACES.items():
+        if other is not lane:
+            _refuse_flags(parsed, lane, [flag for flag in flags if flag not in own], why)
     if lane is DispatchLane.SESSIONS:
         return cli_args.require_flag(parsed, NODE_FLAG)
-    if lane is DispatchLane.NETBOOT:
-        # The machine an arm names is its target, never where it runs, so
-        # the lane claims every arm, whatever machine it names.
-        _refuse_flags(
-            parsed,
-            lane,
-            (NODE_FLAG,),
-            "it claims every arm, and the machine an arm names is its target",
-        )
+    if placed is not None:
+        _refuse_flags(parsed, lane, (NODE_FLAG,), placed[2])
     return _test_hooks.hostname()
-
-
-def netboot_place(parsed: Mapping[str, str], registry: pathlib.Path) -> netboot_arm.NetbootPlace:
-    """Read where a netboot tick's arms run from and write to.
-
-    Args:
-        parsed: The parsed flags.
-        registry: The registry directory this tick loaded.
-
-    Returns:
-        The installed release, the node binary, the served root, the
-        workspace env file and the registry.
-
-    Raises:
-        ValueError: When any of :data:`NETBOOT_FLAGS` is absent.
-    """
-    return netboot_arm.NetbootPlace(
-        release=pathlib.Path(cli_args.require_flag(parsed, NETBOOT_RELEASE_FLAG)),
-        nodejs=cli_args.require_flag(parsed, NODEJS_FLAG),
-        served_root=pathlib.Path(cli_args.require_flag(parsed, SERVED_ROOT_FLAG)),
-        env_file=pathlib.Path(cli_args.require_flag(parsed, ENV_FILE_FLAG)),
-        registry=registry,
-    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -382,9 +381,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     A sessions tick names its machine with ``--node``: the claim takes jobs
     for it and jobs naming none, and its session jobs are reported started
-    there. A netboot tick names where its arms run from and write to with
-    :data:`NETBOOT_FLAGS` and claims with no node. Each refuses the flags
-    only another lane reads (:func:`lane_host`).
+    there. A netboot tick names where its arms run from and write to, and an
+    inspect tick where its inspections run from, each with its own flags of
+    :data:`fleet.cli.agent_lanes.LANE_PLACES`, and claims with no node. Each
+    refuses the flags only another lane reads (:func:`lane_host`).
 
     Args:
         argv: Command-line arguments excluding the program name.
@@ -439,7 +439,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     raw_mcps_root = parsed.get(MCPS_ROOT_FLAG)
     mcps_root = pathlib.Path(raw_mcps_root).resolve() if raw_mcps_root is not None else None
 
-    netboot = netboot_place(parsed, loaded.registry) if lane is DispatchLane.NETBOOT else None
+    netboot = (
+        agent_lanes.netboot_place(parsed, loaded.registry)
+        if lane is DispatchLane.NETBOOT
+        else None
+    )
+    inspect = agent_lanes.inspect_place(parsed) if lane is DispatchLane.INSPECT else None
     claimed = claim_pass(
         credentials,
         identity,
@@ -450,6 +455,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         host=host,
         mcps_root=mcps_root,
         netboot=netboot,
+        inspect=inspect,
     )
     if claimed is None:
         _log.info("%s lane empty", lane.value)
@@ -493,20 +499,14 @@ if __name__ == "__main__":
 
 __all__ = [
     "AGENT_FLAG",
-    "ENV_FILE_FLAG",
     "LANE_FLAG",
     "MCPS_ROOT_FLAG",
-    "NETBOOT_FLAGS",
-    "NETBOOT_RELEASE_FLAG",
-    "NODEJS_FLAG",
     "NODE_FLAG",
     "ROOT_FLAG",
-    "SERVED_ROOT_FLAG",
     "SESSION_FLAG",
     "claim_pass",
     "entrypoint",
     "lane_host",
     "main",
-    "netboot_place",
     "require_runner_lane",
 ]

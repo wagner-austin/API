@@ -18,9 +18,10 @@ from typing import Final
 import pytest
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, narrow_json_to_str
 
-from fleet.cli import agent
+from fleet.cli import agent, agent_lanes
+from fleet.contracts.dispatch import DispatchLane
 from fleet.core import _test_hooks, netboot_adopt, netboot_retire, sealed_release
-from tests._agent_cli import HELD_THEN_CLAIMED, HUB_HOST, NOTHING_HELD, bind_hub_tick, netboot_argv
+from tests._agent_cli import HELD_THEN_CLAIMED, HUB_HOST, NOTHING_HELD, bind_hub_tick, placed_argv
 from tests._netboot_tick import (
     RELEASE_ID,
     REVISION,
@@ -98,13 +99,13 @@ class TestARetirement:
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
         paths = place(tmp_path)
-        release = paths[agent.NETBOOT_RELEASE_FLAG]
+        release = paths[agent_lanes.NETBOOT_RELEASE_FLAG]
         runner = FakeRun([verify_reply(release), ok(f"{RETIRED}\n"), *adopt_replies(paths)])
         _test_hooks.run = runner
         endpoint = ran_queue("passed")
         _test_hooks.http_post = endpoint
 
-        assert agent.main(netboot_argv(config_path, repo, paths)) == 0
+        assert agent.main(placed_argv(DispatchLane.NETBOOT, config_path, repo, paths)) == 0
 
         assert endpoint.tools == [*HELD_THEN_CLAIMED, "dispatch_report", "dispatch_report"]
         assert runner.calls == [
@@ -140,7 +141,7 @@ class TestARetirement:
         )
         _test_hooks.run = FakeRun(
             [
-                verify_reply(paths[agent.NETBOOT_RELEASE_FLAG]),
+                verify_reply(paths[agent_lanes.NETBOOT_RELEASE_FLAG]),
                 failed(1, f"fleet-netboot: {refusal}\n"),
                 *adopt_replies(paths),
             ]
@@ -148,7 +149,7 @@ class TestARetirement:
         endpoint = ran_queue("refused")
         _test_hooks.http_post = endpoint
 
-        assert agent.main(netboot_argv(config_path, repo, paths)) == 0
+        assert agent.main(placed_argv(DispatchLane.NETBOOT, config_path, repo, paths)) == 0
 
         closed = endpoint.arguments[3]
         assert closed["status"] == "refused"
@@ -170,7 +171,7 @@ class TestARetirement:
         )
         _test_hooks.http_post = endpoint
 
-        assert agent.main(netboot_argv(config_path, repo, paths)) == 0
+        assert agent.main(placed_argv(DispatchLane.NETBOOT, config_path, repo, paths)) == 0
 
         # Only the adopt pass ran.
         assert runner.calls == adopt_calls(paths, config_path)

@@ -10,9 +10,10 @@ from typing import Final
 
 import pytest
 
-from fleet.cli import agent
+from fleet.cli import agent_lanes
 from fleet.contracts.dispatch import ClosingStatus
 from fleet.core import _test_hooks, netboot_arm
+from fleet.core.release_cli import ReleaseCliOutcome
 from fleet.core.sealed_release import SealedRelease
 from tests._netboot_tick import (
     WRITER_ID,
@@ -53,7 +54,7 @@ def env_file(tmp_path: pathlib.Path, text: str) -> pathlib.Path:
     return path
 
 
-def outcome(result: _test_hooks.CommandResult) -> netboot_arm.ArmOutcome:
+def outcome(result: _test_hooks.CommandResult) -> ReleaseCliOutcome:
     """Read an arm of lavender from :data:`RELEASE`.
 
     Args:
@@ -212,8 +213,8 @@ class TestTheFleetWifi:
 
     def test_ready_gives_the_wifi_and_refuses_half_a_network(self, tmp_path: pathlib.Path) -> None:
         paths = place(tmp_path)
-        env = paths[agent.ENV_FILE_FLAG]
-        release = paths[agent.NETBOOT_RELEASE_FLAG]
+        env = paths[agent_lanes.ENV_FILE_FLAG]
+        release = paths[agent_lanes.NETBOOT_RELEASE_FLAG]
         where = netboot_place(paths, tmp_path / "registry")
         env.write_text(env.read_text(encoding="utf-8") + WIFI_LINES, encoding="utf-8")
         _test_hooks.run = FakeRun([verify_reply(release)])
@@ -303,7 +304,7 @@ class TestTheCommandLine:
 
 class TestTheOutcome:
     def test_an_arm_that_printed_its_line_passes_with_it(self) -> None:
-        assert outcome(ok(f"NETBOOT BUILT digest=4be1\n{ARMED}\n")) == netboot_arm.ArmOutcome(
+        assert outcome(ok(f"NETBOOT BUILT digest=4be1\n{ARMED}\n")) == ReleaseCliOutcome(
             status=ClosingStatus.PASSED, exit_code=0, detail=f"{OPENING}: {ARMED}"
         )
 
@@ -313,7 +314,7 @@ class TestTheOutcome:
     ) -> None:
         count = stdout.count("NETBOOT ARMED")
 
-        assert outcome(ok(stdout)) == netboot_arm.ArmOutcome(
+        assert outcome(ok(stdout)) == ReleaseCliOutcome(
             status=ClosingStatus.REFUSED,
             exit_code=None,
             detail=(
@@ -347,7 +348,7 @@ class TestTheOutcome:
     ) -> None:
         stderr = f"progress\nfleet-netboot: {code}: lavender, as the arm says\n"
 
-        assert outcome(failed(1, stderr)) == netboot_arm.ArmOutcome(
+        assert outcome(failed(1, stderr)) == ReleaseCliOutcome(
             status=ClosingStatus.REFUSED,
             exit_code=None,
             detail=f"{code}: lavender, as the arm says",
@@ -368,14 +369,14 @@ class TestTheOutcome:
             returncode=2, stdout="usage: fleet-netboot build ...\n", stderr="", timed_out=False
         )
 
-        assert outcome(usage) == netboot_arm.ArmOutcome(
+        assert outcome(usage) == ReleaseCliOutcome(
             status=ClosingStatus.FAILED,
             exit_code=2,
             detail=f"{OPENING} exited 2: usage: fleet-netboot build ...",
         )
 
     def test_an_arm_ended_at_its_deadline_closes_failed_saying_so(self) -> None:
-        assert outcome(timed_out(netboot_arm.ARM_TIMEOUT_SECONDS)) == netboot_arm.ArmOutcome(
+        assert outcome(timed_out(netboot_arm.ARM_TIMEOUT_SECONDS)) == ReleaseCliOutcome(
             status=ClosingStatus.FAILED,
             exit_code=_test_hooks.TIMED_OUT_RETURNCODE,
             detail=(f"{OPENING} exited {_test_hooks.TIMED_OUT_RETURNCODE}: timed out after 1800 s"),

@@ -35,9 +35,10 @@ MCPs board task f78f7e33) is read from the same file and handed to an
 arm's environment alone, for the arm of a machine whose roster file
 declares ``netbootWifi`` to give its first boot.
 
-SHARED WITH THE ADOPT PASS. :func:`ready`, :func:`cli_argv`,
-:func:`run_cli`, :func:`carries_key` and :func:`output_tail` are how every
-``fleet-netboot`` command the duty runs is verified, composed, run and read;
+SHARED WITH THE ADOPT PASS. :func:`ready`, :func:`run_cli` and
+:func:`carries_key` are how every ``fleet-netboot`` command the duty runs is
+verified, run and read, composed by
+:func:`fleet.core.release_cli.release_cli_argv` as every release CLI is;
 :mod:`fleet.core.netboot_adopt` runs ``adopt`` through them each tick.
 
 HOW THE JOB CLOSES. Exit 0 with exactly one ``NETBOOT ARMED`` line is
@@ -61,6 +62,7 @@ from platform_core.errors import AppError
 
 from fleet.contracts.dispatch import ClosingStatus
 from fleet.core import _test_hooks
+from fleet.core.release_cli import ReleaseCliOutcome, output_tail, release_cli_argv
 from fleet.core.sealed_release import SealedRelease, verify_release
 
 #: The release kind an arm runs, as MCPs ``release-kinds.json`` names it.
@@ -110,9 +112,6 @@ ARM_REFUSALS: Final[tuple[str, ...]] = (
 #: a few GB, and builds the served tree; later arms reuse both and finish
 #: in seconds. Inside the runner's one-hour lease and the tick's wall.
 ARM_TIMEOUT_SECONDS: Final[int] = 1800
-
-#: How much of a failed arm's output its detail carries.
-DETAIL_TAIL_CHARS: Final[int] = 600
 
 #: Detail prefix when the env file holds no usable key.
 NO_KEY_CODE: Final = "NETBOOT_ARM_NO_KEY"
@@ -178,20 +177,6 @@ class FleetWifi(TypedDict):
 
     ssid: str
     passphrase: str
-
-
-class ArmOutcome(TypedDict):
-    """How a finished arm closes its job.
-
-    Attributes:
-        status: ``passed``, ``failed`` or ``refused``.
-        exit_code: The arm's exit status, or None for ``refused``.
-        detail: The line the submitter reads.
-    """
-
-    status: ClosingStatus
-    exit_code: int | None
-    detail: str
 
 
 class Ready(TypedDict):
@@ -300,25 +285,6 @@ def read_tailnet_writer(env_file: pathlib.Path) -> TailnetWriter | str:
     return TailnetWriter(client_id=client_id, client_secret=client_secret)
 
 
-def cli_argv(place: NetbootPlace, release: SealedRelease, *arguments: str) -> tuple[str, ...]:
-    """The release's own ``fleet-netboot``, run with ``arguments``.
-
-    Args:
-        place: Where the netboot duty's commands run from.
-        release: The verified release.
-        *arguments: The command and its flags.
-
-    Returns:
-        Node importing the release's CLI and running it with ``arguments``;
-        the CLI reads them from ``process.argv[1]`` on under ``-e``.
-    """
-    importer = (
-        f"const m = await import({(release['root'] / CLI).as_uri()!r}); "
-        "await m.runFromProcess(process);"
-    )
-    return (place["nodejs"], "--input-type=module", "-e", importer, *arguments)
-
-
 def arm_argv(place: NetbootPlace, release: SealedRelease, machine: str) -> tuple[str, ...]:
     """The release's own ``fleet-netboot arm`` of one roster machine.
 
@@ -333,9 +299,10 @@ def arm_argv(place: NetbootPlace, release: SealedRelease, machine: str) -> tuple
         revision as the commit, the machine and the loaded registry.
     """
     root = release["root"]
-    return cli_argv(
-        place,
-        release,
+    return release_cli_argv(
+        place["nodejs"],
+        root / CLI,
+        (),
         "arm",
         "--definition",
         str(root / DEFINITION),
@@ -362,7 +329,7 @@ def run_cli(
     """Run one ``fleet-netboot`` command with the writer client in its environment alone.
 
     Args:
-        argv: What :func:`cli_argv` composed.
+        argv: What :func:`fleet.core.release_cli.release_cli_argv` composed.
         writer: The tailnet writer client.
         wifi: The fleet's Wi-Fi for an arm, which hands it to the machine's
             first boot; None for every other command, and for an arm when
@@ -420,22 +387,9 @@ def carries_key(result: _test_hooks.CommandResult) -> bool:
     return KEY_MARK in result["stdout"] or KEY_MARK in result["stderr"]
 
 
-def output_tail(result: _test_hooks.CommandResult) -> str:
-    """The end of a failed command's output, for the line that reports it.
-
-    Args:
-        result: The command's exit status and streams.
-
-    Returns:
-        The last :data:`DETAIL_TAIL_CHARS` characters of its stdout then
-        stderr, stripped.
-    """
-    return (result["stdout"] + result["stderr"]).strip()[-DETAIL_TAIL_CHARS:]
-
-
 def arm_outcome(
     result: _test_hooks.CommandResult, release: SealedRelease, machine: str
-) -> ArmOutcome:
+) -> ReleaseCliOutcome:
     """Read a finished arm into the job's close.
 
     Args:
@@ -456,7 +410,7 @@ def arm_outcome(
     )
     returncode = result["returncode"]
     if carries_key(result):
-        return ArmOutcome(
+        return ReleaseCliOutcome(
             status=ClosingStatus.REFUSED if returncode == 0 else ClosingStatus.FAILED,
             exit_code=None if returncode == 0 else returncode,
             detail=(
@@ -468,10 +422,10 @@ def arm_outcome(
     if returncode == 0:
         armed = [line for line in result["stdout"].splitlines() if line.startswith(ARMED_PREFIX)]
         if len(armed) == 1:
-            return ArmOutcome(
+            return ReleaseCliOutcome(
                 status=ClosingStatus.PASSED, exit_code=0, detail=f"{opening}: {armed[0]}"
             )
-        return ArmOutcome(
+        return ReleaseCliOutcome(
             status=ClosingStatus.REFUSED,
             exit_code=None,
             detail=(
@@ -482,8 +436,8 @@ def arm_outcome(
         )
     error = cli_error(result["stderr"])
     if any(error.startswith(f"{code}:") for code in ARM_REFUSALS):
-        return ArmOutcome(status=ClosingStatus.REFUSED, exit_code=None, detail=error)
-    return ArmOutcome(
+        return ReleaseCliOutcome(status=ClosingStatus.REFUSED, exit_code=None, detail=error)
+    return ReleaseCliOutcome(
         status=ClosingStatus.FAILED,
         exit_code=returncode,
         detail=f"{opening} exited {returncode}: {output_tail(result)}",
@@ -499,7 +453,6 @@ __all__ = [
     "CLI",
     "CLI_ERROR_PREFIX",
     "DEFINITION",
-    "DETAIL_TAIL_CHARS",
     "KEY_IN_OUTPUT_CODE",
     "KEY_MARK",
     "KIND",
@@ -509,7 +462,6 @@ __all__ = [
     "WIFI_NAMES",
     "WIFI_UNUSABLE_CODE",
     "WRITER_NAMES",
-    "ArmOutcome",
     "FleetWifi",
     "NetbootPlace",
     "Ready",
@@ -517,9 +469,7 @@ __all__ = [
     "arm_argv",
     "arm_outcome",
     "carries_key",
-    "cli_argv",
     "cli_error",
-    "output_tail",
     "read_fleet_wifi",
     "read_tailnet_writer",
     "ready",

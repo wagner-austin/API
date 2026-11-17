@@ -147,7 +147,7 @@ class TestTheNetbootLanes:
             tick.plan_tick(pathlib.Path("/api"), lane, node, {"--nodejs": "/usr/bin/node"})
 
         assert str(refused.value) == (
-            f"FLEET_TICK_USAGE: the {lane.value} lane takes no --nodejs; only the netboot lane arms"
+            f"FLEET_TICK_USAGE: the {lane.value} lane takes no --nodejs; only a netboot tick arms"
         )
 
 

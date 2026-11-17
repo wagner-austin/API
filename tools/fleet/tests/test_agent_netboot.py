@@ -22,7 +22,8 @@ from board_watch import config as board_config
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, narrow_json_to_str
 from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
-from fleet.cli import agent
+from fleet.cli import agent, agent_lanes
+from fleet.contracts.dispatch import DispatchLane
 from fleet.core import _test_hooks, netboot_adopt, netboot_arm, queue, sealed_release
 from tests._agent_cli import (
     HELD_THEN_CLAIMED,
@@ -30,7 +31,7 @@ from tests._agent_cli import (
     NOTHING_HELD,
     agent_argv,
     bind_hub_tick,
-    netboot_argv,
+    placed_argv,
     sessions_argv,
     tick_run_id,
 )
@@ -142,7 +143,7 @@ class TestTheNetbootLane:
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
         paths = place(tmp_path)
-        release = paths[agent.NETBOOT_RELEASE_FLAG]
+        release = paths[agent_lanes.NETBOOT_RELEASE_FLAG]
         runner = FakeRun(
             [
                 verify_reply(release),
@@ -154,7 +155,7 @@ class TestTheNetbootLane:
         endpoint = ran_queue("passed")
         _test_hooks.http_post = endpoint
 
-        assert agent.main(netboot_argv(config_path, repo, paths)) == 0
+        assert agent.main(placed_argv(DispatchLane.NETBOOT, config_path, repo, paths)) == 0
 
         assert endpoint.tools == [*HELD_THEN_CLAIMED, "dispatch_report", "dispatch_report"]
         # Every arm, whatever machine it names: the machine is the target.
@@ -195,7 +196,7 @@ class TestTheNetbootLane:
     ) -> None:
         # MCPs board task f78f7e33; a made-up network, never the fleet's own.
         paths = place(tmp_path)
-        env = paths[agent.ENV_FILE_FLAG]
+        env = paths[agent_lanes.ENV_FILE_FLAG]
         env.write_text(
             env.read_text(encoding="utf-8")
             + "FLEET_WIFI_SSID=corvis test net\nFLEET_WIFI_PASSPHRASE=made-up-passphrase-0001\n",
@@ -203,7 +204,7 @@ class TestTheNetbootLane:
         )
         runner = FakeRun(
             [
-                verify_reply(paths[agent.NETBOOT_RELEASE_FLAG]),
+                verify_reply(paths[agent_lanes.NETBOOT_RELEASE_FLAG]),
                 ok(f"{ARMED}\n"),
                 *adopt_replies(paths),
             ]
@@ -212,7 +213,7 @@ class TestTheNetbootLane:
         endpoint = ran_queue("passed")
         _test_hooks.http_post = endpoint
 
-        assert agent.main(netboot_argv(config_path, repo, paths)) == 0
+        assert agent.main(placed_argv(DispatchLane.NETBOOT, config_path, repo, paths)) == 0
 
         wifi_env = (
             ("FLEET_WIFI_SSID", "corvis test net"),
@@ -229,7 +230,7 @@ class TestTheNetbootLane:
         refusal = "NETBOOT_ARM_MACHINE_NOT_ARMABLE: lavender declares no bootMac"
         _test_hooks.run = FakeRun(
             [
-                verify_reply(paths[agent.NETBOOT_RELEASE_FLAG]),
+                verify_reply(paths[agent_lanes.NETBOOT_RELEASE_FLAG]),
                 failed(1, f"fleet-netboot: {refusal}\n"),
                 *adopt_replies(paths),
             ]
@@ -237,7 +238,7 @@ class TestTheNetbootLane:
         endpoint = ran_queue("refused")
         _test_hooks.http_post = endpoint
 
-        assert agent.main(netboot_argv(config_path, repo, paths)) == 0
+        assert agent.main(placed_argv(DispatchLane.NETBOOT, config_path, repo, paths)) == 0
 
         closed = endpoint.arguments[3]
         assert closed["status"] == "refused"
@@ -250,7 +251,7 @@ class TestTheNetbootLane:
         paths = place(tmp_path)
         _test_hooks.run = FakeRun(
             [
-                verify_reply(paths[agent.NETBOOT_RELEASE_FLAG]),
+                verify_reply(paths[agent_lanes.NETBOOT_RELEASE_FLAG]),
                 failed(1, "fleet-netboot: TAILNET_KEY_MINT_FAILED: Tailscale answered 403\n"),
                 *adopt_replies(paths),
             ]
@@ -258,7 +259,7 @@ class TestTheNetbootLane:
         endpoint = ran_queue("failed")
         _test_hooks.http_post = endpoint
 
-        assert agent.main(netboot_argv(config_path, repo, paths)) == 0
+        assert agent.main(placed_argv(DispatchLane.NETBOOT, config_path, repo, paths)) == 0
 
         closed = endpoint.arguments[3]
         assert closed["status"] == "failed"
@@ -283,9 +284,9 @@ class TestNetbootRefusals:
         endpoint = refused_queue()
         _test_hooks.http_post = endpoint
 
-        assert agent.main(netboot_argv(config_path, repo, paths)) == 0
+        assert agent.main(placed_argv(DispatchLane.NETBOOT, config_path, repo, paths)) == 0
 
-        verify = sealed_release.verify_argv(paths[agent.NETBOOT_RELEASE_FLAG], "netboot")
+        verify = sealed_release.verify_argv(paths[agent_lanes.NETBOOT_RELEASE_FLAG], "netboot")
         assert runner.calls == [verify, verify]
         assert endpoint.tools == [*HELD_THEN_CLAIMED, "dispatch_report"]
         detail = narrow_json_to_str(endpoint.arguments[2]["detail"])
@@ -296,19 +297,19 @@ class TestNetbootRefusals:
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
         paths = place(tmp_path)
-        paths[agent.ENV_FILE_FLAG].write_text("VM_HOST=lavender-wsl\n", encoding="utf-8")
-        release = paths[agent.NETBOOT_RELEASE_FLAG]
+        paths[agent_lanes.ENV_FILE_FLAG].write_text("VM_HOST=lavender-wsl\n", encoding="utf-8")
+        release = paths[agent_lanes.NETBOOT_RELEASE_FLAG]
         runner = FakeRun([verify_reply(release), verify_reply(release)])
         _test_hooks.run = runner
         endpoint = refused_queue()
         _test_hooks.http_post = endpoint
 
-        assert agent.main(netboot_argv(config_path, repo, paths)) == 0
+        assert agent.main(placed_argv(DispatchLane.NETBOOT, config_path, repo, paths)) == 0
 
         # The arm's verify and the adopt pass's, and neither command ran.
         assert len(runner.calls) == 2
         assert narrow_json_to_str(endpoint.arguments[2]["detail"]) == (
-            f"{netboot_arm.NO_KEY_CODE}: {paths[agent.ENV_FILE_FLAG]} sets no "
+            f"{netboot_arm.NO_KEY_CODE}: {paths[agent_lanes.ENV_FILE_FLAG]} sets no "
             "TAILNET_WRITER_CLIENT_ID or TAILNET_WRITER_CLIENT_SECRET, or sets it empty, and the "
             "netboot duty's commands run with the tailnet writer client; nothing ran"
         )
@@ -322,7 +323,7 @@ class TestNetbootRefusals:
         endpoint = refused_queue(requestedNode=None)
         _test_hooks.http_post = endpoint
 
-        assert agent.main(netboot_argv(config_path, repo, paths)) == 0
+        assert agent.main(placed_argv(DispatchLane.NETBOOT, config_path, repo, paths)) == 0
 
         # Only the adopt pass ran.
         assert runner.calls == adopt_calls(paths, config_path)
@@ -381,8 +382,10 @@ class TestTheNetbootCommandLine:
         endpoint = FakeQueue([])
         _test_hooks.http_post = endpoint
 
+        argv = placed_argv(DispatchLane.NETBOOT, config_path, repo, place(tmp_path))
+
         with pytest.raises(ValueError) as refused:
-            agent.main([*netboot_argv(config_path, repo, place(tmp_path)), *extra])
+            agent.main([*argv, *extra])
 
         assert str(refused.value) == f"FLEET_AGENT_USAGE: the netboot lane takes no {named}; {why}"
         assert endpoint.tools == []
@@ -398,7 +401,7 @@ class TestTheNetbootCommandLine:
         )
 
         with pytest.raises(ValueError) as refused:
-            agent.main([*argv, agent.NODEJS_FLAG, "node", agent.ENV_FILE_FLAG, ".env"])
+            agent.main([*argv, agent_lanes.NODEJS_FLAG, "node", agent_lanes.ENV_FILE_FLAG, ".env"])
 
         assert str(refused.value) == (
             f"FLEET_AGENT_USAGE: the {lane} lane takes no --nodejs or --env-file; "
@@ -409,12 +412,12 @@ class TestTheNetbootCommandLine:
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
         paths = place(tmp_path)
-        del paths[agent.NETBOOT_RELEASE_FLAG]
+        del paths[agent_lanes.NETBOOT_RELEASE_FLAG]
         endpoint = FakeQueue([])
         _test_hooks.http_post = endpoint
 
         with pytest.raises(ValueError, match="--netboot-release"):
-            agent.main(netboot_argv(config_path, repo, paths))
+            agent.main(placed_argv(DispatchLane.NETBOOT, config_path, repo, paths))
 
         assert endpoint.tools == []
 
@@ -430,7 +433,7 @@ class TestTheNetbootCommandLine:
         )
         endpoint = FakeQueue(["checked in"])
         _test_hooks.http_post = endpoint
-        argv = [*netboot_argv(config_path, repo, {}), queue.ANNOUNCE_FLAG]
+        argv = [*placed_argv(DispatchLane.NETBOOT, config_path, repo, {}), queue.ANNOUNCE_FLAG]
 
         assert agent.main(argv) == 0
 

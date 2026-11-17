@@ -37,6 +37,7 @@ from __future__ import annotations
 from typing import Final
 
 from fleet.core import _test_hooks, netboot_arm
+from fleet.core.release_cli import output_tail, release_cli_argv
 from fleet.core.sealed_release import SealedRelease
 
 #: The pass's deadline: one device list, then a delete, a readdress and a
@@ -62,9 +63,10 @@ def adopt_argv(place: netboot_arm.NetbootPlace, release: SealedRelease) -> tuple
         whose arms and adoption records it reads, and the registry this
         tick loaded, whose roster names each machine's address.
     """
-    return netboot_arm.cli_argv(
-        place,
-        release,
+    return release_cli_argv(
+        place["nodejs"],
+        release["root"] / netboot_arm.CLI,
+        (),
         "adopt",
         "--root",
         str(place["served_root"]),
@@ -98,7 +100,7 @@ def adopt_report(result: _test_hooks.CommandResult, release: SealedRelease) -> t
             "root's adoption records on the netboot host are the record",
         )
     if returncode != 0:
-        return (f"{opening} exited {returncode}: {netboot_arm.output_tail(result)}",)
+        return (f"{opening} exited {returncode}: {output_tail(result)}",)
     printed = tuple(
         f"{opening}: {line}" for line in result["stdout"].splitlines() if line.strip() != ""
     )

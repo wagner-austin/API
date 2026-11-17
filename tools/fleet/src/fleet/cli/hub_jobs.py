@@ -16,7 +16,11 @@ it and closes in the tick that claimed it, so nothing crosses ticks:
 * a NETBOOT ARM (the netboot duty's) runs the installed sealed netboot
   release's ``fleet-netboot arm`` (:mod:`fleet.core.netboot_arm`), and a
   NETBOOT RETIREMENT its ``fleet-netboot retire``
-  (:mod:`fleet.core.netboot_retire`, MCPs board task 7b7570c5).
+  (:mod:`fleet.core.netboot_retire`, MCPs board task 7b7570c5);
+* an INSPECTION (the control duty's) runs the installed sealed fleet-audit
+  release's ``fleet-inspect`` of one machine and catalog probe, and closes
+  with the inspection it printed (:mod:`fleet.core.fleet_inspect`, MCPs
+  board task 3e9c99af).
 
 Each refuses before it starts what it cannot run, by a named code, with
 nothing run; then reports the job started on this machine, runs it, and
@@ -35,7 +39,16 @@ from platform_core.mcp_client import McpCredentials
 
 from fleet.cli import job_close
 from fleet.contracts.dispatch import ClosingStatus, DispatchCommand, DispatchJob
-from fleet.core import netboot_arm, netboot_retire, queue, rebuild, restart, session_release
+from fleet.core import (
+    fleet_inspect,
+    netboot_arm,
+    netboot_retire,
+    queue,
+    rebuild,
+    restart,
+    session_release,
+)
+from fleet.core.sealed_release import verify_release
 
 _log = get_logger(__name__)
 
@@ -301,9 +314,70 @@ def netboot_job(
     )
 
 
+def inspect_job(
+    credentials: McpCredentials,
+    job: DispatchJob,
+    identity: JSONObject,
+    *,
+    place: fleet_inspect.InspectPlace,
+    node: str,
+    run_id: str,
+) -> DispatchJob:
+    """Execute a claimed ``inspect`` job on this machine, start to close.
+
+    The job names the machine to read as its requested node and the probe
+    as its project (MCPs mig 987), which is why the lane claims with no node
+    filter: the runner is placed by holding the control duty, and the
+    requested node is the target. The installed fleet-audit release's seal
+    is checked before the job is reported started, so a release that fails
+    it refuses the job with nothing run (:mod:`fleet.core.fleet_inspect`
+    carries the rest).
+
+    Args:
+        credentials: The queue's endpoint and headers.
+        job: The claimed ``inspect`` job.
+        identity: This runner's identity arguments.
+        place: Where inspections run from.
+        node: This machine's alias, which the job is reported started on.
+        run_id: The tick's run, which the job is reported started as.
+
+    Returns:
+        The job, whatever became of it.
+
+    Raises:
+        AppError: Only from the queue calls themselves.
+    """
+    target = fleet_inspect.inspect_target(job)
+    if isinstance(target, str):
+        return job_close.refuse(credentials, job, identity, detail=target)
+    release = verify_release(place["release"], fleet_inspect.KIND)
+    if isinstance(release, str):
+        return job_close.refuse(credentials, job, identity, detail=release)
+    _start(credentials, job, identity, node=node, run_id=run_id)
+    result = fleet_inspect.run_inspection(fleet_inspect.inspect_argv(place, release, target))
+    inspection = fleet_inspect.answered_inspection(result)
+    if inspection is not None:
+        closed = queue.report_inspected(
+            credentials, job_id=job["job_id"], inspection=inspection, identity=identity
+        )
+        _log.info("inspected %s: closed %s", job["job_id"], closed["status"])
+        return closed
+    outcome = fleet_inspect.inspect_outcome(result, release, target)
+    return job_close.close(
+        credentials,
+        job,
+        identity,
+        status=outcome["status"],
+        exit_code=outcome["exit_code"],
+        detail=outcome["detail"],
+        result=None,
+    )
+
+
 __all__ = [
     "CLAIM_LEASE_SECONDS",
     "PRESTART_LEASE_SECONDS",
+    "inspect_job",
     "netboot_job",
     "rebuild_job",
     "session_job",

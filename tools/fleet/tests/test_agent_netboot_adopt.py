@@ -15,9 +15,10 @@ from typing import Final
 import pytest
 from platform_core.json_utils import dump_json_str
 
-from fleet.cli import agent
+from fleet.cli import agent, agent_lanes
+from fleet.contracts.dispatch import DispatchLane
 from fleet.core import _test_hooks, netboot_adopt, sealed_release
-from tests._agent_cli import NOTHING_HELD, bind_hub_tick, netboot_argv
+from tests._agent_cli import NOTHING_HELD, bind_hub_tick, placed_argv
 from tests._netboot_tick import (
     NOTHING_PENDING,
     RELEASE_ID,
@@ -71,7 +72,7 @@ def empty_tick(
     endpoint = FakeQueue([NOTHING_HELD, dump_json_str({"claimed": None})])
     _test_hooks.http_post = endpoint
     with caplog.at_level("INFO"):
-        assert agent.main(netboot_argv(config_path, repo, paths)) == 0
+        assert agent.main(placed_argv(DispatchLane.NETBOOT, config_path, repo, paths)) == 0
     assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
     return [record.getMessage() for record in caplog.records]
 
@@ -123,7 +124,7 @@ class TestTheAdoptPass:
         paths = place(tmp_path)
         refusal = "fleet-netboot: NETBOOT_ADOPT_UNSEEN: no device of 9 holds 100.88.1.2"
         runner = FakeRun(
-            [verify_reply(paths[agent.NETBOOT_RELEASE_FLAG]), failed(1, f"{refusal}\n")]
+            [verify_reply(paths[agent_lanes.NETBOOT_RELEASE_FLAG]), failed(1, f"{refusal}\n")]
         )
 
         logged = empty_tick(config_path, repo, paths, runner, caplog)

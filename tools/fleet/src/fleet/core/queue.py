@@ -321,6 +321,45 @@ def report_close(
     )
 
 
+def report_inspected(
+    credentials: McpCredentials,
+    *,
+    job_id: str,
+    inspection: JSONObject,
+    identity: JSONObject,
+) -> DispatchJob:
+    """Close an inspect job with the inspection its probe answered.
+
+    The queue closes the job and records the inspection in one transaction
+    (MCPs mig 987, ``dispatch_report``'s ``inspected``): ``passed`` when the
+    probe exited 0, ``failed`` otherwise, so this report names no status of
+    its own. The inspection is the line fleet-mcp's inspect CLI printed, in
+    the shape the tool's field validates; it is passed on unread, so this
+    runner holds no second copy of that shape.
+
+    Args:
+        credentials: Endpoint and headers.
+        job_id: The claimed inspect job.
+        inspection: The inspection object the CLI printed.
+        identity: From :func:`identity_arguments`.
+
+    Returns:
+        The closed job.
+
+    Raises:
+        AppError: Any transport or contract failure from the underlying call,
+            including the queue refusing an inspection out of its shape.
+    """
+    return decode_reported(
+        call_mcp_tool(
+            _test_hooks.http_post,
+            credentials,
+            "dispatch_report",
+            {"action": "inspected", "jobId": job_id, "inspection": inspection, **identity},
+        )
+    )
+
+
 def get_job(credentials: McpCredentials, *, job_id: str) -> DispatchJob:
     """Read one job as the queue holds it now.
 
@@ -460,6 +499,7 @@ __all__ = [
     "load_credentials",
     "observe_sessions",
     "report_close",
+    "report_inspected",
     "report_progress",
     "report_start",
     "trail_claims",

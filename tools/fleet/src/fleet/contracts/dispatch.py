@@ -111,9 +111,10 @@ class DispatchCommand(StrEnum):
     # MCPs mig 987, board task dcf8b536: read one read-only probe of the
     # committed catalog from the roster node in requestedNode, named as
     # project probes/<catalog id> and run by the control-duty holder on the
-    # queue's inspect lane, which no runner of this package claims. Decoded
-    # before the queue admits one, since a command this reader does not know
-    # fails every listing (MCPs board task 13d112bb).
+    # queue's inspect lane, which fleet-agent's inspect tick claims (MCPs
+    # board task 3e9c99af). Decoded before the queue admitted one, since a
+    # command this reader does not know fails every listing (MCPs board task
+    # 13d112bb).
     INSPECT = "inspect"
 
 
@@ -138,8 +139,11 @@ class DispatchLane(StrEnum):
     arms and their retirements, run on the machine holding the netboot duty
     (MCPs board tasks bea0264b and 7b7570c5); ``models`` is the load and
     unload of a catalog model, each claimed on the node it names (MCPs mig
-    896, board task 62b1bb0a). The queue partitions its claims by lane,
-    which is what stops a revive queueing behind a check.
+    896, board task 62b1bb0a); ``inspect`` is one read-only probe of a
+    roster node, run by ``fleet-agent`` on the machine holding the control
+    duty, whatever node the job names (MCPs mig 987, board task 3e9c99af).
+    The queue partitions its claims by lane, which is what stops a revive
+    queueing behind a check.
     """
 
     HUB = "hub"
@@ -148,6 +152,7 @@ class DispatchLane(StrEnum):
     NETBOOT = "netboot"
     RESEARCH = "research"
     MODELS = "models"
+    INSPECT = "inspect"
 
 
 class ClosingStatus(StrEnum):

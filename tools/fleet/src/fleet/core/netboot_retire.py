@@ -33,6 +33,7 @@ from typing import Final
 
 from fleet.contracts.dispatch import ClosingStatus
 from fleet.core import _test_hooks, netboot_arm
+from fleet.core.release_cli import ReleaseCliOutcome, output_tail, release_cli_argv
 from fleet.core.sealed_release import SealedRelease
 
 #: The line the command prints for each arm it retired.
@@ -80,9 +81,10 @@ def retire_argv(
         this tick loaded, whose roster names the machine's boot MAC, the
         machine and the reason.
     """
-    return netboot_arm.cli_argv(
-        place,
-        release,
+    return release_cli_argv(
+        place["nodejs"],
+        release["root"] / netboot_arm.CLI,
+        (),
         "retire",
         "--root",
         str(place["served_root"]),
@@ -97,7 +99,7 @@ def retire_argv(
 
 def retire_outcome(
     result: _test_hooks.CommandResult, release: SealedRelease, machine: str
-) -> netboot_arm.ArmOutcome:
+) -> ReleaseCliOutcome:
     """Read a finished retirement into the job's close.
 
     Args:
@@ -118,7 +120,7 @@ def retire_outcome(
     )
     returncode = result["returncode"]
     if netboot_arm.carries_key(result):
-        return netboot_arm.ArmOutcome(
+        return ReleaseCliOutcome(
             status=ClosingStatus.REFUSED if returncode == 0 else ClosingStatus.FAILED,
             exit_code=None if returncode == 0 else returncode,
             detail=(
@@ -131,10 +133,10 @@ def retire_outcome(
         stdout = result["stdout"].splitlines()
         retired = [line for line in stdout if line.startswith(RETIRED_PREFIX)]
         if retired:
-            return netboot_arm.ArmOutcome(
+            return ReleaseCliOutcome(
                 status=ClosingStatus.PASSED, exit_code=0, detail=f"{opening}: {'; '.join(retired)}"
             )
-        return netboot_arm.ArmOutcome(
+        return ReleaseCliOutcome(
             status=ClosingStatus.REFUSED,
             exit_code=None,
             detail=(
@@ -145,11 +147,11 @@ def retire_outcome(
         )
     error = netboot_arm.cli_error(result["stderr"])
     if any(error.startswith(f"{code}:") for code in RETIRE_REFUSALS):
-        return netboot_arm.ArmOutcome(status=ClosingStatus.REFUSED, exit_code=None, detail=error)
-    return netboot_arm.ArmOutcome(
+        return ReleaseCliOutcome(status=ClosingStatus.REFUSED, exit_code=None, detail=error)
+    return ReleaseCliOutcome(
         status=ClosingStatus.FAILED,
         exit_code=returncode,
-        detail=f"{opening} exited {returncode}: {netboot_arm.output_tail(result)}",
+        detail=f"{opening} exited {returncode}: {output_tail(result)}",
     )
 
 
