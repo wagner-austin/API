@@ -444,6 +444,41 @@ class TestTheNextTick:
         ] == [DEMO_RUN_ID]
         assert _ledger(sourced_config)[-1]["outcome"] == "running"
 
+    def test_a_run_from_before_its_job_was_claimed_again_is_never_the_new_claim_s(
+        self, sourced_config: pathlib.Path
+    ) -> None:
+        """MCPs board tasks dd71f858 and 6f26aeb5. The job's lease lapsed while
+        its run lived and this runner claimed it again: the queue answers it
+        at generation 2 with no run id, since a claim clears it, and claimed
+        past the old run's window. The old run is not adopted as the new
+        claim's, and the give-back names generation 2, the claim it is about."""
+        launch(sourced_config)
+        loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
+        reclaimed = {
+            **ORPHANED,
+            "claimGeneration": 2,
+            "claimedAt": queue_instant(DEMO_NOW + claim_window.CLAIM_CLOCK_SLACK_SECONDS + 1),
+        }
+        endpoint = FakeQueue([dump_json_str({"job": queue_job(status="queued")})])
+        _test_hooks.http_post = endpoint
+
+        reconciled = node_collect.reconcile_claim(
+            loaded,
+            queue.load_credentials(),
+            decode_job(reclaimed, answer=dump_json_str(reclaimed)),
+            {},
+            alias="lavender",
+            running=frozenset(),
+        )
+
+        assert reconciled["adopted"] is None
+        assert endpoint.tools == ["dispatch_report"]
+        assert endpoint.arguments[0]["action"] == "lost"
+        assert endpoint.arguments[0]["jobId"] == DEFAULT_JOB_ID
+        assert endpoint.arguments[0]["claimGeneration"] == 2
+        assert _ledger(sourced_config)[-1]["run_id"] == DEMO_RUN_ID
+        assert _ledger(sourced_config)[-1]["outcome"] == "running"
+
     def test_refuses_rather_than_guesses_between_two_runs_either_claim_could_have_launched(
         self, sourced_config: pathlib.Path
     ) -> None:
