@@ -271,7 +271,9 @@ def test_lenovold_refuses_the_suite_and_no_other_node_carrying_its_tags_does(
 
 def test_only_the_stack_hosts_check_only_their_pinned_projects() -> None:
     declared = {
-        name for name, node in shipped_workspace()["nodes"].items() if node["budget"]["pinned_checks_only"]
+        name
+        for name, node in shipped_workspace()["nodes"].items()
+        if node["budget"]["pinned_checks_only"]
     }
 
     assert declared == {"demure", "diphtheria"}
@@ -356,8 +358,9 @@ def test_any_pool_worker_whose_probe_found_nixos_test_checks_the_nixos_flake() -
 
     assert project["node"] is None
     assert project["required_tags"] == (NodeTag.LINUX, NodeTag.NIXOS_TEST)
+    carried = {NodeTag.NIXOS_TEST}
     with_tag = {
-        name: assess(node, idle_state(node), project, node_tags(node) | {NodeTag.NIXOS_TEST})["code"]
+        name: assess(node, idle_state(node), project, node_tags(node) | carried)["code"]
         for name, node in enabled.items()
     }
     without_tag = {
