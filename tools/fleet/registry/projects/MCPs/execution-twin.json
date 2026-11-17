@@ -1,6 +1,8 @@
 {
   "worker_ram_gb": 4.5,
   "minimum_workers": 1,
+  "worker_cores": 8,
+  "worker_cores_measurement": "Fleet jobs 7c1a25c9 and 75d1c95c on sedona at 1 worker and 6f257615 there at 2 (2026-11-17), each running every one of its 20 or 21 cases, read dispatch=416s/49s, 418s/75s and 413s/48s: 8.5, 5.6 and 8.6 cores for the run, about 415 CPU-seconds whatever the workers, because its twin cases start Keycloak and browser containers on the docker lane, which runs in the node's dispatch share since MCPs board task 34514037. Charged one core, fleet job 94ebe31d took 4 workers on lavender, 4 of its 8-core share, and the fleet placed MCPs/repo-contracts' check c4df04fb beside it: the share read dispatch=1389s/184s/throttled:1042s and a 30 s repo-contracts case timed out at 40 s (MCPs board task d198701c); 6b46dfff at 4 workers there read throttled:531s. Charged 8, a node grants it 1 worker, lavender places nothing beside it, and a node whose spare cores are fewer than 8 (serendipity's 6) refuses it.",
   "expected_minutes": 30,
   "required_tags": [
     "linux",
