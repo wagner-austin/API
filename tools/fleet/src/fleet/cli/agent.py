@@ -440,9 +440,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     mcps_root = pathlib.Path(raw_mcps_root).resolve() if raw_mcps_root is not None else None
 
     netboot = (
-        agent_lanes.netboot_place(parsed, loaded.registry)
-        if lane is DispatchLane.NETBOOT
-        else None
+        agent_lanes.netboot_place(parsed, loaded.registry) if lane is DispatchLane.NETBOOT else None
     )
     inspect = agent_lanes.inspect_place(parsed) if lane is DispatchLane.INSPECT else None
     claimed = claim_pass(
