@@ -8,7 +8,7 @@
   "standby": [],
   "ledger_observer": "none",
   "tailnetIp": "100.101.229.93",
-  "reachKey": null,
+  "reachKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYNPZs6SMZdOYrMoVACWWXGa5xV2KdyD3I1MaYLjQNX u0_a320@pixelate",
   "bootMac": null,
   "netbootWifi": false,
   "secureBoot": null,
