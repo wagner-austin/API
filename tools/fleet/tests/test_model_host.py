@@ -201,7 +201,10 @@ class TestCatalogModel:
                 "model file 'ggml-large-v3-turbo.gguf' is not a plain .bin file name, which "
                 "whisper-server reads",
             ),
-            ({**ORNITH_9B_WIRE, "contextTokens": None}, "model field 'contextTokens' is None"),
+            (
+                {**ORNITH_9B_WIRE, "contextTokens": None},
+                "field 'contextTokens' is None, not a whole number of at least 1",
+            ),
         ],
     )
     def test_a_context_or_file_that_is_not_its_server_s_is_malformed(
