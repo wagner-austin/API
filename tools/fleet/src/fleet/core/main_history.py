@@ -26,6 +26,20 @@ and two main commits are ordered by depth with no git.
 A REPOSITORY THAT CANNOT BE READ IS LOGGED AND LEFT OUT: a refused credential
 or a lost fetch for one remote says nothing about another's, and the queue
 keeps what it held for a repository a publication leaves out.
+
+A HOST THAT CANNOT BE RESOLVED IS ASKED ONCE A TICK (MCPs board task
+84ee4f44). A fetch git refused because this host could not resolve the
+remote's host name does say something about every other remote on that host.
+From 21:54 to 22:08Z on 2026-11-14 lacrymal resolved no ``github.com``, and
+its tick sent each of 15 repositories' fetches through all of
+:data:`fleet.core.mirror_fetch.FETCH_PAUSES_SECONDS`, 75 attempts over 14
+minutes, before the same tick's observe pass ran; ziggurat's native evidence
+read at 21:51:21Z for 600 s was next renewed 1095.6 s later, and
+``execution/tests/served/observe-pass-gaps-live.test.ts`` failed
+``OBSERVE_GAP_EXPIRED``. So once one repository's fetch is refused naming an
+unresolved host, each later repository whose remote is on that host is left
+out unfetched, as :data:`HOST_UNRESOLVED_CODE`, naming the repository whose
+fetch found it; the next tick asks again.
 """
 
 from __future__ import annotations
@@ -33,6 +47,7 @@ from __future__ import annotations
 import pathlib
 from collections.abc import Mapping, Sequence
 from typing import Final, TypedDict
+from urllib.parse import urlsplit
 
 from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import (
@@ -64,6 +79,10 @@ REMOTES_DISAGREE_CODE: Final = "FLEET_MAIN_REMOTES_DISAGREE"
 
 #: Detail prefix for a history git could not list.
 HISTORY_UNREADABLE_CODE: Final = "FLEET_MAIN_HISTORY_UNREADABLE"
+
+#: Detail prefix for a repository left unfetched because an earlier fetch of
+#: the same tick could not resolve its remote's host.
+HOST_UNRESOLVED_CODE: Final = "FLEET_MAIN_HOST_UNRESOLVED"
 
 
 class MainHistoryRead(TypedDict):
@@ -188,21 +207,37 @@ def read_mains(
 ) -> tuple[tuple[MainHistoryRead, ...], tuple[str, ...]]:
     """Read every repository's default branch, leaving out each that fails.
 
+    A repository whose remote is on a host an earlier fetch of this call
+    could not resolve is left out without a fetch.
+
     Args:
         mirrors_root: The hub's mirrors directory.
         remotes: Each repository's remote.
 
     Returns:
         Each read, in repository order; and, for each repository that could
-        not be read, a line naming it and the refusal, in repository order.
+        not be read, a line naming it and the refusal, or the repository
+        whose fetch found its host unresolved, in repository order.
     """
     reads: list[MainHistoryRead] = []
     unread: list[str] = []
+    unresolved: dict[str, str] = {}
     for repository, remote in sorted(remotes.items()):
+        host = urlsplit(remote).hostname
+        found_by = None if host is None else unresolved.get(host)
+        if found_by is not None:
+            unread.append(
+                f"{repository}: {HOST_UNRESOLVED_CODE}: not fetched from {remote}: "
+                f"this tick's fetch for {found_by} could not resolve {host}"
+            )
+            continue
         try:
             reads.append(read_main(mirrors_root, repository, remote))
         except AppError as refused:
             unread.append(f"{repository}: {refused.code}: {refused.message}")
+            named = mirror_fetch.unresolved_host(refused.message)
+            if named is not None:
+                unresolved[named] = repository
     return tuple(reads), tuple(unread)
 
 

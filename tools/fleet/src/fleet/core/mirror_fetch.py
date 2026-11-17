@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
 from collections.abc import Callable
 from typing import Final
 
@@ -169,6 +170,14 @@ CREDENTIAL_REFUSED_MARKERS: Final = (
     "Permission denied (publickey)",
 )
 
+#: What git says, through curl, when this host could not resolve a remote's
+#: host name, the name captured: git 2.43 on lacrymal from 21:54 to 22:08Z
+#: on 2026-11-14 printed ``Could not resolve host: github.com`` for each of
+#: 75 attempts at 15 repositories. The attempts are still sent again, since a
+#: resolver may answer a moment later; what the words say is that every
+#: other remote on that host would be refused the same way.
+HOST_UNRESOLVED: Final = re.compile(r"Could not resolve host: ([^\s;'\"]+)")
+
 
 def _words(stderr: str) -> str:
     """git's own words from one command, bounded.
@@ -180,6 +189,20 @@ def _words(stderr: str) -> str:
         The first 600 characters, stripped, or a note that it wrote nothing.
     """
     return stderr.strip()[:600] if stderr.strip() else "(git wrote nothing to stderr)"
+
+
+def unresolved_host(refusal: str) -> str | None:
+    """The host name a refused fetch could not resolve, as git named it.
+
+    Args:
+        refusal: A refused fetch's message, which carries git's words.
+
+    Returns:
+        The first host git said it could not resolve, lowercased, or
+        ``None`` when git said no such thing.
+    """
+    named = HOST_UNRESOLVED.search(refusal)
+    return None if named is None else named.group(1).lower()
 
 
 def git_failure(code: FleetErrorCode, verb: str, stderr: str) -> AppError[FleetErrorCode]:

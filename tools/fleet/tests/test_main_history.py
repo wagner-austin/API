@@ -16,7 +16,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue, dump_json_str
 
 from fleet.cli import hub_passes
-from fleet.core import _test_hooks, declared, export, main_history, queue
+from fleet.core import _test_hooks, declared, export, main_history, mirror_fetch, queue
 from tests._git_fixtures import git
 from tests._queue_fakes import FakeQueue, queue_env
 from tests.conftest import FakeRun, failed, ok, pin_clock
@@ -202,6 +202,55 @@ class TestReadMains:
         assert unread[0].startswith(
             f"gone: EXPORT_FAILED: git fetch {missing} {main_history.DEFAULT_BRANCH_REF} into "
         )
+
+    def test_fetches_nothing_more_from_a_host_one_fetch_could_not_resolve(
+        self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # RFC 6761 reserves .invalid, so real git meets a real resolver that
+        # answers no address, as lacrymal's did for github.com on 2026-11-14.
+        pin_clock(PINNED)
+        caplog.set_level(logging.INFO)
+        remote = tmp_path / "remote" / "MCPs"
+        commits = merged_repository(remote)
+        first = "https://one.invalid/wagner-austin/API.git"
+        second = "https://one.invalid/wagner-austin/LSTM.git"
+        elsewhere = "https://two.invalid/wagner-austin/wiki.git"
+
+        reads, unread = main_history.read_mains(
+            tmp_path / "mirrors",
+            {"API": first, "LSTM": second, "MCPs": str(remote), "wiki": elsewhere},
+        )
+
+        assert [read["repository"] for read in reads] == ["MCPs"]
+        assert reads[0]["commits"][0] == commits["merge"]
+        assert len(unread) == 3
+        assert unread[0].startswith(f"API: EXPORT_FAILED: git fetch {first} ")
+        assert "Could not resolve host: one.invalid" in unread[0]
+        assert unread[1] == (
+            f"LSTM: {main_history.HOST_UNRESOLVED_CODE}: not fetched from {second}: "
+            "this tick's fetch for API could not resolve one.invalid"
+        )
+        assert unread[2].startswith(f"wiki: EXPORT_FAILED: git fetch {elsewhere} ")
+        assert "Could not resolve host: two.invalid" in unread[2]
+        said = messages(caplog)
+        assert sum(first in line for line in said) == len(mirror_fetch.FETCH_PAUSES_SECONDS)
+        assert not any(second in line for line in said)
+        assert sum(elsewhere in line for line in said) == len(mirror_fetch.FETCH_PAUSES_SECONDS)
+
+
+class TestUnresolvedHost:
+    def test_names_the_host_git_could_not_resolve_lowercased(self) -> None:
+        assert (
+            mirror_fetch.unresolved_host(
+                "git fetch https://GitHub.com/a.git HEAD into m: attempt 1: fatal: unable to "
+                "access 'https://GitHub.com/a.git/': Could not resolve host: GitHub.com; "
+                "attempt 2: Could not resolve host: other.invalid"
+            )
+            == "github.com"
+        )
+
+    def test_names_none_for_any_other_refusal(self) -> None:
+        assert mirror_fetch.unresolved_host("fatal: Connection reset by peer") is None
 
 
 class TestSourceRemotes:
