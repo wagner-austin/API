@@ -55,8 +55,11 @@ CALLED: Final[frozenset[str]] = frozenset(
 #: 52017b1e, the queue's close posting every outcome, which leaves 20. The
 #: 21st is :func:`fleet.core.main_history.publish_mains`'s
 #: ``dispatch_main_publish`` (MCPs board task 8b3dcb31), which fleet-mcp
-#: serves since MCPs 83d18456a.
-CALL_SITES: Final[int] = 21
+#: serves since MCPs 83d18456a. The 22nd is
+#: :func:`fleet.core.queue.report_inspected`'s ``dispatch_report`` with
+#: action ``inspected`` (MCPs board task 3e9c99af), which fleet-mcp serves
+#: since MCPs bb5b71db0.
+CALL_SITES: Final[int] = 22
 
 
 def constants(tree: ast.Module) -> dict[str, str]:

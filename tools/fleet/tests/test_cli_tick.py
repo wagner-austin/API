@@ -250,6 +250,8 @@ class TestTheLanes:
             "sessions-announce",
             "netboot",
             "netboot-announce",
+            "inspect",
+            "inspect-announce",
             "node",
             "announce",
             "research",
@@ -262,6 +264,8 @@ class TestTheLanes:
             tick.Lane.SESSIONS_ANNOUNCE,
             tick.Lane.NETBOOT,
             tick.Lane.NETBOOT_ANNOUNCE,
+            tick.Lane.INSPECT,
+            tick.Lane.INSPECT_ANNOUNCE,
             tick.Lane.NODE,
             tick.Lane.ANNOUNCE,
             tick.Lane.RESEARCH,
@@ -274,7 +278,8 @@ class TestTheLanes:
         # e705f08c), so a hub still naming one is refused by the word.
         assert str(refused.value) == (
             "FLEET_TICK_USAGE: --lane is one of ['hub', 'hub-announce', 'sessions', "
-            "'sessions-announce', 'netboot', 'netboot-announce', 'node', 'announce', "
+            "'sessions-announce', 'netboot', 'netboot-announce', 'inspect', "
+            "'inspect-announce', 'node', 'announce', "
             "'research', 'research-announce'], "
             "not 'elevated'"
         )

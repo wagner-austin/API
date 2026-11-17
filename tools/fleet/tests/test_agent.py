@@ -161,13 +161,15 @@ class TestTheSessionsLane:
             agent.require_runner_lane(word)
 
         assert str(refused.value) == (
-            f"FLEET_AGENT_USAGE: --lane is one of ['hub', 'sessions', 'netboot'], not {word!r}"
+            "FLEET_AGENT_USAGE: --lane is one of ['hub', 'sessions', 'netboot', 'inspect'], "
+            f"not {word!r}"
         )
 
     def test_each_lane_word_names_its_lane(self) -> None:
         assert agent.require_runner_lane("hub") is DispatchLane.HUB
         assert agent.require_runner_lane("sessions") is DispatchLane.SESSIONS
         assert agent.require_runner_lane("netboot") is DispatchLane.NETBOOT
+        assert agent.require_runner_lane("inspect") is DispatchLane.INSPECT
 
     def test_a_tick_without_a_lane_is_refused_before_any_call(
         self, config_path: pathlib.Path, repo: pathlib.Path
