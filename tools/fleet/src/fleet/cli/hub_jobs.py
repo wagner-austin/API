@@ -354,7 +354,10 @@ def inspect_job(
     if isinstance(release, str):
         return job_close.refuse(credentials, job, identity, detail=release)
     _start(credentials, job, identity, node=node, run_id=run_id)
-    result = fleet_inspect.run_inspection(fleet_inspect.inspect_argv(place, release, target))
+    result = fleet_inspect.run_inspection(
+        fleet_inspect.inspect_argv(place, release, target),
+        timeout_seconds=fleet_inspect.INSPECT_TIMEOUT_SECONDS,
+    )
     inspection = fleet_inspect.answered_inspection(result)
     if inspection is not None:
         closed = queue.report_inspected(

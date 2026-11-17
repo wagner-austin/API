@@ -112,7 +112,9 @@ class TestTheCommand:
         _test_hooks.run = runner
         argv = fleet_inspect.inspect_argv(PLACE, RELEASE, TARGET)
 
-        assert fleet_inspect.run_inspection(argv) == ok(f"{ANSWER}\n")
+        assert fleet_inspect.run_inspection(
+            argv, timeout_seconds=fleet_inspect.INSPECT_TIMEOUT_SECONDS
+        ) == ok(f"{ANSWER}\n")
 
         assert runner.calls == [argv]
         assert runner.timeouts == [fleet_inspect.INSPECT_TIMEOUT_SECONDS]
@@ -124,11 +126,16 @@ class TestTheAnswer:
     def test_one_json_object_on_an_exit_0_run_is_the_inspection_passed_on_unread(
         self,
     ) -> None:
-        inspection = fleet_inspect.answered_inspection(ok(f"{ANSWER}\n"))
-
-        assert inspection is not None
-        assert inspection["probe"] == "services"
-        assert inspection["data"] == {"systemState": "running"}
+        assert fleet_inspect.answered_inspection(ok(f"{ANSWER}\n")) == {
+            "node": "pendragon",
+            "hostname": "pendragon",
+            "probe": "services",
+            "startedAt": "2026-11-17T06:00:00.000Z",
+            "finishedAt": "2026-11-17T06:00:01.200Z",
+            "exitStatus": 0,
+            "data": {"systemState": "running"},
+            "error": None,
+        }
 
     @pytest.mark.parametrize(
         "result",
@@ -198,18 +205,26 @@ class TestARealProcess:
     def test_a_process_printing_one_object_is_answered(self) -> None:
         script = f"import sys; sys.stdout.write({ANSWER!r} + '\\n')"
 
-        result = fleet_inspect.run_inspection((sys.executable, "-c", script))
+        result = fleet_inspect.run_inspection(
+            (sys.executable, "-c", script), timeout_seconds=fleet_inspect.INSPECT_TIMEOUT_SECONDS
+        )
 
         assert result["returncode"] == 0
-        assert fleet_inspect.answered_inspection(result) is not None
+        assert fleet_inspect.answered_inspection(result) == {
+            "node": "pendragon",
+            "hostname": "pendragon",
+            "probe": "services",
+            "startedAt": "2026-11-17T06:00:00.000Z",
+            "finishedAt": "2026-11-17T06:00:01.200Z",
+            "exitStatus": 0,
+            "data": {"systemState": "running"},
+            "error": None,
+        }
 
-    def test_a_process_held_past_its_deadline_is_ended_and_the_job_fails(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setattr(fleet_inspect, "INSPECT_TIMEOUT_SECONDS", 1)
-
+    def test_a_process_held_past_its_deadline_is_ended_and_the_job_fails(self) -> None:
         result = fleet_inspect.run_inspection(
-            (sys.executable, "-c", "import time; print('started', flush=True); time.sleep(60)")
+            (sys.executable, "-c", "import time; print('started', flush=True); time.sleep(60)"),
+            timeout_seconds=1,
         )
 
         assert result["timed_out"] is True

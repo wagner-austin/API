@@ -148,17 +148,19 @@ def inspect_argv(
     )
 
 
-def run_inspection(argv: tuple[str, ...]) -> _test_hooks.CommandResult:
+def run_inspection(argv: tuple[str, ...], *, timeout_seconds: int) -> _test_hooks.CommandResult:
     """Run one ``fleet-inspect`` with no variable added to its environment.
 
     Args:
         argv: What :func:`inspect_argv` composed.
+        timeout_seconds: Its deadline; a job runs it with
+            :data:`INSPECT_TIMEOUT_SECONDS`.
 
     Returns:
         Its exit status and captured streams, or the timed-out result after
-        :data:`INSPECT_TIMEOUT_SECONDS`.
+        ``timeout_seconds``.
     """
-    return _test_hooks.run(argv, timeout_seconds=INSPECT_TIMEOUT_SECONDS, set_env=())
+    return _test_hooks.run(argv, timeout_seconds=timeout_seconds, set_env=())
 
 
 def answered_inspection(result: _test_hooks.CommandResult) -> JSONObject | None:
