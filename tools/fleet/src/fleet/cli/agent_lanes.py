@@ -55,9 +55,10 @@ LANE_PLACES: Final[Mapping[DispatchLane, tuple[tuple[str, ...], str, str]]] = {
     ),
 }
 
-#: Every flag a placed lane reads, each once.
-PLACE_FLAGS: Final = tuple(
-    dict.fromkeys(flag for flags, _, _ in LANE_PLACES.values() for flag in flags)
+#: Every flag a placed lane reads, each once; a lane hands the agent its own
+#: in the order of its own tuple, so this set's order is only the parser's.
+PLACE_FLAGS: Final[tuple[str, ...]] = tuple(
+    sorted({flag for flags, _, _ in LANE_PLACES.values() for flag in flags})
 )
 
 
