@@ -50,9 +50,9 @@ fetch's ``tmp_pack`` is removed (:func:`remove_dead_packs`), and
 
 from __future__ import annotations
 
+import itertools
 import os
 import pathlib
-import re
 from collections.abc import Callable
 from typing import Final
 
@@ -176,7 +176,11 @@ CREDENTIAL_REFUSED_MARKERS: Final = (
 #: 75 attempts at 15 repositories. The attempts are still sent again, since a
 #: resolver may answer a moment later; what the words say is that every
 #: other remote on that host would be refused the same way.
-HOST_UNRESOLVED: Final = re.compile(r"Could not resolve host: ([^\s;'\"]+)")
+HOST_UNRESOLVED_MARKER: Final = "Could not resolve host: "
+
+#: What ends the host name git writes after :data:`HOST_UNRESOLVED_MARKER`
+#: in a refusal: the ``;`` between attempts, or a quote, beside whitespace.
+HOST_NAME_ENDS: Final = frozenset(";'\"")
 
 
 def _words(stderr: str) -> str:
@@ -199,10 +203,13 @@ def unresolved_host(refusal: str) -> str | None:
 
     Returns:
         The first host git said it could not resolve, lowercased, or
-        ``None`` when git said no such thing.
+        ``None`` when git named none.
     """
-    named = HOST_UNRESOLVED.search(refusal)
-    return None if named is None else named.group(1).lower()
+    _, marked, rest = refusal.partition(HOST_UNRESOLVED_MARKER)
+    host = "".join(
+        itertools.takewhile(lambda char: not char.isspace() and char not in HOST_NAME_ENDS, rest)
+    )
+    return host.lower() if marked and host else None
 
 
 def git_failure(code: FleetErrorCode, verb: str, stderr: str) -> AppError[FleetErrorCode]:

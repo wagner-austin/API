@@ -249,8 +249,19 @@ class TestUnresolvedHost:
             == "github.com"
         )
 
-    def test_names_none_for_any_other_refusal(self) -> None:
-        assert mirror_fetch.unresolved_host("fatal: Connection reset by peer") is None
+    def test_names_the_host_where_the_refusal_ends(self) -> None:
+        assert mirror_fetch.unresolved_host("Could not resolve host: one.invalid") == "one.invalid"
+
+    @pytest.mark.parametrize(
+        "refusal",
+        [
+            pytest.param("fatal: Connection reset by peer", id="another-refusal"),
+            pytest.param("fatal: Could not resolve host: ", id="no-host-named"),
+            pytest.param("fatal: Could not resolve host: ;attempt 2", id="host-empty-before-semicolon"),
+        ],
+    )
+    def test_names_none_when_git_named_no_host(self, refusal: str) -> None:
+        assert mirror_fetch.unresolved_host(refusal) is None
 
 
 class TestSourceRemotes:
