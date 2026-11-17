@@ -162,12 +162,10 @@ class TestMalformedAnswers:
 
     def test_the_claim_generation_is_read_as_the_queue_counts_it(self) -> None:
         """MCPs mig 986, board task 8f130298: the generation a run reports under."""
-        job = decode_claim(answer({"claimed": queue_job(claimGeneration=0)}))
-        assert job is not None
-        assert job["claim_generation"] == 0
-        again = decode_claim(answer({"claimed": queue_job(claimGeneration=7)}))
-        assert again is not None
-        assert again["claim_generation"] == 7
+        first = decode_reported(answer({"job": queue_job(claimGeneration=0)}))
+        assert first["claim_generation"] == 0
+        later = decode_reported(answer({"job": queue_job(claimGeneration=7)}))
+        assert later["claim_generation"] == 7
 
     @pytest.mark.parametrize(
         ("value", "message"),
