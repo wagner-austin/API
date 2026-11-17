@@ -14,6 +14,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
 
 from fleet.contracts.dispatch import (
+    CATALOG_COMMANDS,
     MODEL_COMMANDS,
     DispatchCommand,
     DispatchJob,
@@ -282,6 +283,11 @@ class TestMalformedAnswers:
         line = encode_job_line(job)
         assert line.endswith(" inspect probes/os @pendragon")
         assert "make" not in line
+        assert CATALOG_COMMANDS == {
+            DispatchCommand.MODEL_LOAD,
+            DispatchCommand.MODEL_UNLOAD,
+            DispatchCommand.INSPECT,
+        }
 
     def test_a_missing_reason_key_is_a_changed_contract_not_an_absent_reason(self) -> None:
         row = queue_job()

@@ -122,6 +122,10 @@ MODEL_COMMANDS: frozenset[DispatchCommand] = frozenset(
     {DispatchCommand.MODEL_LOAD, DispatchCommand.MODEL_UNLOAD}
 )
 
+#: The commands that name an entry of a committed catalog, a model or a
+#: probe, as their project, rather than a registry project at a commit.
+CATALOG_COMMANDS: frozenset[DispatchCommand] = MODEL_COMMANDS | frozenset({DispatchCommand.INSPECT})
+
 
 class DispatchLane(StrEnum):
     """The lanes a runner claims from (MCPs migs 532 and 795, board tasks
@@ -545,19 +549,18 @@ def encode_job_line(job: DispatchJob) -> str:
         verb = "retire netboot arm"
     elif job["command"] is DispatchCommand.RESEARCH:
         verb = f"research request {job['project']}"
-    elif job["command"] in MODEL_COMMANDS:
-        # A model job names a catalog model, not a make target or a commit.
+    elif job["command"] in CATALOG_COMMANDS:
+        # A model job or an inspect names a catalog entry, not a make target
+        # or a commit; an inspect's @where is the node it reads, not the
+        # machine that runs it.
         verb = f"{job['command']} {job['project']}"
-    elif job["command"] is DispatchCommand.INSPECT:
-        # Nor is an inspect: it names a catalog probe, and @where is the
-        # node it reads, not the machine that runs it.
-        verb = f"inspect {job['project']}"
     else:
         verb = f"make {job['command']} {job['project']}{at}"
     return f"{job['job_id']} {job['status']} {verb} @{where}{run}"
 
 
 __all__ = [
+    "CATALOG_COMMANDS",
     "MODEL_COMMANDS",
     "ClosingStatus",
     "DispatchCommand",
