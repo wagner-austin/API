@@ -361,7 +361,7 @@ def inspect_job(
     inspection = fleet_inspect.answered_inspection(result)
     if inspection is not None:
         closed = queue.report_inspected(
-            credentials, job_id=job["job_id"], inspection=inspection, identity=identity
+            credentials, job=job, inspection=inspection, identity=identity
         )
         _log.info("inspected %s: closed %s", job["job_id"], closed["status"])
         return closed

@@ -341,7 +341,7 @@ def report_close(
 def report_inspected(
     credentials: McpCredentials,
     *,
-    job_id: str,
+    job: DispatchJob,
     inspection: JSONObject,
     identity: JSONObject,
 ) -> DispatchJob:
@@ -356,7 +356,7 @@ def report_inspected(
 
     Args:
         credentials: Endpoint and headers.
-        job_id: The claimed inspect job.
+        job: The claimed inspect job, as the queue last answered it.
         inspection: The inspection object the CLI printed.
         identity: From :func:`identity_arguments`.
 
@@ -372,7 +372,12 @@ def report_inspected(
             _test_hooks.http_post,
             credentials,
             "dispatch_report",
-            {"action": "inspected", "jobId": job_id, "inspection": inspection, **identity},
+            {
+                "action": "inspected",
+                **report_target(job),
+                "inspection": inspection,
+                **identity,
+            },
         )
     )
 

@@ -216,11 +216,18 @@ class TestTheInspectLane:
             HUB_HOST,
             tick_run_id(),
         )
-        inspected = endpoint.arguments[3]
-        assert inspected["action"] == "inspected"
-        assert inspected["jobId"] == started["jobId"]
-        assert inspected["inspection"] == load_json_str(ANSWER)
-        assert "status" not in inspected
+        # Exactly these keys, so no status rides along and the claim it is
+        # about is named (MCPs board task 6f26aeb5).
+        assert started["claimGeneration"] == 1
+        assert endpoint.arguments[3] == {
+            "action": "inspected",
+            "jobId": started["jobId"],
+            "claimGeneration": 1,
+            "inspection": load_json_str(ANSWER),
+            "agent": started["agent"],
+            "sessionId": started["sessionId"],
+            "cwd": started["cwd"],
+        }
 
     def test_the_cli_s_refusal_closes_the_job_refused_in_its_own_words(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
