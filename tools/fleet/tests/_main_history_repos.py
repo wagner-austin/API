@@ -1,6 +1,7 @@
-"""Real repositories and registry reads for the main-history cases (MCPs board tasks 8b3dcb31 and ecd088e0).
+"""Real repositories and registry reads for the main-history cases.
 
-``test_main_history.py`` reads and publishes main with them and
+MCPs board tasks 8b3dcb31 and ecd088e0. ``test_main_history.py`` reads and
+publishes main with them and
 ``test_main_ancestry.py`` proves main's descent with them; each builds its
 repositories with real git, so a case asserts the history git itself lists.
 """
