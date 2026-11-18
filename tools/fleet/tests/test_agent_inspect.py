@@ -201,8 +201,11 @@ class TestTheInspectLane:
         ]
         assert runner.timeouts == [300, fleet_inspect.INSPECT_TIMEOUT_SECONDS]
         assert runner.set_env == [(), ()]
-        # Nothing from the job but its machine and its probe reaches the CLI.
+        # Nothing from the job but its machine and its probe reaches the CLI,
+        # after the -- that ends node's own options (test claim d225677f,
+        # upheld).
         assert runner.calls[1][4:] == (
+            "--",
             "--workspace",
             str(paths[agent_lanes.WORKSPACE_FLAG]),
             "--node",
