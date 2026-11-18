@@ -102,7 +102,11 @@ def registry(*projects: declared.DeclaredProject) -> declared.RegistryRead:
         The read, at :data:`READ_AT`.
     """
     return declared.RegistryRead(
-        commit="c" * 40, projects=projects, runners=("fleet-node-sedona",), checked_at=READ_AT
+        commit="c" * 40,
+        projects=projects,
+        runners=("fleet-node-sedona",),
+        machines=(declared.DeclaredMachine(name="sedona", client=False, enabled=True),),
+        checked_at=READ_AT,
     )
 
 

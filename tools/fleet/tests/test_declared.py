@@ -1,4 +1,4 @@
-"""The rolled registry's declared projects and node runners, and their publication to the queue.
+"""The rolled registry's declared projects, node runners and machines, and their publication.
 
 MCPs board tasks 1915b042, 0be88a36 and 1e9ab738. The read runs real git over a
 repository whose ``refs/fleet/rolled`` names a commit, with the working tree
@@ -75,9 +75,21 @@ def machine_file(*, enabled: bool = True, held: str | None = None) -> str:
 #: one per worker.
 RUNNERS: Final = ("fleet-node-sedona", "fleet-node-serendipity")
 
+#: Every machine :data:`REGISTRY_FILES`' roster declares, in machine order:
+#: the hub, the machine that is off, the client, the held one and the two
+#: workers, dispatching or not (MCPs board task dcf8b536).
+MACHINES: Final = (
+    declared.DeclaredMachine(name="diphtheria", client=False, enabled=True),
+    declared.DeclaredMachine(name="lacrymal", client=False, enabled=False),
+    declared.DeclaredMachine(name="lapis-lazuli", client=True, enabled=True),
+    declared.DeclaredMachine(name="pendragon", client=False, enabled=True),
+    declared.DeclaredMachine(name="sedona", client=False, enabled=True),
+    declared.DeclaredMachine(name="serendipity", client=False, enabled=True),
+)
+
 #: The registry a rolled commit declares in these cases: a hub whose
-#: dispatch is a reason, a machine that is off, one held out of dispatch,
-#: and two workers.
+#: dispatch is a reason, a machine that is off, a client, one held out of
+#: dispatch, and two workers.
 REGISTRY_FILES = {
     "tools/fleet/registry/settings.json": "{}\n",
     "tools/fleet/registry/projects/MCPs.json": project_file([]),
@@ -91,6 +103,10 @@ REGISTRY_FILES = {
     )
     + "\n",
     "tools/fleet/registry/machines/lacrymal.json": machine_file(enabled=False),
+    "tools/fleet/registry/machines/lapis-lazuli.json": dump_json_str(
+        {**machine_document(role="client", dispatch="a phone is never dispatched to"), "user": None}
+    )
+    + "\n",
     "tools/fleet/registry/machines/pendragon.json": machine_file(held="armed for netboot"),
     "tools/fleet/registry/machines/sedona.json": machine_file(),
     "tools/fleet/registry/machines/serendipity.json": machine_file(),
@@ -220,6 +236,7 @@ class TestReadDeclared:
                 ),
             ),
             runners=RUNNERS,
+            machines=MACHINES,
             checked_at="2026-10-14T23:00:00+00:00",
         )
 
@@ -285,6 +302,7 @@ class TestReadDeclared:
                 ),
             ),
             runners=("fleet-node-sedona",),
+            machines=(declared.DeclaredMachine(name="sedona", client=False, enabled=True),),
             checked_at="2026-10-14T23:00:00+00:00",
         )
         assert run.calls[1][-2:] == (
@@ -370,6 +388,11 @@ class TestPublishRegistry:
             ),
         ),
         runners=("fleet-node-lavender", "fleet-node-sedona"),
+        machines=(
+            declared.DeclaredMachine(name="lapis-lazuli", client=True, enabled=True),
+            declared.DeclaredMachine(name="lavender", client=False, enabled=False),
+            declared.DeclaredMachine(name="sedona", client=False, enabled=True),
+        ),
         checked_at="2026-10-14T23:00:00+00:00",
     )
     IDENTITY: Final[JSONObject] = {
@@ -413,6 +436,11 @@ class TestPublishRegistry:
                 },
             ],
             "runners": ["fleet-node-lavender", "fleet-node-sedona"],
+            "machines": [
+                {"name": "lapis-lazuli", "client": True, "enabled": True},
+                {"name": "lavender", "client": False, "enabled": False},
+                {"name": "sedona", "client": False, "enabled": True},
+            ],
             "commit": "b" * 40,
             "checkedAt": "2026-10-14T23:00:00+00:00",
             **self.IDENTITY,
@@ -479,6 +507,10 @@ class TestTheHubTickPublishes:
             },
         ]
         assert endpoint.arguments[2]["runners"] == list(RUNNERS)
+        assert endpoint.arguments[2]["machines"] == [
+            {"name": machine["name"], "client": machine["client"], "enabled": machine["enabled"]}
+            for machine in MACHINES
+        ]
         assert endpoint.arguments[2]["commit"] == commit
         assert (
             f"published 3 project(s) from the registry at {commit} (0 dropped since the last "

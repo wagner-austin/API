@@ -35,6 +35,11 @@ held, the rule MCPs session-audit's ``fleet_lanes`` lays the hub's lanes by.
 The queue deletes the tick of every runner the publication does not name
 (MCPs mig 824): until then fleet-node-lavender-wsl stayed on
 ``fleet_status`` a day after lavender's reimage took its machine.
+
+AND EVERY MACHINE (MCPs board task dcf8b536). The publication names each
+roster machine with whether it is a client and whether it is enabled
+(:func:`declared_machines`); the queue keeps them (MCPs mig 989) and its one
+writer refuses an inspect job of a machine they do not admit.
 """
 
 from __future__ import annotations
@@ -53,7 +58,7 @@ from platform_core.json_utils import (
 )
 from platform_core.mcp_client import McpCredentials, call_mcp_tool
 
-from fleet.contracts.machine import Machine, decode_machine
+from fleet.contracts.machine import Machine, MachineRole, decode_machine
 from fleet.contracts.project import decode_project_config
 from fleet.contracts.tags import NodeTag, encode_tags
 from fleet.core import _test_hooks, commit_tree, names, rolled
@@ -122,6 +127,21 @@ class DeclaredProject(TypedDict):
     source: DeclaredSource | None
 
 
+class DeclaredMachine(TypedDict):
+    """One roster machine as the queue's inspect admission reads it.
+
+    Attributes:
+        name: The machine's name, its file's stem.
+        client: Whether its role is :attr:`MachineRole.CLIENT`, which the
+            fleet never reaches over ssh.
+        enabled: Whether the roster enables it.
+    """
+
+    name: str
+    client: bool
+    enabled: bool
+
+
 class RegistryRead(TypedDict):
     """The registry as one read of the rolled ref found it.
 
@@ -130,6 +150,8 @@ class RegistryRead(TypedDict):
         projects: Every project that commit declares, sorted by key.
         runners: Every node runner its roster declares, in machine order
             (:func:`declared_runners`).
+        machines: Every machine its roster declares, in machine order
+            (:func:`declared_machines`).
         checked_at: An ISO-8601 instant in UTC taken before the ref was
             resolved, floored to the second.
     """
@@ -137,6 +159,7 @@ class RegistryRead(TypedDict):
     commit: str
     projects: tuple[DeclaredProject, ...]
     runners: tuple[str, ...]
+    machines: tuple[DeclaredMachine, ...]
     checked_at: str
 
 
@@ -216,6 +239,31 @@ def declared_runners(machines: Sequence[Machine]) -> tuple[str, ...]:
         names.node_runner_label(machine["name"])
         for machine in machines
         if (node := machine["dispatch"]) is not None and node["enabled"]
+    )
+
+
+def declared_machines(machines: Sequence[Machine]) -> tuple[DeclaredMachine, ...]:
+    """Every machine a roster declares, as the queue admits an inspection by.
+
+    The queue's one writer refuses an inspect job of a machine this list
+    does not name, of a client and of a disabled machine (MCPs mig 989,
+    board task dcf8b536), so every machine is sent, dispatching or not: the
+    stack host and the hub dispatch nothing and are inspected all the same.
+
+    Args:
+        machines: The roster's machines.
+
+    Returns:
+        Each machine's name, whether it is a client and whether it is
+        enabled, in the machines' order.
+    """
+    return tuple(
+        DeclaredMachine(
+            name=machine["name"],
+            client=machine["role"] is MachineRole.CLIENT,
+            enabled=machine["enabled"],
+        )
+        for machine in machines
     )
 
 
@@ -362,7 +410,11 @@ def read_declared(checkout: pathlib.Path) -> RegistryRead | str:
             "nothing was published, since the queue would retire every runner"
         )
     return RegistryRead(
-        commit=commit, projects=tuple(projects), runners=runners, checked_at=checked_at
+        commit=commit,
+        projects=tuple(projects),
+        runners=runners,
+        machines=declared_machines(machines),
+        checked_at=checked_at,
     )
 
 
@@ -404,6 +456,10 @@ def publish_registry(
             for project in read["projects"]
         ],
         "runners": list(read["runners"]),
+        "machines": [
+            {"name": machine["name"], "client": machine["client"], "enabled": machine["enabled"]}
+            for machine in read["machines"]
+        ],
         "commit": read["commit"],
         "checkedAt": read["checked_at"],
         **identity,
@@ -428,11 +484,13 @@ __all__ = [
     "PROJECTS_PATH",
     "PUBLISH_TOOL",
     "READ_FAILED_CODE",
+    "DeclaredMachine",
     "DeclaredProject",
     "DeclaredSource",
     "RegistryPublication",
     "RegistryRead",
     "declared_files",
+    "declared_machines",
     "declared_runners",
     "dispatch_nodes",
     "machine_files",

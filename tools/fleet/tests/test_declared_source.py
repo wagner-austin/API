@@ -71,6 +71,7 @@ def test_publishes_source_coordinates_from_the_commit_instead_of_keys_or_working
         {
             "projects": expected,
             "runners": ["fleet-node-sedona"],
+            "machines": [{"name": "sedona", "client": False, "enabled": True}],
             "commit": commit,
             "checkedAt": read["checked_at"],
         }
