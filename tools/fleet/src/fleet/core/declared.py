@@ -76,6 +76,11 @@ PROJECTS_PATH: Final = f"{rolled.REGISTRY_DIRECTORY}/{PROJECTS_DIRECTORY}"
 #: The roster's per-machine files, as paths in the API repository.
 MACHINES_PATH: Final = f"{rolled.REGISTRY_DIRECTORY}/{MACHINES_DIRECTORY}"
 
+#: The roles the fleet never reaches over ssh, which the publication names a
+#: machine a client for: a client alone. A set, so a role is read by
+#: membership and no ordering of the vocabulary can answer for it.
+UNREACHED_ROLES: Final = frozenset({MachineRole.CLIENT})
+
 #: The queue's tool a publication calls.
 PUBLISH_TOOL: Final = "dispatch_registry_publish"
 
@@ -260,7 +265,7 @@ def declared_machines(machines: Sequence[Machine]) -> tuple[DeclaredMachine, ...
     return tuple(
         DeclaredMachine(
             name=machine["name"],
-            client=machine["role"] is MachineRole.CLIENT,
+            client=machine["role"] in UNREACHED_ROLES,
             enabled=machine["enabled"],
         )
         for machine in machines
@@ -484,6 +489,7 @@ __all__ = [
     "PROJECTS_PATH",
     "PUBLISH_TOOL",
     "READ_FAILED_CODE",
+    "UNREACHED_ROLES",
     "DeclaredMachine",
     "DeclaredProject",
     "DeclaredSource",
