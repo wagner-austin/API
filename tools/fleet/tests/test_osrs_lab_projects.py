@@ -54,6 +54,15 @@ at osrs-lab 2965f4a7 (fleet job 0fe8dabb on colossus) its 19 tests passed,
 real PIT runs over compiled fixtures among them, at lines 117/117 and
 branches 47/47.
 
+test-selection (MCPs board task 632d8e8c) runs the check of osrs-lab's own
+test selection in the same image: a JUnit Platform listener that records each
+test class's JaCoCo session, and the Select and Keep programs that
+desktop-input/test-selection.gradle runs so quick-run's gate reruns only the
+test classes whose recorded run executed a changed class. The observer's and
+the recorder's test tasks load it, but only this directory's own check
+mutates it. Run in quick-run's container on loki, its check passed with 78
+of 78 mutants detected.
+
 input-policy (board task b2ee9cbe) runs the input boundary policy's own make
 check in the same image since osrs-lab 6176e3d, whose packaged-classes.gradle
 the recorder and the observer's login plugin artifact apply: on colossus it
@@ -107,6 +116,7 @@ DIRECTORIES: Final[tuple[str, ...]] = (
     "observer-input-coverage",
     "recorder",
     "recorder-release",
+    "test-selection",
 )
 
 
