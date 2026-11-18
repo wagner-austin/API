@@ -96,8 +96,10 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # MCPs/packages/board-registry, the board's register lifted out of
     # mcp-shared (MCPs board task 8a782787). 78 since
     # MCPs/packages/civic-sources, the parsers, meeting clients and source
-    # registry lifted out of mcp-shared (MCPs board task 19bc6d34).
-    assert len(prepared) == 78
+    # registry lifted out of mcp-shared (MCPs board task 19bc6d34). 81
+    # since MCPs/packages/public-portal, search-query-parser and
+    # document-categories-codegen, lifted out of civic-sources (the same task).
+    assert len(prepared) == 81
     assert prepared["MCPs/scripts/ci-contracts"] == (
         InstallStep(phase="install", argv=(*PREPARE, "install")),
         InstallStep(
