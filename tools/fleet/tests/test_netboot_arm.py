@@ -284,6 +284,8 @@ class TestTheCommandLine:
             "--input-type=module",
             "-e",
             f"const m = await import('{cli}'); await m.runFromProcess(process);",
+            # Ends node's own options (test claim d0bf5884, upheld).
+            "--",
             "arm",
             "--definition",
             str(root / "fleet-mcp" / "netboot"),

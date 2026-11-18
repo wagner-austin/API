@@ -70,6 +70,8 @@ class TestTheCommandLine:
             "--input-type=module",
             "-e",
             f"const m = await import('{cli}'); await m.runFromProcess(process);",
+            # Ends node's own options (test claim 092c8dc8, upheld).
+            "--",
             "adopt",
             "--root",
             str(served),

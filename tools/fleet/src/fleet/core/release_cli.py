@@ -61,13 +61,18 @@ def release_cli_argv(
             ``process.argv[1]`` on.
 
     Returns:
-        ``node --input-type=module -e <importer> <arguments>``.
+        ``node --input-type=module -e <importer> -- <arguments>``. The
+        ``--`` ends node's own options: without it node reads a leading
+        flag as one of its own, as it refused fleet-inspect's
+        ``--workspace`` with ``bad option`` (MCPs board task c8978826), and
+        node consumes it, so ``process.argv[1]`` is the first argument
+        whatever it is.
     """
     handed = "".join(f", {dump_json_str(value)}" for value in entered_with)
     importer = (
         f"const m = await import({module.as_uri()!r}); await m.runFromProcess(process{handed});"
     )
-    return (nodejs, "--input-type=module", "-e", importer, *arguments)
+    return (nodejs, "--input-type=module", "-e", importer, "--", *arguments)
 
 
 def output_tail(result: _test_hooks.CommandResult) -> str:

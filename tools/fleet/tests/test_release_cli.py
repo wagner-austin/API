@@ -4,6 +4,10 @@ is composed, how much of a failed run a detail keeps, and the close shape."""
 from __future__ import annotations
 
 import pathlib
+import shutil
+
+import pytest
+from platform_core.json_utils import load_json_str
 
 from fleet.contracts.dispatch import ClosingStatus
 from fleet.core import _test_hooks
@@ -21,13 +25,15 @@ MODULE = pathlib.Path("/srv/releases/fleet-audit/abc/MCPs/fleet-mcp/dist/src/ins
 class TestTheCommand:
     def test_a_cli_needing_nothing_more_is_entered_with_the_process_alone(self) -> None:
         # The netboot CLI's importer, byte for byte as netboot_arm composed it
-        # before the lift.
+        # before the lift, then the -- ending node's own options (test claim
+        # f6051b29, upheld).
         assert release_cli_argv("/usr/bin/node", MODULE, (), "arm", "--node", "pendragon") == (
             "/usr/bin/node",
             "--input-type=module",
             "-e",
             "const m = await import('file:///srv/releases/fleet-audit/abc/MCPs/fleet-mcp/dist/"
             "src/inspect-cli.js'); await m.runFromProcess(process);",
+            "--",
             "arm",
             "--node",
             "pendragon",
@@ -42,7 +48,51 @@ class TestTheCommand:
             "src/inspect-cli.js'); await m.runFromProcess(process, "
             '"/srv/releases/it\'s \\"quoted\\"", "second");'
         )
-        assert argv[4:] == ("--probe", "os")
+        # The CLI's arguments follow the -- that ends node's options (test
+        # claim b753494c, upheld).
+        assert argv[4:] == ("--", "--probe", "os")
+
+
+class TestRealNode:
+    """The composed command run by real node (MCPs board task c8978826).
+
+    Job 0aad55fd's fleet-inspect exited 9 on ``node: bad option:
+    --workspace``: no case had run the argv with node, only with a stand-in
+    process. A module recording what ``runFromProcess`` is handed is run
+    here with the node the fleet runs MCPs' TypeScript checks with, which
+    every node carries.
+    """
+
+    @pytest.mark.parametrize(
+        "arguments",
+        [
+            ("--workspace", "/home/corvis/PROJECTS/MCPs", "--node", "pendragon", "--probe", "os"),
+            ("arm", "--node", "pendragon"),
+        ],
+    )
+    def test_node_hands_the_cli_its_arguments_whether_a_flag_or_a_command_comes_first(
+        self, tmp_path: pathlib.Path, arguments: tuple[str, ...]
+    ) -> None:
+        node = shutil.which("node")
+        assert node is not None, "node runs every MCPs TypeScript check, so every node has it"
+        module = tmp_path / "cli.mjs"
+        module.write_text(
+            "export async function runFromProcess(proc, root) {\n"
+            "  proc.stdout.write(JSON.stringify({ argv: proc.argv.slice(1), root }) + '\\n');\n"
+            "}\n",
+            encoding="utf-8",
+        )
+
+        result = _test_hooks.run(
+            release_cli_argv(node, module, ("/srv/releases/fleet-audit/abc",), *arguments),
+            timeout_seconds=30,
+        )
+
+        assert (result["returncode"], result["stderr"]) == (0, "")
+        assert load_json_str(result["stdout"]) == {
+            "argv": list(arguments),
+            "root": "/srv/releases/fleet-audit/abc",
+        }
 
 
 class TestTheTail:
