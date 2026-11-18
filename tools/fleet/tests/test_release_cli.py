@@ -4,7 +4,6 @@ is composed, how much of a failed run a detail keeps, and the close shape."""
 from __future__ import annotations
 
 import pathlib
-import shutil
 
 import pytest
 from platform_core.json_utils import load_json_str
@@ -73,8 +72,6 @@ class TestRealNode:
     def test_node_hands_the_cli_its_arguments_whether_a_flag_or_a_command_comes_first(
         self, tmp_path: pathlib.Path, arguments: tuple[str, ...]
     ) -> None:
-        node = shutil.which("node")
-        assert node is not None, "node runs every MCPs TypeScript check, so every node has it"
         module = tmp_path / "cli.mjs"
         module.write_text(
             "export async function runFromProcess(proc, root) {\n"
@@ -84,7 +81,9 @@ class TestRealNode:
         )
 
         result = _test_hooks.run(
-            release_cli_argv(node, module, ("/srv/releases/fleet-audit/abc",), *arguments),
+            # node from PATH, as every fleet node carries it for MCPs'
+            # TypeScript checks; a node without it fails here, never skips.
+            release_cli_argv("node", module, ("/srv/releases/fleet-audit/abc",), *arguments),
             timeout_seconds=30,
         )
 
