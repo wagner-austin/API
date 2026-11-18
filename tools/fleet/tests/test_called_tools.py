@@ -33,6 +33,7 @@ CALLED: Final[frozenset[str]] = frozenset(
         "dispatch_claim",
         "dispatch_get",
         "dispatch_list",
+        "dispatch_main_heads",
         "dispatch_main_publish",
         "dispatch_publisher_tick",
         "dispatch_registry_publish",
@@ -58,8 +59,11 @@ CALLED: Final[frozenset[str]] = frozenset(
 #: serves since MCPs 83d18456a. The 22nd is
 #: :func:`fleet.core.queue.report_inspected`'s ``dispatch_report`` with
 #: action ``inspected`` (MCPs board task 3e9c99af), which fleet-mcp serves
-#: since MCPs bb5b71db0.
-CALL_SITES: Final[int] = 22
+#: since MCPs bb5b71db0. The 23rd is
+#: :func:`fleet.core.main_history.held_heads`'s ``dispatch_main_heads``
+#: (MCPs board task ecd088e0), which fleet-mcp must serve before the roll
+#: that calls it.
+CALL_SITES: Final[int] = 23
 
 
 def constants(tree: ast.Module) -> dict[str, str]:

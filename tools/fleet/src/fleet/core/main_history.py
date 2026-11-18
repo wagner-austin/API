@@ -18,10 +18,25 @@ THE DEFAULT BRANCH, NOT A NAMED ONE. The remote's ``HEAD`` names it, ``main``
 for most repositories and ``master`` for some; the registry declares a
 ``base_branch`` only for a project whose check asks what its commit changes.
 
-A COMMIT'S DEPTH is ``git rev-list --first-parent --count`` of it: the head's
-is counted once, and the queue gives each older commit one less than the
-commit after it, so only the newest :data:`MAX_COMMITS` are sent each tick
-and two main commits are ordered by depth with no git.
+A COMMIT'S GENERATION (MCPs board task ecd088e0, mig 990) is 1 for a root
+commit, else 1 plus the greatest of its parents', computed in one pass over
+``git rev-list --topo-order --reverse --parents`` of the head, which lists
+every parent before its children. It is the commit's own and rises from a
+commit to each of its descendants, so the queue orders two main commits by
+it however main's first-parent chain runs. The first-parent depth sent until
+then did not: osrs-lab's merge e6b6a0a8 took its side branch as first parent
+and reached main as a fast forward, the held head bf635924 left the
+first-parent chain at depth 760, the branch's commits took depths 684..1147,
+and from 2026-11-18T00:06Z the queue refused every tick's publication as main
+rewritten. Only the newest :data:`MAX_COMMITS` first-parent commits are sent.
+
+MAIN REWRITTEN IS DECIDED BY GIT. The queue answers each repository's held
+head (``dispatch_main_heads``); the mirror says whether main descends from it
+(``git merge-base --is-ancestor``), and the read sends the held head it
+proved as ``since``, or None. The queue writes a repository only when
+``since`` is the head it still holds, and answers every other repository it
+refuses by code beside the heads it wrote, so one refused repository leaves
+the rest current and the tick's later passes run.
 
 A REPOSITORY THAT CANNOT BE READ IS LOGGED AND LEFT OUT: a refused credential
 or a lost fetch for one remote says nothing about another's, and the queue
@@ -53,6 +68,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
+    JSONValue,
     load_json_str,
     require_int,
     require_str,
@@ -64,6 +80,9 @@ from fleet.core.declared import DeclaredProject
 
 #: The queue's tool a publication calls.
 PUBLISH_TOOL: Final = "dispatch_main_publish"
+
+#: The queue's tool that answers each repository's held head.
+HEADS_TOOL: Final = "dispatch_main_heads"
 
 #: The ref a remote's default branch is fetched by.
 DEFAULT_BRANCH_REF: Final = "HEAD"
@@ -80,39 +99,113 @@ REMOTES_DISAGREE_CODE: Final = "FLEET_MAIN_REMOTES_DISAGREE"
 #: Detail prefix for a history git could not list.
 HISTORY_UNREADABLE_CODE: Final = "FLEET_MAIN_HISTORY_UNREADABLE"
 
+#: Detail prefix for a held head whose ancestry git could not answer.
+ANCESTRY_UNREADABLE_CODE: Final = "FLEET_MAIN_ANCESTRY_UNREADABLE"
+
 #: Detail prefix for a repository left unfetched because an earlier fetch of
 #: the same tick could not resolve its remote's host.
 HOST_UNRESOLVED_CODE: Final = "FLEET_MAIN_HOST_UNRESOLVED"
 
 
-class MainHistoryRead(TypedDict):
-    """One repository's default branch as the hub read it.
+class MainCommit(TypedDict):
+    """One main commit and its rank.
+
+    Attributes:
+        sha: The commit.
+        generation: 1 for a root commit, else 1 plus the greatest of its parents'.
+    """
+
+    sha: str
+    generation: int
+
+
+class MainRead(TypedDict):
+    """One repository's default branch as the hub fetched and listed it.
 
     Attributes:
         repository: The repository, as the registry's source declarations name it.
-        head_depth: The head's first-parent depth.
+        mirror: The hub's mirror it was read in, which the proof of descent asks.
+        head: The fetched head.
         commits: The head and its first-parent ancestors, newest first.
     """
 
     repository: str
-    head_depth: int
-    commits: tuple[str, ...]
+    mirror: pathlib.Path
+    head: str
+    commits: tuple[MainCommit, ...]
+
+
+class MainHistoryRead(TypedDict):
+    """One repository's read as the queue is handed it.
+
+    Attributes:
+        repository: The repository.
+        commits: The head and its first-parent ancestors, newest first.
+        since: The held head main was proved to descend from, or None when
+            the queue holds none or main does not descend from it.
+    """
+
+    repository: str
+    commits: tuple[MainCommit, ...]
+    since: str | None
+
+
+class HeldHead(TypedDict):
+    """A repository's head as the queue holds it.
+
+    Attributes:
+        repository: The repository.
+        head: The held commit.
+        generation: Its generation.
+        read_at: The instant the publication that wrote it was read at.
+    """
+
+    repository: str
+    head: str
+    generation: int
+    read_at: str
 
 
 class MainHistoryHead(TypedDict):
-    """What the queue answered for one repository.
+    """What the queue answered for one repository it wrote.
 
     Attributes:
         repository: The repository.
         head: Its head as read.
-        depth: The head's depth.
+        generation: The head's generation.
         added: How many of the read's commits the queue did not hold before.
     """
 
     repository: str
     head: str
-    depth: int
+    generation: int
     added: int
+
+
+class MainHistoryRefused(TypedDict):
+    """One repository the queue wrote nothing for.
+
+    Attributes:
+        repository: The repository.
+        code: Why, as the queue names it.
+        message: The refusal, opening with its code.
+    """
+
+    repository: str
+    code: str
+    message: str
+
+
+class MainHistoryPublication(TypedDict):
+    """What the queue answered for one publication.
+
+    Attributes:
+        heads: Each repository written, in repository order.
+        refused: Each repository refused, in the publication's order.
+    """
+
+    heads: tuple[MainHistoryHead, ...]
+    refused: tuple[MainHistoryRefused, ...]
 
 
 def source_remotes(projects: Sequence[DeclaredProject]) -> tuple[dict[str, str], tuple[str, ...]]:
@@ -174,7 +267,28 @@ def _listed(mirror: pathlib.Path, argv: Sequence[str]) -> str:
     return listed["stdout"].strip()
 
 
-def read_main(mirrors_root: pathlib.Path, repository: str, remote: str) -> MainHistoryRead:
+def generations(mirror: pathlib.Path, head: str) -> dict[str, int]:
+    """Every commit the head contains, with its generation.
+
+    Args:
+        mirror: The mirror.
+        head: The head.
+
+    Returns:
+        Each commit's generation: 1 for a root commit, else 1 plus the
+        greatest of its parents'.
+
+    Raises:
+        AppError: As :func:`_listed` says.
+    """
+    ranked: dict[str, int] = {}
+    for line in _listed(mirror, ("--topo-order", "--reverse", "--parents", head)).splitlines():
+        commit, *parents = line.split()
+        ranked[commit] = 1 + max((ranked[parent] for parent in parents), default=0)
+    return ranked
+
+
+def read_main(mirrors_root: pathlib.Path, repository: str, remote: str) -> MainRead:
     """Fetch a remote's default branch into its mirror and read its history.
 
     Args:
@@ -183,8 +297,8 @@ def read_main(mirrors_root: pathlib.Path, repository: str, remote: str) -> MainH
         remote: Its declared remote.
 
     Returns:
-        Its head's depth and its newest :data:`MAX_COMMITS` first-parent
-        commits, newest first.
+        Its head and its newest :data:`MAX_COMMITS` first-parent commits,
+        newest first, each with its generation.
 
     Raises:
         AppError: As :func:`fleet.core.export.ensure_mirror` and
@@ -196,15 +310,21 @@ def read_main(mirrors_root: pathlib.Path, repository: str, remote: str) -> MainH
     head = mirror_fetch.fetch_ref(
         mirror, remote, DEFAULT_BRANCH_REF, declared_as="the repository's default branch"
     )
-    depth = int(_listed(mirror, ("--first-parent", "--count", head)))
+    ranked = generations(mirror, head)
     newest = _listed(mirror, ("--first-parent", f"--max-count={MAX_COMMITS}", head))
-    commits = tuple(newest.splitlines())
-    return MainHistoryRead(repository=repository, head_depth=depth, commits=commits)
+    return MainRead(
+        repository=repository,
+        mirror=mirror,
+        head=head,
+        commits=tuple(
+            MainCommit(sha=commit, generation=ranked[commit]) for commit in newest.splitlines()
+        ),
+    )
 
 
 def read_mains(
     mirrors_root: pathlib.Path, remotes: Mapping[str, str]
-) -> tuple[tuple[MainHistoryRead, ...], tuple[str, ...]]:
+) -> tuple[tuple[MainRead, ...], tuple[str, ...]]:
     """Read every repository's default branch, leaving out each that fails.
 
     A repository whose remote is on a host an earlier fetch of this call
@@ -219,7 +339,7 @@ def read_mains(
         not be read, a line naming it and the refusal, or the repository
         whose fetch found its host unresolved, in repository order.
     """
-    reads: list[MainHistoryRead] = []
+    reads: list[MainRead] = []
     unread: list[str] = []
     unresolved: dict[str, str] = {}
     for repository, remote in sorted(remotes.items()):
@@ -241,38 +361,184 @@ def read_mains(
     return tuple(reads), tuple(unread)
 
 
+def _git_answers(mirror: pathlib.Path, argv: Sequence[str]) -> bool:
+    """Ask the mirror a yes-or-no question git answers by exit status.
+
+    Args:
+        mirror: The mirror.
+        argv: The git arguments, for a command that exits 0 for yes and 1 for no.
+
+    Returns:
+        Whether it exited 0.
+
+    Raises:
+        AppError: ``EXPORT_FAILED``, :data:`ANCESTRY_UNREADABLE_CODE` and
+            git's words, for any other exit.
+    """
+    answered = _test_hooks.run(
+        ("git", "-C", str(mirror), *argv), timeout_seconds=mirror_fetch.INIT_TIMEOUT_SECONDS
+    )
+    match answered["returncode"]:
+        case 0:
+            return True
+        case 1:
+            return False
+        case _:
+            raise mirror_fetch.git_failure(
+                FleetErrorCode.EXPORT_FAILED,
+                f"{ANCESTRY_UNREADABLE_CODE}: git {' '.join(argv)} in {mirror}",
+                answered["stderr"],
+            )
+
+
+def descends(mirror: pathlib.Path, held: str, head: str) -> bool:
+    """Whether a head contains a held commit.
+
+    Args:
+        mirror: The mirror the head was read in.
+        held: The commit the queue holds as the repository's head.
+        head: The head as read.
+
+    Returns:
+        Whether ``held`` is the head or one of its ancestors. A commit the
+        mirror does not hold is no ancestor of a head it does.
+
+    Raises:
+        AppError: As :func:`_git_answers` says.
+    """
+    return _git_answers(mirror, ("cat-file", "-e", held)) and _git_answers(
+        mirror, ("merge-base", "--is-ancestor", held, head)
+    )
+
+
+def held_heads(credentials: McpCredentials) -> dict[str, HeldHead]:
+    """Each repository's head as the queue holds it.
+
+    Args:
+        credentials: The queue's endpoint and headers.
+
+    Returns:
+        Each held head, keyed by repository.
+
+    Raises:
+        AppError: Any transport or contract failure from the call.
+        InvalidJsonError: If the answer is not JSON.
+        JSONTypeError: If the answer is not an object carrying a ``heads``
+            list of objects with a text ``repository``, ``head`` and
+            ``readAt`` and a whole ``generation``.
+    """
+    body = load_json_str(call_mcp_tool(_test_hooks.http_post, credentials, HEADS_TOOL, {}))
+    held: dict[str, HeldHead] = {}
+    for head in _objects(body, HEADS_TOOL, "heads"):
+        repository = require_str(head, "repository")
+        held[repository] = HeldHead(
+            repository=repository,
+            head=require_str(head, "head"),
+            generation=require_int(head, "generation"),
+            read_at=require_str(head, "readAt"),
+        )
+    return held
+
+
+def prove_reads(
+    reads: Sequence[MainRead], held: Mapping[str, HeldHead]
+) -> tuple[tuple[MainHistoryRead, ...], tuple[str, ...]]:
+    """Each read with the held head it was proved to descend from.
+
+    Args:
+        reads: Each repository's read.
+        held: Each repository's held head, from :func:`held_heads`.
+
+    Returns:
+        Each read the mirror could answer for, with ``since`` the held head
+        when main descends from it and None otherwise, in the reads' order;
+        and, for each it could not, a line naming it and the refusal.
+    """
+    proved: list[MainHistoryRead] = []
+    unproved: list[str] = []
+    for read in reads:
+        held_head = held.get(read["repository"])
+        try:
+            since = (
+                held_head["head"]
+                if held_head is not None
+                and descends(read["mirror"], held_head["head"], read["head"])
+                else None
+            )
+        except AppError as refused:
+            unproved.append(f"{read['repository']}: {refused.code}: {refused.message}")
+            continue
+        proved.append(
+            MainHistoryRead(repository=read["repository"], commits=read["commits"], since=since)
+        )
+    return tuple(proved), tuple(unproved)
+
+
+def _objects(body: JSONValue, tool: str, field: str) -> list[JSONObject]:
+    """The list of objects an answer carries under one field.
+
+    Args:
+        body: The decoded answer.
+        tool: The tool that answered, for the message.
+        field: The field.
+
+    Returns:
+        Each object, in order.
+
+    Raises:
+        JSONTypeError: If the answer is not an object, the field not a list,
+            or an entry not an object.
+    """
+    if not isinstance(body, dict):
+        raise JSONTypeError(f"{tool} must answer an object, got {type(body).__name__}")
+    entries = body.get(field)
+    if not isinstance(entries, list):
+        raise JSONTypeError(f"{tool} must answer a {field} list")
+    objects: list[JSONObject] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise JSONTypeError(f"{tool} {field} must be objects, got {type(entry).__name__}")
+        objects.append(entry)
+    return objects
+
+
 def publish_mains(
     credentials: McpCredentials,
     reads: Sequence[MainHistoryRead],
     *,
     read_at: str,
     identity: JSONObject,
-) -> tuple[MainHistoryHead, ...]:
+) -> MainHistoryPublication:
     """Hand the queue each repository's history as read.
 
     Args:
         credentials: The queue's endpoint and headers.
-        reads: Each repository's read.
+        reads: Each repository's read, with its since.
         read_at: An ISO-8601 instant no later than the reads.
         identity: From :func:`fleet.core.queue.identity_arguments`.
 
     Returns:
-        Each repository's head as the queue answered it.
+        Each repository the queue wrote, with its head, and each it refused,
+        with its code and message.
 
     Raises:
         AppError: Any transport or contract failure from the call, the
-            queue's refusal of a stale or rewritten read among them.
+            queue's refusal of a malformed publication among them.
         InvalidJsonError: If the answer is not JSON.
         JSONTypeError: If the answer is not an object carrying a ``heads``
             list of objects with a text ``repository`` and ``head`` and a
-            whole ``depth`` and ``added``.
+            whole ``generation`` and ``added``, and a ``refused`` list of
+            objects with a text ``repository``, ``code`` and ``message``.
     """
     arguments: JSONObject = {
         "repositories": [
             {
                 "repository": read["repository"],
-                "headDepth": read["head_depth"],
-                "commits": list(read["commits"]),
+                "commits": [
+                    {"sha": commit["sha"], "generation": commit["generation"]}
+                    for commit in read["commits"]
+                ],
+                "since": read["since"],
             }
             for read in reads
         ],
@@ -280,34 +546,45 @@ def publish_mains(
         **identity,
     }
     body = load_json_str(call_mcp_tool(_test_hooks.http_post, credentials, PUBLISH_TOOL, arguments))
-    if not isinstance(body, dict):
-        raise JSONTypeError(f"{PUBLISH_TOOL} must answer an object, got {type(body).__name__}")
-    heads = body.get("heads")
-    if not isinstance(heads, list):
-        raise JSONTypeError(f"{PUBLISH_TOOL} must answer a heads list")
-    answered: list[MainHistoryHead] = []
-    for head in heads:
-        if not isinstance(head, dict):
-            raise JSONTypeError(f"{PUBLISH_TOOL} heads must be objects, got {type(head).__name__}")
-        answered.append(
-            MainHistoryHead(
-                repository=require_str(head, "repository"),
-                head=require_str(head, "head"),
-                depth=require_int(head, "depth"),
-                added=require_int(head, "added"),
-            )
+    heads = tuple(
+        MainHistoryHead(
+            repository=require_str(head, "repository"),
+            head=require_str(head, "head"),
+            generation=require_int(head, "generation"),
+            added=require_int(head, "added"),
         )
-    return tuple(answered)
+        for head in _objects(body, PUBLISH_TOOL, "heads")
+    )
+    refused = tuple(
+        MainHistoryRefused(
+            repository=require_str(each, "repository"),
+            code=require_str(each, "code"),
+            message=require_str(each, "message"),
+        )
+        for each in _objects(body, PUBLISH_TOOL, "refused")
+    )
+    return MainHistoryPublication(heads=heads, refused=refused)
 
 
 __all__ = [
+    "ANCESTRY_UNREADABLE_CODE",
     "DEFAULT_BRANCH_REF",
+    "HEADS_TOOL",
     "HISTORY_UNREADABLE_CODE",
     "MAX_COMMITS",
     "PUBLISH_TOOL",
     "REMOTES_DISAGREE_CODE",
+    "HeldHead",
+    "MainCommit",
     "MainHistoryHead",
+    "MainHistoryPublication",
     "MainHistoryRead",
+    "MainHistoryRefused",
+    "MainRead",
+    "descends",
+    "generations",
+    "held_heads",
+    "prove_reads",
     "publish_mains",
     "read_main",
     "read_mains",

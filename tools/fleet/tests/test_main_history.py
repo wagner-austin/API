@@ -2,8 +2,11 @@
 
 The reads run real git against real repositories used as remotes, so what is
 asserted is the history git itself lists: a merge's second parent left out,
-the head's depth counted from the root, at most ``MAX_COMMITS`` sent. The
-queue is the dispatch-queue fake that speaks the endpoint's own wire shape.
+each commit's generation counted from its parents, a first-parent chain
+re-routed through a merge's second parent (MCPs board task ecd088e0), at
+most ``MAX_COMMITS`` sent, and whether main descends from a held head as
+``git merge-base`` answers it. The queue is the dispatch-queue fake that
+speaks the endpoint's own wire shape.
 """
 
 from __future__ import annotations
@@ -74,6 +77,51 @@ def merged_repository(repo: pathlib.Path) -> dict[str, str]:
     return {"first": first, "side": side, "second": second, "merge": merge}
 
 
+def rerouted_repository(repo: pathlib.Path) -> dict[str, str]:
+    """A main fast-forwarded to a branch that merged it, as osrs-lab's e6b6a0a8 was.
+
+    main is first, second, third; a branch off first made b1, b2 and b3,
+    merged main as its second parent, and main fast-forwarded to the merge,
+    so main's first-parent chain now runs through the branch.
+
+    Args:
+        repo: Where to build it.
+
+    Returns:
+        Each commit by name: ``first``, ``b1``, ``b2``, ``b3``, ``second``,
+        ``third`` and ``merge``.
+    """
+    repo.mkdir(parents=True)
+    git(repo, "init", "--quiet", "--initial-branch=main")
+    first = commit(repo, "a.txt", "1", "first")
+    git(repo, "checkout", "--quiet", "-b", "branch")
+    built = {"first": first}
+    for index in (1, 2, 3):
+        built[f"b{index}"] = commit(repo, "b.txt", str(index), f"b{index}")
+    git(repo, "checkout", "--quiet", "main")
+    built["second"] = commit(repo, "a.txt", "2", "second")
+    built["third"] = commit(repo, "a.txt", "3", "third")
+    git(repo, "checkout", "--quiet", "branch")
+    git(repo, "merge", "--quiet", "--no-ff", "-m", "merge main", "main")
+    built["merge"] = git(repo, "rev-parse", "HEAD")
+    git(repo, "checkout", "--quiet", "main")
+    git(repo, "merge", "--quiet", "--ff-only", "branch")
+    return built
+
+
+def mirror_of(mirrors_root: pathlib.Path, remote: pathlib.Path) -> pathlib.Path:
+    """The hub's mirror a read of a local remote fetches into.
+
+    Args:
+        mirrors_root: The mirrors directory.
+        remote: The remote.
+
+    Returns:
+        The mirror's path.
+    """
+    return export.mirror_path(mirrors_root, export.remote_mirror_key(str(remote)))
+
+
 def source(remote: str, repository: str) -> declared.DeclaredProject:
     """A declared project sourced from a remote.
 
@@ -126,17 +174,43 @@ class TestReadMain:
     def test_reads_the_default_branch_first_parent_history_and_the_head_depth(
         self, tmp_path: pathlib.Path
     ) -> None:
+        # The merge's parents, second and side, are each of generation 2, so
+        # it is of 3 (test claim upheld on MCPs board task ecd088e0).
         remote = tmp_path / "remote" / "MCPs"
         commits = merged_repository(remote)
 
         read = main_history.read_main(tmp_path / "mirrors", "MCPs", str(remote))
 
-        assert read == main_history.MainHistoryRead(
+        assert read == main_history.MainRead(
             repository="MCPs",
-            head_depth=3,
-            commits=(commits["merge"], commits["second"], commits["first"]),
+            mirror=mirror_of(tmp_path / "mirrors", remote),
+            head=commits["merge"],
+            commits=(
+                main_history.MainCommit(sha=commits["merge"], generation=3),
+                main_history.MainCommit(sha=commits["second"], generation=2),
+                main_history.MainCommit(sha=commits["first"], generation=1),
+            ),
         )
-        assert commits["side"] not in read["commits"]
+        assert commits["side"] not in [listed["sha"] for listed in read["commits"]]
+
+    def test_ranks_a_chain_re_routed_through_a_merge_by_generation_above_the_old_main(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        remote = tmp_path / "remote" / "osrs-lab"
+        commits = rerouted_repository(remote)
+
+        read = main_history.read_main(tmp_path / "mirrors", "osrs-lab", str(remote))
+
+        # The branch's b2 shares third's first-parent depth, 3; the merge
+        # contains third and outranks it, 5 against 3.
+        assert read["commits"] == (
+            main_history.MainCommit(sha=commits["merge"], generation=5),
+            main_history.MainCommit(sha=commits["b3"], generation=4),
+            main_history.MainCommit(sha=commits["b2"], generation=3),
+            main_history.MainCommit(sha=commits["b1"], generation=2),
+            main_history.MainCommit(sha=commits["first"], generation=1),
+        )
+        assert main_history.descends(read["mirror"], commits["third"], read["head"]) is True
 
     def test_sends_at_most_the_newest_thousand_commits_counting_the_head_from_the_root(
         self, tmp_path: pathlib.Path
@@ -159,10 +233,14 @@ class TestReadMain:
 
         read = main_history.read_main(tmp_path / "mirrors", "long", str(repo))
 
-        assert read["head_depth"] == 1001
+        # A linear history's head is of generation 1001, its count from the root.
         assert len(read["commits"]) == 1000
-        assert read["commits"][0] == git(repo, "rev-parse", "main")
-        assert read["commits"][-1] == git(repo, "rev-parse", "main~999")
+        assert read["commits"][0] == main_history.MainCommit(
+            sha=git(repo, "rev-parse", "main"), generation=1001
+        )
+        assert read["commits"][-1] == main_history.MainCommit(
+            sha=git(repo, "rev-parse", "main~999"), generation=2
+        )
 
     @pytest.mark.parametrize("returncode", [128, -9])
     def test_refuses_a_history_git_cannot_list(
@@ -182,7 +260,7 @@ class TestReadMain:
         assert raised.value.code is FleetErrorCode.EXPORT_FAILED
         assert raised.value.message.startswith(
             f"{main_history.HISTORY_UNREADABLE_CODE}: "
-            f"git rev-list --first-parent --count {head} in {mirror}: "
+            f"git rev-list --topo-order --reverse --parents {head} in {mirror}: "
         )
         assert f"fatal: bad object {head}" in raised.value.message
 
@@ -201,7 +279,7 @@ class TestReadMains:
         )
 
         assert [read["repository"] for read in reads] == ["MCPs"]
-        assert reads[0]["commits"][0] == commits["merge"]
+        assert reads[0]["commits"][0]["sha"] == commits["merge"]
         assert len(unread) == 1
         assert unread[0].startswith(
             f"gone: EXPORT_FAILED: git fetch {missing} {main_history.DEFAULT_BRANCH_REF} into "
@@ -226,7 +304,7 @@ class TestReadMains:
         )
 
         assert [read["repository"] for read in reads] == ["MCPs"]
-        assert reads[0]["commits"][0] == commits["merge"]
+        assert reads[0]["commits"][0]["sha"] == commits["merge"]
         assert len(unread) == 3
         assert unread[0].startswith(f"API: EXPORT_FAILED: git fetch {first} ")
         assert "Could not resolve host: one.invalid" in unread[0]
@@ -294,27 +372,193 @@ class TestSourceRemotes:
         )
 
 
+class TestDescends:
+    def test_answers_whether_main_contains_a_held_commit_and_none_the_mirror_lacks(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        remote = tmp_path / "remote" / "osrs-lab"
+        commits = rerouted_repository(remote)
+        read = main_history.read_main(tmp_path / "mirrors", "osrs-lab", str(remote))
+        mirror = read["mirror"]
+
+        assert main_history.descends(mirror, commits["merge"], commits["merge"]) is True
+        assert main_history.descends(mirror, commits["second"], commits["merge"]) is True
+        # Present in the mirror, but the newer commit is not contained in the older.
+        assert main_history.descends(mirror, commits["merge"], commits["third"]) is False
+        # A commit the mirror never fetched is no ancestor of anything it holds.
+        assert main_history.descends(mirror, "f" * 40, commits["merge"]) is False
+
+    def test_refuses_an_ancestry_git_cannot_answer(self, tmp_path: pathlib.Path) -> None:
+        # A blob is an object the mirror holds but no commit, and merge-base exits 128.
+        remote = tmp_path / "remote" / "MCPs"
+        merged_repository(remote)
+        read = main_history.read_main(tmp_path / "mirrors", "MCPs", str(remote))
+        blob = git(remote, "rev-parse", "main:a.txt")
+
+        with pytest.raises(AppError) as raised:
+            main_history.descends(read["mirror"], blob, read["head"])
+
+        assert raised.value.code is FleetErrorCode.EXPORT_FAILED
+        assert raised.value.message.startswith(
+            f"{main_history.ANCESTRY_UNREADABLE_CODE}: "
+            f"git merge-base --is-ancestor {blob} {read['head']} in {read['mirror']}: "
+        )
+        assert "is a blob, not a commit" in raised.value.message
+
+
+class TestHeldHeads:
+    def test_reads_each_held_head_keyed_by_repository(self) -> None:
+        _test_hooks.env = queue_env()
+        answer = {
+            "heads": [
+                {"repository": "API", "head": "a" * 40, "generation": 7, "readAt": READ_AT},
+                {"repository": "MCPs", "head": "b" * 40, "generation": 3, "readAt": READ_AT},
+            ]
+        }
+        endpoint = FakeQueue([dump_json_str(answer)])
+        _test_hooks.http_post = endpoint
+
+        held = main_history.held_heads(queue.load_credentials())
+
+        assert held == {
+            "API": main_history.HeldHead(
+                repository="API", head="a" * 40, generation=7, read_at=READ_AT
+            ),
+            "MCPs": main_history.HeldHead(
+                repository="MCPs", head="b" * 40, generation=3, read_at=READ_AT
+            ),
+        }
+        assert endpoint.tools == ["dispatch_main_heads"]
+        assert endpoint.arguments == [{}]
+
+    @pytest.mark.parametrize(
+        ("answer", "words"),
+        [
+            ([1], "dispatch_main_heads must answer an object, got list"),
+            ({"heads": 3}, "dispatch_main_heads must answer a heads list"),
+            ({"heads": [1]}, "dispatch_main_heads heads must be objects, got int"),
+            (
+                {"heads": [{"repository": "MCPs", "head": "b", "generation": "3", "readAt": "t"}]},
+                "generation",
+            ),
+        ],
+    )
+    def test_refuses_an_answer_it_cannot_read(self, answer: JSONValue, words: str) -> None:
+        _test_hooks.env = queue_env()
+        _test_hooks.http_post = FakeQueue([dump_json_str(answer)])
+
+        with pytest.raises(JSONTypeError, match=words):
+            main_history.held_heads(queue.load_credentials())
+
+
+class TestProveReads:
+    def test_sends_the_held_head_main_descends_from_and_none_otherwise(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        remote = tmp_path / "remote" / "osrs-lab"
+        commits = rerouted_repository(remote)
+        rerouted = main_history.read_main(tmp_path / "mirrors", "osrs-lab", str(remote))
+        unheld = main_history.MainRead(
+            repository="fresh", mirror=rerouted["mirror"], head=commits["merge"], commits=()
+        )
+        rewritten = main_history.MainRead(
+            repository="rewritten", mirror=rerouted["mirror"], head=commits["third"], commits=()
+        )
+        held = {
+            "osrs-lab": main_history.HeldHead(
+                repository="osrs-lab", head=commits["third"], generation=3, read_at=READ_AT
+            ),
+            "rewritten": main_history.HeldHead(
+                repository="rewritten", head=commits["merge"], generation=5, read_at=READ_AT
+            ),
+        }
+
+        proved, unproved = main_history.prove_reads((rerouted, unheld, rewritten), held)
+
+        assert proved == (
+            main_history.MainHistoryRead(
+                repository="osrs-lab", commits=rerouted["commits"], since=commits["third"]
+            ),
+            main_history.MainHistoryRead(repository="fresh", commits=(), since=None),
+            main_history.MainHistoryRead(repository="rewritten", commits=(), since=None),
+        )
+        assert unproved == ()
+
+    def test_leaves_out_and_names_a_read_whose_ancestry_git_cannot_answer(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        remote = tmp_path / "remote" / "MCPs"
+        merged_repository(remote)
+        read = main_history.read_main(tmp_path / "mirrors", "MCPs", str(remote))
+        unheld = main_history.MainRead(
+            repository="fresh", mirror=read["mirror"], head=read["head"], commits=()
+        )
+        blob = git(remote, "rev-parse", "main:a.txt")
+        held = {
+            "MCPs": main_history.HeldHead(
+                repository="MCPs", head=blob, generation=1, read_at=READ_AT
+            )
+        }
+
+        proved, unproved = main_history.prove_reads((read, unheld), held)
+
+        assert proved == (main_history.MainHistoryRead(repository="fresh", commits=(), since=None),)
+        assert len(unproved) == 1
+        assert unproved[0].startswith(
+            f"MCPs: EXPORT_FAILED: {main_history.ANCESTRY_UNREADABLE_CODE}: "
+            f"git merge-base --is-ancestor {blob} "
+        )
+
+
 class TestPublishMains:
     READ = main_history.MainHistoryRead(
-        repository="MCPs", head_depth=3, commits=("b" * 40, "a" * 40)
+        repository="MCPs",
+        commits=(
+            main_history.MainCommit(sha="b" * 40, generation=3),
+            main_history.MainCommit(sha="a" * 40, generation=2),
+        ),
+        since="a" * 40,
     )
 
     def test_sends_each_read_and_answers_each_head(self) -> None:
         _test_hooks.env = queue_env()
-        head: JSONObject = {"repository": "MCPs", "head": "b" * 40, "depth": 3, "added": 2}
-        endpoint = FakeQueue([dump_json_str({"heads": [head]})])
+        head: JSONObject = {"repository": "MCPs", "head": "b" * 40, "generation": 3, "added": 1}
+        refused: JSONObject = {
+            "repository": "API",
+            "code": "DISPATCH_MAIN_HISTORY_STALE",
+            "message": "DISPATCH_MAIN_HISTORY_STALE: API's main read at ...",
+        }
+        endpoint = FakeQueue([dump_json_str({"heads": [head], "refused": [refused]})])
         _test_hooks.http_post = endpoint
 
-        heads = main_history.publish_mains(
+        published = main_history.publish_mains(
             queue.load_credentials(), [self.READ], read_at=READ_AT, identity=IDENTITY
         )
 
-        assert heads == (
-            main_history.MainHistoryHead(repository="MCPs", head="b" * 40, depth=3, added=2),
+        assert published == main_history.MainHistoryPublication(
+            heads=(
+                main_history.MainHistoryHead(
+                    repository="MCPs", head="b" * 40, generation=3, added=1
+                ),
+            ),
+            refused=(
+                main_history.MainHistoryRefused(
+                    repository="API",
+                    code="DISPATCH_MAIN_HISTORY_STALE",
+                    message="DISPATCH_MAIN_HISTORY_STALE: API's main read at ...",
+                ),
+            ),
         )
         sent: JSONObject = {
             "repositories": [
-                {"repository": "MCPs", "headDepth": 3, "commits": ["b" * 40, "a" * 40]}
+                {
+                    "repository": "MCPs",
+                    "commits": [
+                        {"sha": "b" * 40, "generation": 3},
+                        {"sha": "a" * 40, "generation": 2},
+                    ],
+                    "since": "a" * 40,
+                }
             ],
             "readAt": READ_AT,
             **IDENTITY,
@@ -326,9 +570,18 @@ class TestPublishMains:
         ("answer", "words"),
         [
             ([1], "must answer an object, got list"),
-            ({"heads": 3}, "must answer a heads list"),
-            ({"heads": [1]}, "heads must be objects, got int"),
-            ({"heads": [{"repository": "MCPs", "head": "b", "depth": "3", "added": 2}]}, "depth"),
+            ({"heads": 3, "refused": []}, "must answer a heads list"),
+            ({"heads": [1], "refused": []}, "heads must be objects, got int"),
+            (
+                {
+                    "heads": [{"repository": "MCPs", "head": "b", "generation": "3", "added": 2}],
+                    "refused": [],
+                },
+                "generation",
+            ),
+            ({"heads": []}, "must answer a refused list"),
+            ({"heads": [], "refused": [1]}, "refused must be objects, got int"),
+            ({"heads": [], "refused": [{"repository": "MCPs", "code": 1, "message": "m"}]}, "code"),
         ],
     )
     def test_refuses_an_answer_it_cannot_read(self, answer: JSONValue, words: str) -> None:
@@ -371,8 +624,21 @@ class TestMainPass:
             source(missing, "twin"),
         )
         _test_hooks.env = queue_env()
-        head: JSONObject = {"repository": "MCPs", "head": commits["merge"], "depth": 3, "added": 3}
-        endpoint = FakeQueue([dump_json_str({"heads": [head]})])
+        held: JSONObject = {
+            "repository": "MCPs",
+            "head": commits["second"],
+            "generation": 2,
+            "readAt": READ_AT,
+        }
+        head: JSONObject = {
+            "repository": "MCPs",
+            "head": commits["merge"],
+            "generation": 3,
+            "added": 1,
+        }
+        endpoint = FakeQueue(
+            [dump_json_str({"heads": [held]}), dump_json_str({"heads": [head], "refused": []})]
+        )
         _test_hooks.http_post = endpoint
 
         with caplog.at_level(logging.INFO):
@@ -380,12 +646,17 @@ class TestMainPass:
                 queue.load_credentials(), IDENTITY, read, mirrors_root=tmp_path / "mirrors"
             )
 
-        assert endpoint.arguments[0]["readAt"] == READ_AT
-        assert endpoint.arguments[0]["repositories"] == [
+        assert endpoint.tools == ["dispatch_main_heads", "dispatch_main_publish"]
+        assert endpoint.arguments[1]["readAt"] == READ_AT
+        assert endpoint.arguments[1]["repositories"] == [
             {
                 "repository": "MCPs",
-                "headDepth": 3,
-                "commits": [commits["merge"], commits["second"], commits["first"]],
+                "commits": [
+                    {"sha": commits["merge"], "generation": 3},
+                    {"sha": commits["second"], "generation": 2},
+                    {"sha": commits["first"], "generation": 1},
+                ],
+                "since": commits["second"],
             }
         ]
         logged = messages(caplog)
@@ -397,8 +668,96 @@ class TestMainPass:
         assert any(line.startswith(left_out) for line in logged)
         assert (
             f"published the main history of 1 repositories: MCPs at {commits['merge'][:12]} "
-            "(depth 3, 3 new)"
+            "(generation 3, 1 new)"
         ) in logged
+
+    def test_logs_each_repository_the_queue_refused_and_publishes_the_rest(
+        self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        pin_clock(PINNED)
+        merged_repository(tmp_path / "remote" / "MCPs")
+        rerouted = rerouted_repository(tmp_path / "remote" / "osrs-lab")
+        read = registry(
+            source(str(tmp_path / "remote" / "MCPs"), "MCPs"),
+            source(str(tmp_path / "remote" / "osrs-lab"), "osrs-lab"),
+        )
+        _test_hooks.env = queue_env()
+        held: JSONObject = {
+            "heads": [
+                {"repository": "MCPs", "head": "f" * 40, "generation": 9, "readAt": READ_AT},
+                {
+                    "repository": "osrs-lab",
+                    "head": rerouted["third"],
+                    "generation": 3,
+                    "readAt": READ_AT,
+                },
+            ]
+        }
+        message = (
+            "DISPATCH_MAIN_HISTORY_REWRITTEN: MCPs's main as read does not descend from the "
+            f"head the queue holds, {'f' * 40} at generation 9, so main was rewritten; nothing "
+            "was written for it"
+        )
+        answer: JSONObject = {
+            "heads": [
+                {"repository": "osrs-lab", "head": rerouted["merge"], "generation": 5, "added": 4}
+            ],
+            "refused": [
+                {
+                    "repository": "MCPs",
+                    "code": "DISPATCH_MAIN_HISTORY_REWRITTEN",
+                    "message": message,
+                }
+            ],
+        }
+        endpoint = FakeQueue([dump_json_str(held), dump_json_str(answer)])
+        _test_hooks.http_post = endpoint
+
+        with caplog.at_level(logging.INFO):
+            hub_passes.main_pass(
+                queue.load_credentials(), IDENTITY, read, mirrors_root=tmp_path / "mirrors"
+            )
+
+        sent = endpoint.arguments[1]["repositories"]
+        assert isinstance(sent, list)
+        assert [
+            (entry["repository"], entry["since"]) for entry in sent if isinstance(entry, dict)
+        ] == [("MCPs", None), ("osrs-lab", rerouted["third"])]
+        logged = messages(caplog)
+        assert f"the queue wrote no main history for {message}" in logged
+        assert (
+            f"published the main history of 1 repositories: osrs-lab at {rerouted['merge'][:12]} "
+            "(generation 5, 4 new)"
+        ) in logged
+
+    def test_publishes_nothing_when_no_read_could_be_proved(
+        self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        pin_clock(PINNED)
+        remote = tmp_path / "remote" / "MCPs"
+        merged_repository(remote)
+        blob = git(remote, "rev-parse", "main:a.txt")
+        read = registry(source(str(remote), "MCPs"))
+        _test_hooks.env = queue_env()
+        held: JSONObject = {
+            "heads": [{"repository": "MCPs", "head": blob, "generation": 1, "readAt": READ_AT}]
+        }
+        endpoint = FakeQueue([dump_json_str(held)])
+        _test_hooks.http_post = endpoint
+
+        with caplog.at_level(logging.WARNING):
+            hub_passes.main_pass(
+                queue.load_credentials(), IDENTITY, read, mirrors_root=tmp_path / "mirrors"
+            )
+
+        assert endpoint.tools == ["dispatch_main_heads"]
+        logged = messages(caplog)
+        unproved = (
+            "read no main history for MCPs: EXPORT_FAILED: "
+            f"{main_history.ANCESTRY_UNREADABLE_CODE}: "
+        )
+        assert any(line.startswith(unproved) for line in logged)
+        assert "published no main history: none of 1 repositories was proved" in logged
 
     def test_publishes_nothing_when_no_repository_could_be_read(
         self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture

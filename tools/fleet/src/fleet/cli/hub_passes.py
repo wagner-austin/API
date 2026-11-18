@@ -73,8 +73,13 @@ def main_pass(
     so task_update's cancel gate reads only checks at main commits newer than
     a failure's. Each repository is fetched into the hub's mirror of its
     remote; one that cannot be read, or whose projects name two remotes, is
-    logged with its code and left out, and the rest are sent at the
-    registry read's instant, which was taken before any of them.
+    logged with its code and left out. The queue's held heads are read
+    (``dispatch_main_heads``) and each read sends as ``since`` the held head
+    its mirror proves main descends from (MCPs board task ecd088e0); one
+    whose ancestry git cannot answer is logged and left out. The rest are
+    sent at the registry read's instant, which was taken before any of them,
+    and each repository the queue refuses is logged with its code while the
+    others are written.
 
     Args:
         credentials: The queue's endpoint and headers.
@@ -84,8 +89,8 @@ def main_pass(
         mirrors_root: The hub's mirrors directory.
 
     Raises:
-        AppError: From the queue call, its refusal of a stale or rewritten
-            history among them.
+        AppError: From a queue call, its refusal of a malformed publication
+            among them.
     """
     if isinstance(read, str):
         _log.warning("read no main history: the rolled registry was not read")
@@ -99,16 +104,24 @@ def main_pass(
     if not reads:
         _log.warning("published no main history: none of %d repositories was read", len(remotes))
         return
-    heads = main_history.publish_mains(
-        credentials, reads, read_at=read["checked_at"], identity=identity
+    proved, unproved = main_history.prove_reads(reads, main_history.held_heads(credentials))
+    for line in unproved:
+        _log.warning("read no main history for %s", line)
+    if not proved:
+        _log.warning("published no main history: none of %d repositories was proved", len(reads))
+        return
+    published = main_history.publish_mains(
+        credentials, proved, read_at=read["checked_at"], identity=identity
     )
+    for refused in published["refused"]:
+        _log.warning("the queue wrote no main history for %s", refused["message"])
     _log.info(
         "published the main history of %d repositories: %s",
-        len(heads),
+        len(published["heads"]),
         ", ".join(
             f"{head['repository']} at {head['head'][:12]} "
-            f"(depth {head['depth']}, {head['added']} new)"
-            for head in heads
+            f"(generation {head['generation']}, {head['added']} new)"
+            for head in published["heads"]
         ),
     )
 
