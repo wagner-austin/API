@@ -1,6 +1,8 @@
 {
   "worker_ram_gb": 0.5,
   "minimum_workers": 3,
+  "worker_cores": 2,
+  "worker_cores_measurement": "Fleet jobs bb4159fd and f5f9366d on lavender and 6b23ca14, 3d1a1569 and 1b8ee2a1 on colossus, each at 4 workers with no other fleet check on its node (2026-11-18), used 4.84, 5.05, 4.79, 5.17 and 4.66 cores by their units' systemd CPU accounting: 1.2 to 1.3 cores a worker, because its cases spawn git, node and tsc beside each vitest worker in the dispatch share; a run draws about 5 cores whatever its workers (0.63 a worker at sedona's 9, 0141f188). Charged one core, it took 4 of lavender's 8-core share and the fleet placed MCPs/watcher's 4 workers beside it (fleet jobs 86aa64d0 and 8bcc8e08): their units used 4.5 and 2.5 cores, the share read throttled:670s, and a 19 s watcher case timed out at 60 s (MCPs board task 18f5d762). Charged 2, lavender grants it 4 workers, its whole share, and places nothing beside it.",
   "expected_minutes": 8,
   "required_tags": [
     "cxx"

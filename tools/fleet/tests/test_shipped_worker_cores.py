@@ -38,6 +38,16 @@ was placed beside it, the share was throttled 1042 s and a 30 s case timed
 out (fleet job c4df04fb). Charged 8, a node grants it one worker, lavender
 places nothing beside it, and serendipity, whose spare cores are 6, refuses
 it.
+
+MCPs/repo-contracts, the suite placed beside each of those three, is charged
+2 cores a worker as well (MCPs board task 18f5d762). Its cases spawn git,
+node and tsc beside each vitest worker, so a run draws about 5 cores whatever
+its workers: 1.2 to 1.3 a worker at the 4 lavender and colossus grant it.
+Charged one, it took 4 of lavender's 8 quota cores and MCPs/watcher's 4
+workers were placed beside it (fleet jobs 86aa64d0 and 8bcc8e08); together
+they wanted about 8.4 cores, the share was throttled 670 s, and a 19 s watcher
+case timed out at 60 s. Charged 2, lavender grants it 4 workers, its whole
+share, and places no suite beside it, nor it beside a suite already there.
 """
 
 from __future__ import annotations
@@ -48,6 +58,20 @@ from fleet.contracts.node import LiveLoad
 from fleet.contracts.tags import node_tags
 from fleet.core.capacity import assess
 from tests._registry import idle_state, shipped_workspace
+
+#: The runs MCPs/repo-contracts' registry row names beside its worker_cores 2.
+CONTRACTS_CORES_MEASUREMENT = (
+    "Fleet jobs bb4159fd and f5f9366d on lavender and 6b23ca14, 3d1a1569 and 1b8ee2a1 on "
+    "colossus, each at 4 workers with no other fleet check on its node (2026-11-18), used "
+    "4.84, 5.05, 4.79, 5.17 and 4.66 cores by their units' systemd CPU accounting: 1.2 to 1.3 "
+    "cores a worker, because its cases spawn git, node and tsc beside each vitest worker in "
+    "the dispatch share; a run draws about 5 cores whatever its workers (0.63 a worker at "
+    "sedona's 9, 0141f188). Charged one core, it took 4 of lavender's 8-core share and the "
+    "fleet placed MCPs/watcher's 4 workers beside it (fleet jobs 86aa64d0 and 8bcc8e08): "
+    "their units used 4.5 and 2.5 cores, the share read throttled:670s, and a 19 s watcher "
+    "case timed out at 60 s (MCPs board task 18f5d762). Charged 2, lavender grants it 4 "
+    "workers, its whole share, and places nothing beside it."
+)
 
 #: The runs MCPs/execution-deploy's registry row names beside its worker_cores 2.
 DEPLOY_CORES_MEASUREMENT = (
@@ -111,7 +135,7 @@ def test_lavender_places_no_three_worker_suite_beside_the_deploy_rehearsal() -> 
 
     assert deploy["worker_cores"] == 2
     assert deploy["worker_cores_measurement"] == DEPLOY_CORES_MEASUREMENT
-    assert contracts["worker_cores"] == 1
+    assert contracts["worker_cores"] == 2
     assert assess(node, state, deploy, deploy_tags) == {"workers": 3, "code": None, "reason": ""}
     assert assess(node, state, contracts, contracts_tags) == {
         "workers": 4,
@@ -127,10 +151,10 @@ def test_lavender_places_no_three_worker_suite_beside_the_deploy_rehearsal() -> 
     )
     assert beside_deploy["reason"].startswith(
         "lavender's checks are held to 8.00 CPU(s) by the quota systemd keeps on their slice, "
-        "so 2 core(s) are left where the suite's minimum of 3 worker(s) occupies 3"
+        "so 2 core(s) are left where the suite's minimum of 3 worker(s) occupies 6"
     )
 
-    state["live"] = LiveLoad(runs=1, workers=4, cores=4, ram_gb=2.0)
+    state["live"] = LiveLoad(runs=1, workers=4, cores=8, ram_gb=2.0)
     beside_contracts = assess(node, state, deploy, deploy_tags)
     assert (beside_contracts["workers"], beside_contracts["code"]) == (
         0,
@@ -138,7 +162,7 @@ def test_lavender_places_no_three_worker_suite_beside_the_deploy_rehearsal() -> 
     )
     assert beside_contracts["reason"].startswith(
         "lavender's checks are held to 8.00 CPU(s) by the quota systemd keeps on their slice, "
-        "so 4 core(s) are left where the suite's minimum of 3 worker(s) occupies 6"
+        "so 0 core(s) are left where the suite's minimum of 3 worker(s) occupies 6"
     )
 
 
@@ -162,7 +186,7 @@ def test_lavender_books_mcp_shared_at_the_cores_its_workers_use() -> None:
     assert shared["worker_cores"] == 2
     assert shared["worker_cores_measurement"] == SHARED_CORES_MEASUREMENT
     assert (gateway["worker_cores"], gateway["minimum_workers"]) == (1, 2)
-    assert (contracts["worker_cores"], contracts["minimum_workers"]) == (1, 3)
+    assert (contracts["worker_cores"], contracts["minimum_workers"]) == (2, 3)
     assert assess(node, state, shared, shared_tags) == {"workers": 3, "code": None, "reason": ""}
 
     state["live"] = LiveLoad(runs=1, workers=3, cores=6, ram_gb=1.5)
@@ -178,10 +202,10 @@ def test_lavender_books_mcp_shared_at_the_cores_its_workers_use() -> None:
     )
     assert beside_shared["reason"].startswith(
         "lavender's checks are held to 8.00 CPU(s) by the quota systemd keeps on their slice, "
-        "so 2 core(s) are left where the suite's minimum of 3 worker(s) occupies 3"
+        "so 2 core(s) are left where the suite's minimum of 3 worker(s) occupies 6"
     )
 
-    state["live"] = LiveLoad(runs=1, workers=4, cores=4, ram_gb=2.0)
+    state["live"] = LiveLoad(runs=1, workers=4, cores=8, ram_gb=2.0)
     beside_contracts = assess(node, state, shared, shared_tags)
     assert (beside_contracts["workers"], beside_contracts["code"]) == (
         0,
@@ -189,7 +213,7 @@ def test_lavender_books_mcp_shared_at_the_cores_its_workers_use() -> None:
     )
     assert beside_contracts["reason"].startswith(
         "lavender's checks are held to 8.00 CPU(s) by the quota systemd keeps on their slice, "
-        "so 4 core(s) are left where the suite's minimum of 3 worker(s) occupies 6"
+        "so 0 core(s) are left where the suite's minimum of 3 worker(s) occupies 6"
     )
 
 
@@ -214,12 +238,13 @@ def test_execution_twin_takes_lavenders_whole_share_and_one_worker_anywhere() ->
 
     assert (twin["worker_cores"], twin["minimum_workers"]) == (8, 1)
     assert twin["worker_cores_measurement"] == TWIN_CORES_MEASUREMENT
-    assert (contracts["worker_cores"], contracts["minimum_workers"]) == (1, 3)
+    assert (contracts["worker_cores"], contracts["minimum_workers"]) == (2, 3)
     assert (probe["worker_cores"], probe["minimum_workers"]) == (1, 2)
     assert assess(lavender, state, twin, twin_tags) == {"workers": 1, "code": None, "reason": ""}
 
     state["live"] = LiveLoad(runs=1, workers=1, cores=8, ram_gb=4.5)
-    for suite, tags, minimum in ((contracts, contracts_tags, 3), (probe, probe_tags, 2)):
+    beside = ((contracts, contracts_tags, 3, 6), (probe, probe_tags, 2, 2))
+    for suite, tags, minimum, occupies in beside:
         beside_twin = assess(lavender, state, suite, tags)
         assert (beside_twin["workers"], beside_twin["code"]) == (
             0,
@@ -228,10 +253,10 @@ def test_execution_twin_takes_lavenders_whole_share_and_one_worker_anywhere() ->
         assert beside_twin["reason"].startswith(
             "lavender's checks are held to 8.00 CPU(s) by the quota systemd keeps on their "
             f"slice, so 0 core(s) are left where the suite's minimum of {minimum} worker(s) "
-            f"occupies {minimum}"
+            f"occupies {occupies}"
         )
 
-    state["live"] = LiveLoad(runs=1, workers=4, cores=4, ram_gb=2.0)
+    state["live"] = LiveLoad(runs=1, workers=4, cores=8, ram_gb=2.0)
     beside_contracts = assess(lavender, state, twin, twin_tags)
     assert (beside_contracts["workers"], beside_contracts["code"]) == (
         0,
@@ -239,7 +264,7 @@ def test_execution_twin_takes_lavenders_whole_share_and_one_worker_anywhere() ->
     )
     assert beside_contracts["reason"].startswith(
         "lavender's checks are held to 8.00 CPU(s) by the quota systemd keeps on their slice, "
-        "so 4 core(s) are left where the suite's minimum of 1 worker(s) occupies 8"
+        "so 0 core(s) are left where the suite's minimum of 1 worker(s) occupies 8"
     )
 
     sedona = workspace["nodes"]["sedona"]
@@ -256,4 +281,53 @@ def test_execution_twin_takes_lavenders_whole_share_and_one_worker_anywhere() ->
     assert refused["reason"].startswith(
         "serendipity has 24.0 GB free against a reservation of 1.5 GB for whoever is using it, "
         "and 8 cores against 2 reserved. Nothing is left for a dispatch"
+    )
+
+
+def test_lavender_places_nothing_beside_repo_contracts_nor_it_beside_watcher() -> None:
+    """MCPs board task 18f5d762: charged one core a worker, MCPs/repo-contracts
+    took 4 of lavender's 8 quota cores (fleet job 86aa64d0) and MCPs/watcher the
+    other 4 (8bcc8e08), while their units used 4.5 and 2.5 cores; the share was
+    throttled 670 s and a 19 s watcher case timed out at 60 s. Charged 2,
+    repo-contracts is granted lavender's whole share, nothing fits beside it,
+    and it does not fit beside watcher's 4 workers."""
+    workspace = shipped_workspace()
+    contracts = workspace["projects"]["MCPs/repo-contracts"]
+    watcher = workspace["projects"]["MCPs/watcher"]
+    node = workspace["nodes"]["lavender"]
+    contracts_tags = node_tags(node) | frozenset(contracts["required_tags"])
+    watcher_tags = node_tags(node) | frozenset(watcher["required_tags"])
+    state = idle_state(node)
+    state["check_cpu_quota"] = 8.0
+
+    assert (contracts["worker_cores"], contracts["minimum_workers"]) == (2, 3)
+    assert contracts["worker_cores_measurement"] == CONTRACTS_CORES_MEASUREMENT
+    assert (watcher["worker_cores"], watcher["minimum_workers"]) == (1, 2)
+    assert assess(node, state, contracts, contracts_tags) == {
+        "workers": 4,
+        "code": None,
+        "reason": "",
+    }
+    assert assess(node, state, watcher, watcher_tags) == {"workers": 4, "code": None, "reason": ""}
+
+    state["live"] = LiveLoad(runs=1, workers=4, cores=8, ram_gb=2.0)
+    beside_contracts = assess(node, state, watcher, watcher_tags)
+    assert (beside_contracts["workers"], beside_contracts["code"]) == (
+        0,
+        FleetErrorCode.NODE_OWNER_RESERVED,
+    )
+    assert beside_contracts["reason"].startswith(
+        "lavender's checks are held to 8.00 CPU(s) by the quota systemd keeps on their slice, "
+        "so 0 core(s) are left where the suite's minimum of 2 worker(s) occupies 2"
+    )
+
+    state["live"] = LiveLoad(runs=1, workers=4, cores=4, ram_gb=2.0)
+    beside_watcher = assess(node, state, contracts, contracts_tags)
+    assert (beside_watcher["workers"], beside_watcher["code"]) == (
+        0,
+        FleetErrorCode.NODE_OWNER_RESERVED,
+    )
+    assert beside_watcher["reason"].startswith(
+        "lavender's checks are held to 8.00 CPU(s) by the quota systemd keeps on their slice, "
+        "so 4 core(s) are left where the suite's minimum of 3 worker(s) occupies 6"
     )
