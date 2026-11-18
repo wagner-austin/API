@@ -1,7 +1,7 @@
 {
   "worker_ram_gb": 1.5,
   "minimum_workers": 4,
-  "expected_minutes": 10,
+  "expected_minutes": 30,
   "required_tags": [
     "linux",
     "docker"
