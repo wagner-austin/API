@@ -43,6 +43,17 @@ FFmpeg natives from Maven and real Pixel 8 recordings as fixtures: run with the
 same Makefile on diphtheria at osrs-lab 4e1a6837 it passed 82 tests, 75 of its
 own and 7 of input-policy's, at lines 592/592 and branches 278/278.
 
+mutation-history (MCPs board task 0546e41a) runs the check of osrs-lab's own
+PIT history plugin in the same image: open-source PIT has shipped no history
+since 1.23.0, and desktop-input/mutation.gradle puts these classes on PIT's
+classpath in every build that mutates, so a check reuses an earlier check's
+verdict on a mutant whose class and tests are unchanged. Every consumer's
+build runs its tests and coverage before its own mutation step, but only
+this directory's own check mutates the plugin itself. Inside brain's check
+at osrs-lab 2965f4a7 (fleet job 0fe8dabb on colossus) its 19 tests passed,
+real PIT runs over compiled fixtures among them, at lines 117/117 and
+branches 47/47.
+
 input-policy (board task b2ee9cbe) runs the input boundary policy's own make
 check in the same image since osrs-lab 6176e3d, whose packaged-classes.gradle
 the recorder and the observer's login plugin artifact apply: on colossus it
@@ -91,6 +102,7 @@ DIRECTORIES: Final[tuple[str, ...]] = (
     "live-coverage",
     "manual-desktop",
     "mobile",
+    "mutation-history",
     "observer",
     "observer-input-coverage",
     "recorder",
