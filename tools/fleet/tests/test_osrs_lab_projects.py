@@ -63,6 +63,12 @@ the recorder's test tasks load it, but only this directory's own check
 mutates it. Run in quick-run's container on loki, its check passed with 78
 of 78 mutants detected.
 
+quick-run (MCPs board task 632d8e8c) runs the quick iteration's own make
+check in the same image: the observer's liveClient gate builds the live
+client, and test.sh then runs host.sh's deploy and run verbs and every
+refusal it can reach without docker against that client under xvfb-run. Its
+gate verb runs docker and is measured on loki, where the desktops are.
+
 input-policy (board task b2ee9cbe) runs the input boundary policy's own make
 check in the same image since osrs-lab 6176e3d, whose packaged-classes.gradle
 the recorder and the observer's login plugin artifact apply: on colossus it
@@ -114,6 +120,7 @@ DIRECTORIES: Final[tuple[str, ...]] = (
     "mutation-history",
     "observer",
     "observer-input-coverage",
+    "quick-run",
     "recorder",
     "recorder-release",
     "test-selection",
