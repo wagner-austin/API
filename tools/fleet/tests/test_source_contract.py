@@ -39,10 +39,9 @@ from fleet.contracts.source import (
     encode_project_source,
 )
 from fleet.contracts.tags import NodeTag
-from tests._queue_fakes import DEFAULT_SHA, queue_job
+from tests._queue_fakes import DEFAULT_SHA, claimed_job, queue_job
 from tests.conftest import DEMO_PROJECT
 from tests.test_contracts import _project
-from tests.test_dispatch_contracts import claimed_job
 
 HTTPS = "https://github.com/wagner-austin/MCPs.git"
 SSH_SCP = "git@github.com:wagner-austin/MCPs.git"
