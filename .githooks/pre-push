@@ -136,6 +136,27 @@ printf '%s\n' "$PUSH_INPUT" | while read -r _ct_local_ref ct_local_sha _ct_remot
     fi
 done
 
+# NO PUSH LEAVES A WIKI PIN STALE (MCPs board tasks 242cc1af and e4889f5c).
+# A wiki page pins each file its claims rest on in source_git_blobs. On
+# 2026-11-18 commits changed files that five pages pinned without touching a
+# page, and nothing at the push said so. MCPs' maketools push-wiki-pins,
+# run as MCPs' origin/main carries it (published_maketools.py), reads the
+# pages the push can reach at the remote's commit and at the tip, and
+# refuses a pin that was current before the push, or that the push wrote,
+# and is not the tip's blob: re-read the page's claims about the file, then
+# repin in the same push. A pin already stale before the push refuses
+# nothing. Like commit-tasks it runs before the GitHub check below, so no
+# remote escapes it, and set -eu ends the hook when it refuses.
+PIN_UPDATES=""
+while read -r _pin_local_ref pin_local_sha pin_remote_ref pin_remote_sha; do
+    [ -z "$pin_local_sha" ] && continue
+    PIN_UPDATES="$PIN_UPDATES $pin_local_sha:$pin_remote_sha:$pin_remote_ref"
+done <<EOF
+$PUSH_INPUT
+EOF
+# Each update is one word: git refuses whitespace in a ref name.
+"$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" push-wiki-pins "$REPO" $PIN_UPDATES < /dev/null
+
 # PUBLISHED TIPS ALREADY PASSED THEIR PUBLICATION CHECKS (board task dd40bba5).
 # Reuse MCPs' push-published policy, including its fail-closed status contract.
 # A fleet-roll moves a reference to code already on origin/main; checking its
