@@ -92,6 +92,56 @@ TEST_DIFF_TAIL = (
 )
 
 
+#: Fleet job 27baa025, osrs-lab/brain at f158a639 on loki
+#: (osrs-lab-brain-loki-1795061440.log): PIT made 2041 mutants and detected
+#: every one, its history for that digest was new so none was reused, and the
+#: task ran 289 s (PIT's own total read 4 minutes and 48 seconds).
+OSRS_TAIL = (
+    "MUTATION_HISTORY :mutationTest: kept "
+    "osrs-brain-f949a23c4c7d765bc5646bacdc0226b87276e8499c7fe043963f998168562f37.history\n"
+    "MUTATION TOTAL :mutationTest: 2041 of 2041 detected (KILLED 2039, TIMED_OUT 2); "
+    "0 verdicts reused from kept history; threshold 100%\n"
+    "\n"
+    "> Task :check\n"
+    "mutation: passed: 0 of 2041 mutant(s) made in 1 mutation step(s): :mutationTest; "
+    "289s mutation testing, 0 verdict(s) reused from kept history\n"
+    "TESTS :input-policy:test: 7 passed, 0 failed, 0 skipped of 7\n"
+    "TESTS :mutation-history:test: 19 passed, 0 failed, 0 skipped of 19\n"
+    "TESTS :test: 572 passed, 0 failed, 0 skipped of 572\n"
+    "FLEET_RUN: generation=1794418226 began=no phases=check:326s\n"
+)
+
+
+def test_a_step_keeping_a_history_reads_its_own_seconds_and_its_reuse() -> None:
+    assert read_span(OSRS_TAIL) == "289s"
+    assert read_mutation(OSRS_TAIL) == "passed:0/2041,289s,reused:0"
+
+
+def test_a_reuse_count_is_the_summary_s_own() -> None:
+    # OSRS_TAIL with its count changed, as a warm check of the same digest
+    # prints it: the count is read, not assumed.
+    warm = OSRS_TAIL.replace("0 verdict(s) reused", "1946 verdict(s) reused")
+    assert read_mutation(warm) == "passed:0/2041,289s,reused:1946"
+
+
+def test_reuse_is_read_only_off_the_line_the_step_ended_on() -> None:
+    # A step keeping no history ended the check: no reuse is reported for it,
+    # and the span is the later budget line's.
+    assert read_mutation(OSRS_TAIL + PASSED_TAIL) == "passed:0/275,509s/900s"
+    assert read_mutation(PASSED_TAIL + OSRS_TAIL) == "passed:0/2041,289s,reused:0"
+    # A step that refused after the history's summary ended the check.
+    assert read_mutation(OSRS_TAIL + BASELINE_FAILED_TAIL) == "error:MUTATION_BASELINE_FAILED,289s"
+
+
+def test_a_history_summary_inside_a_test_s_output_is_not_read() -> None:
+    summary = OSRS_TAIL.splitlines()[4]
+    assert summary.startswith("mutation: passed: 0 of 2041 ")
+    quoted = '+     "' + summary + '",\n'
+    assert read_mutation(quoted) == "unread"
+    trailing = summary + " and more\n"
+    assert read_mutation(trailing) == "passed:0/2041,unread"
+
+
 def test_a_step_that_found_survivors_reads_failed_with_its_count_and_span() -> None:
     assert read_mutation(FAILED_TAIL) == "failed:8/453,801s/900s"
 

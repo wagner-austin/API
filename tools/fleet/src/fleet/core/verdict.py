@@ -170,7 +170,9 @@ class Verdict(TypedDict):
             (:func:`fleet.core.mutation_verdict.read_mutation`), for
             example ``failed:8/453,801s/900s``: a check whose suite passed
             and whose step found surviving mutants otherwise read like any
-            other red check (MCPs board task 637f648f).
+            other red check (MCPs board task 637f648f). A step keeping a
+            history adds the verdicts it reused, as osrs-lab's
+            ``passed:0/2041,289s,reused:0`` (MCPs board task 0546e41a).
         stalls: The seconds the measured cgroup's tasks stalled on cpu, io
             and memory (:func:`fleet.core.slice_load.read_run_pressure`),
             ``check:`` for the build's own unit and ``lane:`` for the docker
