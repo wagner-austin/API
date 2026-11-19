@@ -73,6 +73,7 @@ from fleet.core.session_argv import (
     compact_argv,
     handoff_argv,
     kill_argv,
+    message_argv,
     move_argv,
     restart_argv,
     revive_argv,
@@ -104,7 +105,10 @@ TARGET_MISSING_CODE: Final = "RESTART_TARGET_MISSING"
 #: limit through the account launcher, which leases another account.
 #: ``handoff-session`` (MCPs mig 831, board task 553cc92f) starts a fresh
 #: worker on a board task in the tree of the session that handed it over,
-#: touching that session not at all. The words are the queue's own
+#: touching that session not at all. ``message-session`` (MCPs board task
+#: d3d514aa) posts one board message, read from its row, to the session's
+#: inbox socket, run as session-audit message (MCPs board task 394b7148).
+#: The words are the queue's own
 #: :class:`DispatchCommand` members, so one vocabulary names them.
 SESSION_COMMANDS: Final[tuple[DispatchCommand, ...]] = (
     DispatchCommand.RESTART_SESSION,
@@ -115,7 +119,13 @@ SESSION_COMMANDS: Final[tuple[DispatchCommand, ...]] = (
     DispatchCommand.EXIT_SESSION,
     DispatchCommand.MOVE_SESSION,
     DispatchCommand.HANDOFF_SESSION,
+    DispatchCommand.MESSAGE_SESSION,
 )
+
+#: Detail prefix for a message-session row that names no message -- a
+#: queue that has stopped pinning the verb to its message (MCPs board task
+#: d3d514aa).
+MESSAGE_MISSING_CODE: Final = "MESSAGE_ID_MISSING"
 
 #: Detail prefix for a handoff-session row that names no task -- a queue
 #: that has stopped enforcing mig 831's CHECK.
@@ -196,6 +206,30 @@ def task_refusal(command: DispatchCommand, task_id: str | None) -> str | None:
     return None
 
 
+def message_refusal(command: DispatchCommand, message_id: int | None) -> str | None:
+    """Decide whether a message-session row names the message it delivers.
+
+    A message-session job names the agent_session_messages row it posts
+    (MCPs mig 995); every other session verb passes. The id is a whole
+    number the decoder already read, so only its absence is judged here,
+    beside the target, as :func:`task_refusal` judges a handoff's task.
+
+    Args:
+        command: The queue row's command.
+        message_id: The queue row's message, or None when it carries none.
+
+    Returns:
+        A ``CODE: message`` refusal detail for the queue, or None when the
+        job can run.
+    """
+    if command is DispatchCommand.MESSAGE_SESSION and message_id is None:
+        return (
+            f"{MESSAGE_MISSING_CODE}: a message-session row names the board message it "
+            "delivers and this one does not; the queue's CHECK should have refused it"
+        )
+    return None
+
+
 class SessionInvocation(TypedDict):
     """What one session verb runs.
 
@@ -227,6 +261,8 @@ def session_invocation(
     requested_by: str,
     host: str,
     task_id: str | None,
+    *,
+    message_id: int | None,
 ) -> SessionInvocation:
     """Map one session verb to its one invocation.
 
@@ -241,6 +277,9 @@ def session_invocation(
         task_id: The queue row's task (already judged by
             :func:`task_refusal`), which only a handoff carries into its
             invocation.
+        message_id: The queue row's message (already judged by
+            :func:`message_refusal`), which only a message-session carries
+            into its invocation.
 
     Returns:
         The :class:`SessionInvocation`.
@@ -331,6 +370,20 @@ def session_invocation(
             mode="handoff",
             argv=handoff_argv(root, host, session_target, task_id, requested_by),
             types_requester=True,
+            release=release_id,
+            revision=revision,
+        )
+    if command is DispatchCommand.MESSAGE_SESSION:
+        if message_id is None:
+            raise ValueError(
+                f"{MESSAGE_MISSING_CODE}: a message-session reached its invocation with no "
+                "message, past message_refusal"
+            )
+        return SessionInvocation(
+            verb="message",
+            mode="message",
+            argv=message_argv(root, host, session_target, message_id),
+            types_requester=False,
             release=release_id,
             revision=revision,
         )
@@ -435,6 +488,7 @@ def describe_result(result: CommandResult, invocation: SessionInvocation) -> str
 __all__ = [
     "COMMAND_UNKNOWN_CODE",
     "LABEL_PATTERN",
+    "MESSAGE_MISSING_CODE",
     "REQUESTER_INVALID_CODE",
     "SESSION_COMMANDS",
     "SESSION_ENVIRONMENT_EXCLUDED",
@@ -446,6 +500,7 @@ __all__ = [
     "TASK_MISSING_CODE",
     "SessionInvocation",
     "describe_result",
+    "message_refusal",
     "refusal_for",
     "requester_refusal",
     "run_session_job",

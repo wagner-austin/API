@@ -209,11 +209,46 @@ def handoff_argv(
     )
 
 
+def message_argv(
+    release_root: pathlib.Path,
+    host: str,
+    session_target: str,
+    message_id: int,
+) -> tuple[str, ...]:
+    """Compose the session-audit invocation for one message-session job.
+
+    Args:
+        release_root: The verified release's checkout.
+        host: The node the addressed session runs on, whose inbox socket the
+            message is posted to.
+        session_target: The addressed session's UUID (already
+            grammar-checked).
+        message_id: The agent_session_messages row to deliver (already
+            judged by :func:`fleet.core.restart.message_refusal`).
+
+    Returns:
+        The argv: ``session-audit message --session <uuid> --message-id <id>``
+        through :func:`session_audit_argv`. Nothing the sender wrote is an
+        element of it: the mode reads the message from its row (MCPs board
+        task 394b7148).
+    """
+    return session_audit_argv(
+        release_root,
+        host,
+        "message",
+        "--session",
+        session_target,
+        "--message-id",
+        str(message_id),
+    )
+
+
 __all__ = [
     "SESSION_AUDIT_DIR",
     "compact_argv",
     "handoff_argv",
     "kill_argv",
+    "message_argv",
     "move_argv",
     "restart_argv",
     "revive_argv",

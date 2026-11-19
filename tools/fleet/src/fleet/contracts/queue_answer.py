@@ -122,6 +122,36 @@ def require_count(row: dict[str, JSONValue], key: str, *, least: int, answer: st
     return value
 
 
+def require_optional_count(
+    row: dict[str, JSONValue], key: str, *, least: int, answer: str
+) -> int | None:
+    """Read one nullable whole-number field no smaller than ``least``.
+
+    Present and null is None; absent is refused, as
+    :func:`require_optional_str` refuses it, because the tool renders every
+    absent value as an explicit ``null``; any other value is read by
+    :func:`require_count`'s rule.
+
+    Args:
+        row: The decoded object.
+        key: The field name.
+        least: The smallest value it may hold when it is not null.
+        answer: The whole answer, for the error message.
+
+    Returns:
+        The value, or None when the field is present and null.
+
+    Raises:
+        AppError: ``QUEUE_ANSWER_MALFORMED`` when absent, or present and
+            neither null nor a whole number of at least ``least``.
+    """
+    if key not in row:
+        raise malformed(f"field {key!r} is missing", answer=answer)
+    if row[key] is None:
+        return None
+    return require_count(row, key, least=least, answer=answer)
+
+
 def require_optional_instant(row: dict[str, JSONValue], key: str, *, answer: str) -> int | None:
     """Read one nullable instant field as whole seconds since the epoch.
 
@@ -174,6 +204,8 @@ __all__ = [
     "INSTANT",
     "envelope",
     "malformed",
+    "require_count",
+    "require_optional_count",
     "require_optional_instant",
     "require_optional_str",
     "require_str",

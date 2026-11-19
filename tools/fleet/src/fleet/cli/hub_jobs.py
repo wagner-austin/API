@@ -187,8 +187,10 @@ def session_job(
     Raises:
         AppError: Only from the queue calls themselves.
     """
-    refusal = restart.refusal_for(job["session_target"]) or restart.task_refusal(
-        job["command"], job["task_id"]
+    refusal = (
+        restart.refusal_for(job["session_target"])
+        or restart.task_refusal(job["command"], job["task_id"])
+        or restart.message_refusal(job["command"], job["message_id"])
     )
     if refusal is not None:
         return job_close.refuse(credentials, job, identity, detail=refusal)
@@ -201,7 +203,13 @@ def session_job(
     if isinstance(release, str):
         return job_close.refuse(credentials, job, identity, detail=release)
     invocation = restart.session_invocation(
-        release, job["command"], target, job["submitted_by"], node, job["task_id"]
+        release,
+        job["command"],
+        target,
+        job["submitted_by"],
+        node,
+        job["task_id"],
+        message_id=job["message_id"],
     )
     # A revive types the submitter's label into its brief and a kill passes
     # it as an argument (MCPs migs 525 and 526), so the label is judged

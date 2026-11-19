@@ -84,6 +84,20 @@ class TestRestartArgv:
             DispatchCommand.EXIT_SESSION,
             DispatchCommand.MOVE_SESSION,
             DispatchCommand.HANDOFF_SESSION,
+            DispatchCommand.MESSAGE_SESSION,
+        )
+
+    def test_composes_the_exact_message_invocation(self) -> None:
+        """MCPs board task d3d514aa: the job names only its session and the
+        message's row; nothing the sender wrote is an argv element."""
+        assert session_argv.message_argv(ROOT, HOST, TARGET, 5185) == (
+            *PREFIX,
+            "message",
+            "--session",
+            TARGET,
+            "--message-id",
+            "5185",
+            *SUFFIX,
         )
 
     def test_composes_the_exact_move_invocation(self) -> None:
@@ -154,7 +168,7 @@ class TestRestartArgv:
         sealed = {"release": RELEASE["release"], "revision": RELEASE["revision"]}
 
         assert restart.session_invocation(
-            RELEASE, DispatchCommand.RESTART_SESSION, TARGET, label, HOST, None
+            RELEASE, DispatchCommand.RESTART_SESSION, TARGET, label, HOST, None, message_id=None
         ) == {
             "verb": "restart",
             "mode": "rollover",
@@ -163,7 +177,7 @@ class TestRestartArgv:
             **sealed,
         }
         assert restart.session_invocation(
-            RELEASE, DispatchCommand.REVIVE_SESSION, TARGET, label, HOST, None
+            RELEASE, DispatchCommand.REVIVE_SESSION, TARGET, label, HOST, None, message_id=None
         ) == {
             "verb": "revive",
             "mode": "revive",
@@ -172,7 +186,7 @@ class TestRestartArgv:
             **sealed,
         }
         assert restart.session_invocation(
-            RELEASE, DispatchCommand.KILL_SESSION, TARGET, label, HOST, None
+            RELEASE, DispatchCommand.KILL_SESSION, TARGET, label, HOST, None, message_id=None
         ) == {
             "verb": "kill",
             "mode": "kill",
@@ -181,11 +195,11 @@ class TestRestartArgv:
             **sealed,
         }
         hard = restart.session_invocation(
-            RELEASE, DispatchCommand.KILL_SESSION_HARD, TARGET, label, HOST, None
+            RELEASE, DispatchCommand.KILL_SESSION_HARD, TARGET, label, HOST, None, message_id=None
         )
         assert hard["argv"] == session_argv.kill_argv(ROOT, HOST, TARGET, label, hard=True)
         assert restart.session_invocation(
-            RELEASE, DispatchCommand.COMPACT_SESSION, TARGET, label, HOST, None
+            RELEASE, DispatchCommand.COMPACT_SESSION, TARGET, label, HOST, None, message_id=None
         ) == {
             "verb": "compact",
             "mode": "compact",
@@ -197,7 +211,7 @@ class TestRestartArgv:
         # kill's one invocation, never the hard one, under its own run verb,
         # marked --exit so a run already gone has met it (MCPs 7829e947).
         assert restart.session_invocation(
-            RELEASE, DispatchCommand.EXIT_SESSION, TARGET, label, HOST, None
+            RELEASE, DispatchCommand.EXIT_SESSION, TARGET, label, HOST, None, message_id=None
         ) == {
             "verb": "exit",
             "mode": "kill",
@@ -206,7 +220,7 @@ class TestRestartArgv:
             **sealed,
         }
         assert restart.session_invocation(
-            RELEASE, DispatchCommand.MOVE_SESSION, TARGET, label, HOST, None
+            RELEASE, DispatchCommand.MOVE_SESSION, TARGET, label, HOST, None, message_id=None
         ) == {
             "verb": "move",
             "mode": "move",
@@ -215,7 +229,7 @@ class TestRestartArgv:
             **sealed,
         }
         assert restart.session_invocation(
-            RELEASE, DispatchCommand.HANDOFF_SESSION, TARGET, label, HOST, TASK
+            RELEASE, DispatchCommand.HANDOFF_SESSION, TARGET, label, HOST, TASK, message_id=None
         ) == {
             "verb": "handoff",
             "mode": "handoff",
@@ -223,6 +237,31 @@ class TestRestartArgv:
             "types_requester": True,
             **sealed,
         }
+        assert restart.session_invocation(
+            RELEASE, DispatchCommand.MESSAGE_SESSION, TARGET, label, HOST, None, message_id=5185
+        ) == {
+            "verb": "message",
+            "mode": "message",
+            "argv": session_argv.message_argv(ROOT, HOST, TARGET, 5185),
+            "types_requester": False,
+            **sealed,
+        }
+
+    def test_a_message_that_reaches_its_invocation_with_no_id_is_a_routing_defect(self) -> None:
+        refusal = (
+            r"^MESSAGE_ID_MISSING: a message-session reached its invocation with no message, "
+            r"past message_refusal$"
+        )
+        with pytest.raises(ValueError, match=refusal):
+            restart.session_invocation(
+                RELEASE,
+                DispatchCommand.MESSAGE_SESSION,
+                TARGET,
+                "opus-mcps-1117-eeab",
+                HOST,
+                None,
+                message_id=None,
+            )
 
     def test_a_handoff_that_reaches_its_invocation_with_no_task_is_a_routing_defect(self) -> None:
         refusal = (
@@ -231,14 +270,26 @@ class TestRestartArgv:
         )
         with pytest.raises(ValueError, match=refusal):
             restart.session_invocation(
-                RELEASE, DispatchCommand.HANDOFF_SESSION, TARGET, "opus-mcps-1020-645e", HOST, None
+                RELEASE,
+                DispatchCommand.HANDOFF_SESSION,
+                TARGET,
+                "opus-mcps-1020-645e",
+                HOST,
+                None,
+                message_id=None,
             )
 
     def test_a_command_that_is_not_a_session_verb_is_refused_by_code(self) -> None:
         refusal = r"^SESSION_COMMAND_UNKNOWN: 'check' is not a session verb$"
         with pytest.raises(ValueError, match=refusal):
             restart.session_invocation(
-                RELEASE, DispatchCommand.CHECK, TARGET, "opus-mcps-0917-e7b5", HOST, None
+                RELEASE,
+                DispatchCommand.CHECK,
+                TARGET,
+                "opus-mcps-0917-e7b5",
+                HOST,
+                None,
+                message_id=None,
             )
 
     def test_a_submitter_that_is_not_a_board_label_is_refused_before_argv(self) -> None:
@@ -296,6 +347,18 @@ class TestRefusals:
         assert restart.task_refusal(DispatchCommand.HANDOFF_SESSION, TASK) is None
         assert restart.task_refusal(DispatchCommand.MOVE_SESSION, None) is None
 
+    def test_a_message_session_with_no_message_is_refused_and_every_other_verb_needs_none(
+        self,
+    ) -> None:
+        """MCPs board task d3d514aa: a runner that met a message-session row
+        naming no message names the fact rather than post nothing."""
+        assert restart.message_refusal(DispatchCommand.MESSAGE_SESSION, None) == (
+            "MESSAGE_ID_MISSING: a message-session row names the board message it delivers "
+            "and this one does not; the queue's CHECK should have refused it"
+        )
+        assert restart.message_refusal(DispatchCommand.MESSAGE_SESSION, 5185) is None
+        assert restart.message_refusal(DispatchCommand.KILL_SESSION, None) is None
+
 
 class TestRunAndDescribe:
     def test_run_withholds_the_agents_paths_and_writes_no_bytecode(self) -> None:
@@ -306,7 +369,13 @@ class TestRunAndDescribe:
 
         result = restart.run_session_job(
             restart.session_invocation(
-                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912", HOST, None
+                RELEASE,
+                DispatchCommand.RESTART_SESSION,
+                TARGET,
+                "fable-dm-0912",
+                HOST,
+                None,
+                message_id=None,
             )
         )
 
@@ -321,7 +390,13 @@ class TestRunAndDescribe:
         runner = FakeRun([ok("REVIVE - REVIVED session x: now pid 5")])
         _test_hooks.run = runner
         invocation = restart.session_invocation(
-            RELEASE, DispatchCommand.REVIVE_SESSION, TARGET, "fable-system-audit-0915", HOST, None
+            RELEASE,
+            DispatchCommand.REVIVE_SESSION,
+            TARGET,
+            "fable-system-audit-0915",
+            HOST,
+            None,
+            message_id=None,
         )
 
         result = restart.run_session_job(invocation)
@@ -344,7 +419,13 @@ class TestRunAndDescribe:
                 timed_out=False,
             ),
             restart.session_invocation(
-                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912", HOST, None
+                RELEASE,
+                DispatchCommand.RESTART_SESSION,
+                TARGET,
+                "fable-dm-0912",
+                HOST,
+                None,
+                message_id=None,
             ),
         )
 
@@ -363,7 +444,13 @@ class TestRunAndDescribe:
                 timed_out=False,
             ),
             restart.session_invocation(
-                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912", HOST, None
+                RELEASE,
+                DispatchCommand.RESTART_SESSION,
+                TARGET,
+                "fable-dm-0912",
+                HOST,
+                None,
+                message_id=None,
             ),
         )
 

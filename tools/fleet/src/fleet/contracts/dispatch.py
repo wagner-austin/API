@@ -34,6 +34,7 @@ from fleet.contracts.queue_answer import (
     envelope,
     malformed,
     require_count,
+    require_optional_count,
     require_optional_instant,
     require_optional_str,
     require_str,
@@ -57,12 +58,9 @@ class DispatchStatus(StrEnum):
 class DispatchCommand(StrEnum):
     """The commands a job may ask for. There is no free-command field.
 
-    ``build-bases`` (MCPs mig 497, board 3c9033ff) runs on the hub itself
-    rather than on a node -- the R6 rebuild lane; its execution lives in
-    :mod:`fleet.core.rebuild`. ``restart-session`` (MCPs mig 507, board
-    ccec3417) is the second hub-local verb, the only one that carries a
-    target; :mod:`fleet.core.restart` maps it to one session-audit
-    invocation.
+    ``build-bases`` (MCPs mig 497) runs on the hub itself, in
+    :mod:`fleet.core.rebuild`. The session verbs carry a target, and
+    :mod:`fleet.core.restart` maps each to one session-audit invocation.
     """
 
     CHECK = "check"
@@ -117,6 +115,9 @@ class DispatchCommand(StrEnum):
     # command this reader does not know fails every listing (MCPs board task
     # 13d112bb).
     INSPECT = "inspect"
+    # MCPs board tasks d3d514aa and c088658f: post the board message in
+    # messageId to the target session's inbox; decoded before it is admitted.
+    MESSAGE_SESSION = "message-session"
 
 
 #: The commands that name a catalog model rather than a registry project.
@@ -217,6 +218,7 @@ class DispatchJob(TypedDict):
         task_id: The board task whose thread receives the verdict, or None
             when the submitter named none, in which case the verdict is a
             note addressed to the submitting label.
+        message_id: The board message a message-session delivers, else None.
         claimed_unix: When the claim was taken, whole seconds since the
             epoch, or None while nothing holds the job. The one timestamp
             decoded, because the collect pass decides from it (MCPs board
@@ -251,6 +253,7 @@ class DispatchJob(TypedDict):
     sha: str | None
     required_tags: tuple[NodeTag, ...]
     task_id: str | None
+    message_id: int | None
     claimed_unix: int | None
     lease_expires_unix: int | None
     research_request: ResearchRequest | None
@@ -364,6 +367,7 @@ def decode_job(value: JSONValue, *, answer: str) -> DispatchJob:
         sha=require_optional_str(value, "sha", answer=answer),
         required_tags=_require_tags(value, answer=answer),
         task_id=require_optional_str(value, "taskId", answer=answer),
+        message_id=require_optional_count(value, "messageId", least=1, answer=answer),
         claimed_unix=require_optional_instant(value, "claimedAt", answer=answer),
         lease_expires_unix=require_optional_instant(value, "leaseExpiresAt", answer=answer),
         research_request=(
