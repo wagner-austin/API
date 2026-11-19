@@ -183,8 +183,10 @@ def _reused(tail: str) -> str:
         ``reused:<count>``, else ``""``.
     """
     ending = _ending(tail)
-    history = _last(HISTORY, tail)
-    if ending is None or history is None or history.start() != ending[0]:
+    if ending is None:
+        return ""
+    history = HISTORY.match(tail, ending[0])
+    if history is None:
         return ""
     return f"reused:{history.group(2)}"
 
