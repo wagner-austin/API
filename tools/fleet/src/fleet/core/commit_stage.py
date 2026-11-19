@@ -349,7 +349,7 @@ def unpack_script(
         )
         + dialect.fed_lines(
             source=("git", "-C", mirror, "archive", "--format=tar", sha, *pathspec),
-            sink=("tar", "-xmf", fifo, "-C", target),
+            sink=("tar", "-xmf", "-", "-C", target),
             fifo=fifo,
         )
         + dialect.checked_lines(stage_repository.index_commands(target, run_id))

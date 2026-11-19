@@ -63,8 +63,9 @@ INIT_REPOSITORY_STEM = "init-repo"
 UNPACK_STEM = "unpack"
 
 #: The named pipe the node's mirror streams the commit's tar through into
-#: the export (:func:`fleet.core.dialect.fed_lines`), in the export's
-#: staging directory beside :data:`ARCHIVE_NAME`.
+#: the export (:func:`fleet.core.dialect.fed_lines`), read to its end as
+#: tar's standard input, in the export's staging directory beside
+#: :data:`ARCHIVE_NAME`.
 TREE_FIFO_NAME = "tree.fifo"
 
 #: The directory under a cache root that holds the node's bare mirror of

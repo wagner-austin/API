@@ -25,6 +25,10 @@ SH_SECONDS = 60
 #: and its 1000 bytes of data padded to 1024.
 FIRST_MEMBER_ENDS = 1536
 
+#: The zeros a source writes past its archive's end: 1 MiB, past the 64 KiB
+#: a Linux pipe holds, so the source is still writing when tar stops.
+PAST_THE_END = 1048576
+
 
 def _two_members(tmp_path: pathlib.Path) -> pathlib.Path:
     """Write a tar of two files, ``a`` and then ``b``.
@@ -61,7 +65,7 @@ def _fed(tmp_path: pathlib.Path, source: tuple[str, ...]) -> tuple[int, str, lis
     fifo = str(tmp_path / "tree.fifo")
     script = (
         dialect.PROLOGUE
-        + dialect.fed_lines(source=source, sink=("tar", "-xmf", fifo, "-C", str(out)), fifo=fifo)
+        + dialect.fed_lines(source=source, sink=("tar", "-xmf", "-", "-C", str(out)), fifo=fifo)
         + dialect.checked_lines((("echo", "reached the end"),))
     )
     done = subprocess.run(
@@ -106,11 +110,30 @@ def test_a_sink_that_fails_ends_the_script_on_the_sink_s_status(tmp_path: pathli
     assert (status, said, landed) == (2, "", [])
 
 
+def test_a_stream_going_on_past_the_archive_s_end_is_read_to_its_end(
+    tmp_path: pathlib.Path,
+) -> None:
+    """MCPs board task 2f8a81b4: GNU tar exits 0 at an archive's end marker
+    without reading on, and git archive pads past that marker with zeros,
+    so a git still writing them when tar closed the pipe died of SIGPIPE
+    and unpack.sh exited 141. Here the zeros past the end are more than a
+    pipe holds, so the source is always still writing when tar ends."""
+    archive = _two_members(tmp_path)
+    padded = f"cat {shlex.quote(str(archive))}; head -c {PAST_THE_END} /dev/zero"
+
+    status, said, landed = _fed(tmp_path, ("sh", "-c", padded))
+
+    assert (status, said, landed) == (0, "reached the end\n", ["a", "b"])
+
+
 def test_the_lines_quote_every_word_and_wait_for_the_sink() -> None:
     lines = dialect.fed_lines(
-        source=("git", "archive", "a b"), sink=("tar", "-xf", "/s/p q"), fifo="/s/p q"
+        source=("git", "archive", "a b"), sink=("tar", "-xf", "-"), fifo="/s/p q"
     )
 
     assert lines == (
-        "mkfifo '/s/p q'\ntar -xf '/s/p q' &\ngit archive 'a b' > '/s/p q'\nwait \"$!\"\n"
+        "mkfifo '/s/p q'\n"
+        "{ fed=0; tar -xf - || fed=$?; cat > /dev/null; exit \"$fed\"; } < '/s/p q' &\n"
+        "git archive 'a b' > '/s/p q'\n"
+        'wait "$!"\n'
     )

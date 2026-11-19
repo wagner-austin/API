@@ -265,10 +265,24 @@ def fed_lines(*, source: tuple[str, ...], sink: tuple[str, ...], fifo: str) -> s
     sink's. The shell opens ``fifo`` for the source before the source runs,
     so a source that fails at once still closes it and the sink ends.
 
+    THE STREAM IS READ TO ITS END, WHATEVER THE SINK READS (MCPs board task
+    2f8a81b4). GNU tar stops reading at an archive's two zero blocks and
+    exits 0, and ``git archive`` pads its tar past them with up to two more
+    10240-byte writes of zeros. When the pipe was full as git reached that
+    padding, tar could read the end marker and close the pipe before git's
+    last write finished, and git died of SIGPIPE, silently: unpack.sh
+    exited 141 with nothing on stderr but the clone's empty-repository
+    warning, six times in the seven days to 2026-11-19 on colossus, sedona,
+    lacrymal and diphtheria, and on CI run 42312210127. So the sink reads
+    ``fifo`` as its standard input, and once it ends ``cat`` reads the same
+    descriptor to the end, so the source never writes into a closed pipe;
+    the background shell then exits with the sink's status, which the
+    ``wait`` returns.
+
     Args:
         source: The command that writes the stream, an argument vector.
-        sink: The command that reads it from ``fifo``, an argument vector
-            that names ``fifo`` as its input.
+        sink: The command that reads the stream on its standard input, an
+            argument vector.
         fifo: Where the named pipe is made, which must not exist yet.
 
     Returns:
@@ -277,7 +291,8 @@ def fed_lines(*, source: tuple[str, ...], sink: tuple[str, ...], fifo: str) -> s
     quoted = shlex.quote(fifo)
     return (
         f"mkfifo {quoted}\n"
-        f"{checked_lines((sink,)).rstrip()} &\n"
+        f"{{ fed=0; {checked_lines((sink,)).rstrip()} || fed=$?; cat > /dev/null; "
+        f'exit "$fed"; }} < {quoted} &\n'
         f"{checked_lines((source,)).rstrip()} > {quoted}\n"
         'wait "$!"\n'
     )
