@@ -14,7 +14,7 @@ from __future__ import annotations
 import pathlib
 
 import pytest
-from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, narrow_json_to_str
+from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
 from fleet.cli import agent
 from fleet.core import _test_hooks, restart, sealed_release, session_argv, session_release
@@ -28,10 +28,17 @@ from tests._agent_cli import (
     tick_run_id,
 )
 from tests._hub_tick import UNROLLED_TICK, unrolled_calls
-from tests._queue_fakes import FakeQueue, queue_job
+from tests._queue_fakes import FakeQueue
+from tests._session_jobs import (
+    SUBMITTER,
+    TARGET,
+    opening,
+    ran_queue,
+    refused_queue,
+    restart_row,
+    verb_reply,
+)
 from tests._session_release_fixtures import (
-    RELEASE_ID,
-    REVISION,
     plant_release,
     point_environment,
     verify_call,
@@ -39,8 +46,6 @@ from tests._session_release_fixtures import (
 )
 from tests.conftest import FakeRun, failed
 
-TARGET = "934d9975-0d65-4e68-83de-b74f8c4df0c4"
-SUBMITTER = "fable-dm-versionsplit-0912"
 #: The board task a handoff's fresh worker starts on (MCPs mig 831).
 HANDOFF_TASK = "553cc92f-39d0-49f3-a631-0d6108a2c5ec"
 
@@ -52,98 +57,6 @@ def _credentials_in_env() -> None:
     And the machine and unit it runs in, which a hub lane job is started on.
     """
     bind_hub_tick()
-
-
-def opening(mode: str, returncode: int) -> str:
-    """The start of a session job's closing detail.
-
-    Args:
-        mode: The session-audit mode that ran.
-        returncode: Its exit code.
-
-    Returns:
-        The mode, the planted release and revision, and the exit code.
-    """
-    return (
-        f"session-audit {mode} from sealed release {RELEASE_ID} "
-        f"(revision {REVISION}) exited {returncode}:"
-    )
-
-
-def restart_row(**overrides: JSONValue) -> JSONObject:
-    """A claimed restart-session row in the real wire shape.
-
-    Args:
-        **overrides: Fields to vary.
-
-    Returns:
-        The wire object.
-    """
-    fields: dict[str, JSONValue] = {
-        "status": "claimed",
-        "command": "restart-session",
-        "project": "MCPs",
-        "requestedNode": HUB_HOST,
-        "sessionTarget": TARGET,
-        "submittedBy": SUBMITTER,
-        # A session verb acts on the hub, not on a commit (MCPs mig 532).
-        "sha": None,
-    }
-    fields.update(overrides)
-    return queue_job(**fields)
-
-
-def ran_queue(command: str, closed: str) -> FakeQueue:
-    """The queue's three answers for a session job that ran.
-
-    Args:
-        command: The row's verb.
-        closed: The status it closes with.
-
-    Returns:
-        The claim, the start report and the close report.
-    """
-    return FakeQueue(
-        [
-            NOTHING_HELD,
-            dump_json_str({"claimed": restart_row(command=command)}),
-            dump_json_str({"job": restart_row(command=command, status="running", node=HUB_HOST)}),
-            dump_json_str({"job": restart_row(command=command, status=closed, node=HUB_HOST)}),
-        ]
-    )
-
-
-def refused_queue(**claimed: JSONValue) -> FakeQueue:
-    """The queue's two answers for a session job refused before it ran.
-
-    Args:
-        **claimed: Fields to vary on the claimed row.
-
-    Returns:
-        The claim and the refusal report.
-    """
-    return FakeQueue(
-        [
-            NOTHING_HELD,
-            dump_json_str({"claimed": restart_row(**claimed)}),
-            dump_json_str({"job": restart_row(status="refused")}),
-        ]
-    )
-
-
-def verb_reply(returncode: int, stdout: str) -> _test_hooks.CommandResult:
-    """session-audit's answer.
-
-    Args:
-        returncode: Its exit code.
-        stdout: What it printed.
-
-    Returns:
-        The result.
-    """
-    return _test_hooks.CommandResult(
-        returncode=returncode, stdout=stdout, stderr="", timed_out=False
-    )
 
 
 class TestRestartLane:
@@ -424,61 +337,6 @@ class TestRestartLane:
         detail = narrow_json_to_str(endpoint.arguments[3]["detail"])
         assert detail == f"{opening('handoff', 0)} {line.strip()}"
 
-    def test_a_claimed_message_runs_session_audits_message_mode_with_its_row(
-        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
-    ) -> None:
-        """MCPs board tasks d3d514aa and c088658f: the message rides the one
-        session job path, runs ``session-audit message`` with the row's target
-        and message id and nothing else, and closes with the mode's line."""
-        release = plant_release(tmp_path)
-        line = f"MESSAGE DELIVERED: {TARGET} message 5185: {TARGET}.jsonl enqueued it\n"
-        runner = FakeRun([verify_reply(tmp_path), verb_reply(0, line), *UNROLLED_TICK])
-        _test_hooks.run = runner
-        row: dict[str, JSONValue] = {"command": "message-session", "messageId": 5185}
-        endpoint = FakeQueue(
-            [
-                NOTHING_HELD,
-                dump_json_str({"claimed": restart_row(**row)}),
-                dump_json_str({"job": restart_row(**row, status="running", node=HUB_HOST)}),
-                dump_json_str({"job": restart_row(**row, status="passed", node=HUB_HOST)}),
-            ]
-        )
-        _test_hooks.http_post = endpoint
-
-        assert agent.main(agent_argv(config_path, repo)) == 0
-
-        assert runner.calls == [
-            verify_call(tmp_path),
-            session_argv.message_argv(release["root"], HUB_HOST, TARGET, 5185),
-            *unrolled_calls(repo),
-        ]
-        closed = endpoint.arguments[3]
-        assert closed["status"] == "passed"
-        assert narrow_json_to_str(closed["detail"]) == f"{opening('message', 0)} {line.strip()}"
-
-    def test_a_message_session_audit_did_not_deliver_closes_failed_with_its_outcome(
-        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
-    ) -> None:
-        plant_release(tmp_path)
-        held = f"MESSAGE HELD: {TARGET} message 5185: held (no-mode-asserted)\n"
-        _test_hooks.run = FakeRun([verify_reply(tmp_path), verb_reply(1, held), *UNROLLED_TICK])
-        endpoint = FakeQueue(
-            [
-                NOTHING_HELD,
-                dump_json_str({"claimed": restart_row(command="message-session", messageId=5185)}),
-                dump_json_str({"job": restart_row(status="running", node=HUB_HOST)}),
-                dump_json_str({"job": restart_row(status="failed", node=HUB_HOST)}),
-            ]
-        )
-        _test_hooks.http_post = endpoint
-
-        assert agent.main(agent_argv(config_path, repo)) == 0
-
-        closed = endpoint.arguments[3]
-        assert closed["status"] == "failed"
-        assert closed["exitCode"] == 1
-        assert "MESSAGE HELD" in narrow_json_to_str(closed["detail"])
-
     def test_an_approved_exit_runs_the_graceful_kill_under_its_own_run_verb(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
@@ -637,19 +495,3 @@ class TestReleaseRefusals:
 
         assert runner.calls == [*unrolled_calls(repo)]
         assert "HANDOFF_TASK_MISSING" in narrow_json_to_str(endpoint.arguments[2]["detail"])
-
-    def test_a_message_session_naming_no_message_is_refused_before_the_release_is_read(
-        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
-    ) -> None:
-        """MCPs board task d3d514aa: a message-session whose row names no
-        message posts nothing."""
-        plant_release(tmp_path)
-        runner = FakeRun([*UNROLLED_TICK])
-        _test_hooks.run = runner
-        endpoint = refused_queue(command="message-session", messageId=None)
-        _test_hooks.http_post = endpoint
-
-        assert agent.main(agent_argv(config_path, repo)) == 0
-
-        assert runner.calls == [*unrolled_calls(repo)]
-        assert "MESSAGE_ID_MISSING" in narrow_json_to_str(endpoint.arguments[2]["detail"])

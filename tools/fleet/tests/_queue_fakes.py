@@ -29,6 +29,7 @@ from platform_core.json_utils import (
 from platform_core.mcp_client import McpCredentials, McpHttpResponse
 from platform_core.mcp_testing import DECLARED_FLEET_URL
 
+from fleet.contracts.dispatch import DispatchJob, decode_claim
 from fleet.core import queue
 from tests.conftest import DEMO_PROJECT
 
@@ -230,6 +231,28 @@ DEFAULT_JOB_ID = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa"
 #: The commit every :func:`queue_job` check names unless overridden (MCPs
 #: mig 532): forty lowercase hex, the shape the queue's pin admits.
 DEFAULT_SHA = "4e3c6bc1d9f0a7b2c3e4f5061728394a5b6c7d8e"
+
+
+def claimed_job(answer: str) -> DispatchJob:
+    """Decode a claim answer that must have produced a job.
+
+    Raising rather than asserting ``is not None``: a bare null check is a
+    weak assertion -- it passes for any object at all -- and the guard bans
+    it for that reason. This narrows AND says what was expected.
+
+    Args:
+        answer: The tool's text.
+
+    Returns:
+        The job.
+
+    Raises:
+        AssertionError: When the answer carried no job.
+    """
+    job = decode_claim(answer)
+    if job is None:
+        raise AssertionError(f"expected a claimed job, got an empty queue: {answer}")
+    return job
 
 
 def queue_job(**overrides: JSONValue) -> JSONObject:

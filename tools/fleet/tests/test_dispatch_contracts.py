@@ -17,7 +17,6 @@ from fleet.contracts.dispatch import (
     CATALOG_COMMANDS,
     MODEL_COMMANDS,
     DispatchCommand,
-    DispatchJob,
     DispatchStatus,
     decode_claim,
     decode_listing,
@@ -26,7 +25,7 @@ from fleet.contracts.dispatch import (
     decode_trail_claims,
     encode_job_line,
 )
-from tests._queue_fakes import queue_job
+from tests._queue_fakes import claimed_job, queue_job
 
 
 def answer(body: JSONObject) -> str:
@@ -39,28 +38,6 @@ def answer(body: JSONObject) -> str:
         Its JSON text.
     """
     return dump_json_str(body)
-
-
-def claimed_job(answer: str) -> DispatchJob:
-    """Decode a claim answer that must have produced a job.
-
-    Raising rather than asserting ``is not None``: a bare null check is a
-    weak assertion -- it passes for any object at all -- and the guard bans
-    it for that reason. This narrows AND says what was expected.
-
-    Args:
-        answer: The tool's text.
-
-    Returns:
-        The job.
-
-    Raises:
-        AssertionError: When the answer carried no job.
-    """
-    job = decode_claim(answer)
-    if job is None:
-        raise AssertionError(f"expected a claimed job, got an empty queue: {answer}")
-    return job
 
 
 class TestDecodeClaim:
@@ -324,58 +301,6 @@ class TestMalformedAnswers:
             DispatchCommand.MODEL_UNLOAD,
             DispatchCommand.INSPECT,
         } == CATALOG_COMMANDS
-
-    def test_a_message_session_decodes_with_its_target_and_message(self) -> None:
-        """The queue admits message-session only after every runner can read
-        it (MCPs board tasks d3d514aa and c088658f); every other job carries
-        its messageId as null."""
-        target = "58a72f7f-27c1-47dc-91cc-181b56cbac5c"
-        job = claimed_job(
-            answer(
-                {
-                    "claimed": queue_job(
-                        command="message-session",
-                        project="MCPs",
-                        requestedNode="ziggurat",
-                        sessionTarget=target,
-                        sha=None,
-                        messageId=5185,
-                    )
-                }
-            )
-        )
-
-        assert job["command"] is DispatchCommand.MESSAGE_SESSION
-        assert job["session_target"] == target
-        assert job["message_id"] == 5185
-        assert claimed_job(answer({"claimed": queue_job()}))["message_id"] is None
-
-    @pytest.mark.parametrize(
-        ("value", "message"),
-        [
-            (0, "field 'messageId' is 0, not a whole number of at least 1"),
-            ("5185", "field 'messageId' is '5185', not a whole number of at least 1"),
-            (True, "field 'messageId' is True, not a whole number of at least 1"),
-        ],
-    )
-    def test_a_message_id_the_queue_cannot_hold_is_refused(
-        self, value: JSONValue, message: str
-    ) -> None:
-        with pytest.raises(AppError) as raised:
-            decode_claim(answer({"claimed": queue_job(messageId=value)}))
-
-        assert raised.value.code is FleetErrorCode.QUEUE_ANSWER_MALFORMED
-        assert message in raised.value.message
-
-    def test_a_missing_message_id_is_a_changed_contract_not_an_absent_message(self) -> None:
-        """A queue rolled before MCPs mig 995 sends none; the roll waits for it."""
-        row = queue_job()
-        del row["messageId"]
-
-        with pytest.raises(AppError) as raised:
-            decode_claim(answer({"claimed": row}))
-
-        assert "field 'messageId' is missing" in raised.value.message
 
     def test_a_missing_reason_key_is_a_changed_contract_not_an_absent_reason(self) -> None:
         row = queue_job()
