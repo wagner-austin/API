@@ -69,6 +69,13 @@ client, and test.sh then runs host.sh's deploy and run verbs and every
 refusal it can reach without docker against that client under xvfb-run. Its
 gate verb runs docker and is measured on loki, where the desktops are.
 
+character-site (MCPs board task 6f9947b1) runs the Jagex character page
+driver's own make check in the same image: its tests start a real headed
+Chromium, Playwright's own and the Google Chrome stable package the image
+installs, as an ordinary browser against pages they serve on loopback, and
+attach Playwright over its debugging port. Its live verbs run by hand on
+loki, on the operator's screen.
+
 input-policy (board task b2ee9cbe) runs the input boundary policy's own make
 check in the same image since osrs-lab 6176e3d, whose packaged-classes.gradle
 the recorder and the observer's login plugin artifact apply: on colossus it
@@ -112,6 +119,7 @@ from tests._registry import shipped_document
 DIRECTORIES: Final[tuple[str, ...]] = (
     "brain",
     "build-runner",
+    "character-site",
     "desktop-input",
     "input-policy",
     "live-coverage",

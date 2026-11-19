@@ -1578,6 +1578,15 @@ and the observer's login plugin artifact apply. On colossus it passed 5 tests in
 18 s at lines 37/37 and branches 26/26, with the policy scan over 138 production
 sources, and the same tags and workers as the observer.
 
+**`osrs-lab/character-site`** (MCPs board task 6f9947b1, 2026-11-19) is the
+Jagex character page driver's own `make check`, run in the same image, which
+carries Google Chrome stable for it: its tests start a real headed browser,
+Playwright's own Chromium and Google Chrome, as an ordinary process against
+pages they serve on two loopback origins and attach Playwright over the
+debugging port, with every line and branch covered. Its verbs against the
+live site run by hand on loki, on the operator's screen, and never here. Same
+tags and workers as the observer.
+
 **`coax-drone/site`** (MCPs board task c88f1f08, 2026-11-12) is coax-drone's
 site directory's own `make check`, the pages lift.austinwagner.org serves: it
 installs the site's pinned TypeScript, type definitions, Playwright and
