@@ -16,7 +16,7 @@ import shlex
 import subprocess
 import tarfile
 
-from fleet.core import dialect
+from fleet.core import dialect, fed_stream
 
 #: The deadline for the real sh and tar these cases run.
 SH_SECONDS = 60
@@ -65,7 +65,7 @@ def _fed(tmp_path: pathlib.Path, source: tuple[str, ...]) -> tuple[int, str, lis
     fifo = str(tmp_path / "tree.fifo")
     script = (
         dialect.PROLOGUE
-        + dialect.fed_lines(source=source, sink=("tar", "-xmf", "-", "-C", str(out)), fifo=fifo)
+        + fed_stream.fed_lines(source=source, sink=("tar", "-xmf", "-", "-C", str(out)), fifo=fifo)
         + dialect.checked_lines((("echo", "reached the end"),))
     )
     done = subprocess.run(
@@ -127,7 +127,7 @@ def test_a_stream_going_on_past_the_archive_s_end_is_read_to_its_end(
 
 
 def test_the_lines_quote_every_word_and_wait_for_the_sink() -> None:
-    lines = dialect.fed_lines(
+    lines = fed_stream.fed_lines(
         source=("git", "archive", "a b"), sink=("tar", "-xf", "-"), fifo="/s/p q"
     )
 

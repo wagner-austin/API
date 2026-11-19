@@ -64,6 +64,7 @@ from fleet.core import (
     _test_hooks,
     dialect,
     export,
+    fed_stream,
     mirror_fetch,
     names,
     node_mirror_probe,
@@ -322,7 +323,7 @@ def unpack_script(
         (:func:`fleet.core.stage_repository.base_branch_commands`), the
         commit's tar streamed into it through
         :data:`fleet.core.names.TREE_FIFO_NAME` and never written whole
-        (:func:`fleet.core.dialect.fed_lines`), and the tree indexed and
+        (:func:`fleet.core.fed_stream.fed_lines`), and the tree indexed and
         committed, its add finding nearly every object it hashes already
         there.
     """
@@ -347,7 +348,7 @@ def unpack_script(
                 *placed,
             )
         )
-        + dialect.fed_lines(
+        + fed_stream.fed_lines(
             source=("git", "-C", mirror, "archive", "--format=tar", sha, *pathspec),
             sink=("tar", "-xmf", "-", "-C", target),
             fifo=fifo,
