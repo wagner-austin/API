@@ -1587,6 +1587,14 @@ debugging port, with every line and branch covered. Its verbs against the
 live site run by hand on loki, on the operator's screen, and never here. Same
 tags and workers as the observer.
 
+**`osrs-lab/watched-run`** (MCPs board task 9c14235d, 2026-11-19) is the
+watched run script's own `make check`, run in the same image: the observer's
+liveClient gate builds the live client, and `watched-run/test.sh` then runs
+every verb and refusal of `watched-run.sh` (start, alive, status, request,
+close, restore) against a real client under xvfb-run. quick-run's `host.sh`
+calls only some of those verbs, and until this entry no node or CI ran the
+suite. Same tags and workers as quick-run.
+
 **`coax-drone/site`** (MCPs board task c88f1f08, 2026-11-12) is coax-drone's
 site directory's own `make check`, the pages lift.austinwagner.org serves: it
 installs the site's pinned TypeScript, type definitions, Playwright and

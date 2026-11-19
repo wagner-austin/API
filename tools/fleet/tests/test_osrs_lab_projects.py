@@ -69,6 +69,12 @@ client, and test.sh then runs host.sh's deploy and run verbs and every
 refusal it can reach without docker against that client under xvfb-run. Its
 gate verb runs docker and is measured on loki, where the desktops are.
 
+watched-run (MCPs board task 9c14235d) runs the watched run script's own make
+check in the same image: the observer's liveClient gate builds the live
+client, and test.sh then runs every verb and refusal of watched-run.sh
+against a real client under xvfb-run, quick-run's host.sh calling only some
+of them. Until it was declared no node or CI ran that suite.
+
 character-site (MCPs board task 6f9947b1) runs the Jagex character page
 driver's own make check in the same image: its tests start a real headed
 Chromium, Playwright's own and the Google Chrome stable package the image
@@ -132,6 +138,7 @@ DIRECTORIES: Final[tuple[str, ...]] = (
     "recorder",
     "recorder-release",
     "test-selection",
+    "watched-run",
 )
 
 
