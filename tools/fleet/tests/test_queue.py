@@ -158,6 +158,7 @@ class TestClaim:
             "sha": DEFAULT_SHA,
             "required_tags": (),
             "task_id": None,
+            "message_id": None,
             "claimed_unix": None,
             "lease_expires_unix": None,
             "research_request": None,
