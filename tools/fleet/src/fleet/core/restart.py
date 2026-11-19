@@ -228,12 +228,14 @@ def message_refusal(command: DispatchCommand, message_id: int | None) -> str | N
         A ``CODE: message`` refusal detail for the queue, or None when the
         job can run.
     """
-    if command is DispatchCommand.MESSAGE_SESSION and message_id is None:
-        return (
-            f"{MESSAGE_MISSING_CODE}: a message-session row names the board message it "
-            "delivers and this one does not; the queue's CHECK should have refused it"
-        )
-    return None
+    match command:
+        case DispatchCommand.MESSAGE_SESSION if message_id is None:
+            return (
+                f"{MESSAGE_MISSING_CODE}: a message-session row names the board message it "
+                "delivers and this one does not; the queue's CHECK should have refused it"
+            )
+        case _:
+            return None
 
 
 class SessionInvocation(TypedDict):
@@ -334,25 +336,30 @@ def _verb_argv(
     Returns:
         The argv.
     """
-    if command is DispatchCommand.RESTART_SESSION:
-        return restart_argv(root, host, session_target)
-    if command is DispatchCommand.REVIVE_SESSION:
-        return revive_argv(root, host, session_target, requested_by)
-    if command in (DispatchCommand.KILL_SESSION, DispatchCommand.KILL_SESSION_HARD):
-        hard = command is DispatchCommand.KILL_SESSION_HARD
-        return kill_argv(root, host, session_target, requested_by, hard=hard)
-    if command is DispatchCommand.COMPACT_SESSION:
-        return compact_argv(root, host, session_target, requested_by)
-    if command is DispatchCommand.EXIT_SESSION:
-        # The graceful kill's keystrokes, idle re-read and pane close: an
-        # approved self-exit is the same act, and the queue's verb is what
-        # the ledger records it by (MCPs 5aa8ed06). Its one difference is
-        # --exit: a headless run that already ended has met its exit, where
-        # a kill of it ends nothing (MCPs board task 7829e947).
-        return kill_argv(root, host, session_target, requested_by, hard=False, exiting=True)
-    if command is DispatchCommand.MOVE_SESSION:
-        return move_argv(root, host, session_target, requested_by)
-    return _carried_argv(root, command, session_target, requested_by, host, task_id, message_id)
+    match command:
+        case DispatchCommand.RESTART_SESSION:
+            return restart_argv(root, host, session_target)
+        case DispatchCommand.REVIVE_SESSION:
+            return revive_argv(root, host, session_target, requested_by)
+        case DispatchCommand.KILL_SESSION:
+            return kill_argv(root, host, session_target, requested_by, hard=False)
+        case DispatchCommand.KILL_SESSION_HARD:
+            return kill_argv(root, host, session_target, requested_by, hard=True)
+        case DispatchCommand.COMPACT_SESSION:
+            return compact_argv(root, host, session_target, requested_by)
+        case DispatchCommand.EXIT_SESSION:
+            # The graceful kill's keystrokes, idle re-read and pane close: an
+            # approved self-exit is the same act, and the queue's verb is what
+            # the ledger records it by (MCPs 5aa8ed06). Its one difference is
+            # --exit: a headless run that already ended has met its exit, where
+            # a kill of it ends nothing (MCPs board task 7829e947).
+            return kill_argv(root, host, session_target, requested_by, hard=False, exiting=True)
+        case DispatchCommand.MOVE_SESSION:
+            return move_argv(root, host, session_target, requested_by)
+        case _:
+            return _carried_argv(
+                root, command, session_target, requested_by, host, task_id, message_id
+            )
 
 
 def _carried_argv(
@@ -383,21 +390,23 @@ def _carried_argv(
             row past its refusal with no argument, ``SESSION_COMMAND_UNKNOWN``
             for a command that is not a session verb.
     """
-    if command is DispatchCommand.HANDOFF_SESSION:
-        if task_id is None:
-            raise ValueError(
-                f"{TASK_MISSING_CODE}: a handoff reached its invocation with no task, "
-                "past task_refusal"
-            )
-        return handoff_argv(root, host, session_target, task_id, requested_by)
-    if command is DispatchCommand.MESSAGE_SESSION:
-        if message_id is None:
-            raise ValueError(
-                f"{MESSAGE_MISSING_CODE}: a message-session reached its invocation with no "
-                "message, past message_refusal"
-            )
-        return message_argv(root, host, session_target, message_id)
-    raise ValueError(f"{COMMAND_UNKNOWN_CODE}: {command.value!r} is not a session verb")
+    match command:
+        case DispatchCommand.HANDOFF_SESSION:
+            if task_id is None:
+                raise ValueError(
+                    f"{TASK_MISSING_CODE}: a handoff reached its invocation with no task, "
+                    "past task_refusal"
+                )
+            return handoff_argv(root, host, session_target, task_id, requested_by)
+        case DispatchCommand.MESSAGE_SESSION:
+            if message_id is None:
+                raise ValueError(
+                    f"{MESSAGE_MISSING_CODE}: a message-session reached its invocation with "
+                    "no message, past message_refusal"
+                )
+            return message_argv(root, host, session_target, message_id)
+        case _:
+            raise ValueError(f"{COMMAND_UNKNOWN_CODE}: {command.value!r} is not a session verb")
 
 
 def requester_refusal(requested_by: str) -> str | None:
