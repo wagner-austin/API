@@ -98,6 +98,13 @@ OLD_NODE = DIPHTHERIA_2026_09_23.replace("node=yes=v24.21.0\n", "node=yes=v18.13
 #: 3.12.3 diphtheria answered on 2026-09-20 (:data:`DIPHTHERIA`).
 WRONG_PYTHON = DIPHTHERIA_2026_09_23.replace("Python 3.11.15", "Python 3.12.3")
 
+#: Why a node is told about ffmpeg, in the tagged gap's words (MCPs board
+#: tasks 939ec5c7 and a717fd3d).
+FFMPEG_REASON = (
+    "grandma-api's check converts real audio files through ffmpeg, and MCPs "
+    "media-review-mcp's measures real clips with ffmpeg and ffprobe"
+)
+
 #: Why a project needs the ``hooks`` tag, as a tick's gap line quotes it (MCPs
 #: board task ec895824).
 HOOKS_REASON = (

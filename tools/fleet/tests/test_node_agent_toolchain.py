@@ -33,6 +33,7 @@ from tests._toolchain_fixtures import (
     CHROME_APT,
     CHROME_REASON,
     DIPHTHERIA_2026_09_23,
+    FFMPEG_REASON,
     GO_APT,
     GO_REASON,
     HOOKS_REASON,
@@ -244,10 +245,9 @@ class TestAToolchainThatCanBuild:
         assert messages[-5:] == [
             READY_HEAD + "ffmpeg absent; hooks absent; go absent; chrome absent; pdftotext absent"
             "; nixos-test absent",
-            "lavender claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
-            "check converts real audio files through ffmpeg, so those jobs go to a node that has "
-            f"it -- sudo apt-get install -y ffmpeg; {HOOKS_GAP}; "
-            f"go -- {GO_REASON}, so those jobs go to a node that has it -- {GO_APT}; "
+            f"lavender claims without the tag of every tool it lacks: ffmpeg -- {FFMPEG_REASON}, "
+            "so those jobs go to a node that has it -- sudo apt-get install -y ffmpeg; "
+            f"{HOOKS_GAP}; go -- {GO_REASON}, so those jobs go to a node that has it -- {GO_APT}; "
             f"chrome -- {CHROME_REASON}, so those jobs go to a node that has it -- "
             f"{CHROME_APT}; pdftotext -- {PDFTOTEXT_REASON}, so those jobs go to a node that "
             f"has it -- {PDFTOTEXT_APT}{NIXOS_TEST_NO_INSTALL}",

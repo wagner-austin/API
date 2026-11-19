@@ -75,7 +75,11 @@ ffmpeg on every tick of 2026-10-02 until 02:48Z while tag-free jobs waited
 (MCPs board task 939ec5c7). It is the one tag no declaration carries: a
 runner adds it when this tick's toolchain probe found the executable
 (:func:`tool_tags`), so installing ffmpeg makes the node eligible on its next
-tick, and a node without it takes every other job.
+tick, and a node without it takes every other job. MCPs ``media-review-mcp``'s
+check measures real clips with ffmpeg and ffprobe; the registry pinned it to
+lavender by name on 2026-11-02 (MCPs board task c33e4c11), and when lavender
+hung after a reboot on 2026-11-19 no node could claim it while seven others
+carried ffmpeg, so it requires this tag instead (MCPs board task a717fd3d).
 ``hooks`` because MCPs ``packages/claude-hooks``'s check runs its suites on
 the system interpreter, as Claude Code runs the hooks, and its live cases
 reach the board through the build account's ``~/.claude/corvis-hooks.json``.

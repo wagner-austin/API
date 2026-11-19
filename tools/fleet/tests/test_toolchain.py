@@ -38,6 +38,7 @@ from tests._toolchain_fixtures import (
     CHROME_REASON,
     DIPHTHERIA,
     DIPHTHERIA_2026_09_23,
+    FFMPEG_REASON,
     GO_APT,
     GO_NO_INSTALL,
     GO_REASON,
@@ -174,9 +175,9 @@ class TestReadiness:
             "nixos-test",
         )
         assert toolchain.tagged_gap("diphtheria", reports) == (
-            "diphtheria claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
-            "check converts real audio files through ffmpeg, so those jobs go to a node that has "
-            f"it -- sudo apt-get install -y ffmpeg; hooks -- {HOOKS_REASON}, so those jobs go to "
+            f"diphtheria claims without the tag of every tool it lacks: ffmpeg -- {FFMPEG_REASON}, "
+            "so those jobs go to a node that has it -- sudo apt-get install -y ffmpeg; "
+            f"hooks -- {HOOKS_REASON}, so those jobs go to "
             f"a node that has it -- no automatic install on this node; go -- {GO_REASON}, so "
             f"those jobs go to a node that has it -- {GO_APT}; chrome -- {CHROME_REASON}, so "
             f"those jobs go to a node that has it -- {CHROME_APT}; pdftotext -- "
@@ -207,9 +208,9 @@ class TestReadiness:
         )
 
         assert toolchain.tagged_gap("lenovoold", reports) == (
-            "lenovoold claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
-            "check converts real audio files through ffmpeg, so those jobs go to a node that has "
-            f"it -- no automatic install on this node; hooks -- {HOOKS_REASON}, so those jobs go "
+            f"lenovoold claims without the tag of every tool it lacks: ffmpeg -- {FFMPEG_REASON}, "
+            "so those jobs go to a node that has it -- no automatic install on this node; "
+            f"hooks -- {HOOKS_REASON}, so those jobs go "
             f"to a node that has it -- {HOOKS_INSTALL}{GO_NO_INSTALL}{CHROME_NO_INSTALL}"
             f"{PDFTOTEXT_NO_INSTALL}{NIXOS_TEST_NO_INSTALL}"
         )

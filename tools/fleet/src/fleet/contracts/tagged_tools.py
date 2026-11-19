@@ -193,7 +193,10 @@ NIXOS_TEST_PROGRAM: Final = (
 TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
     RequiredTool(
         name="ffmpeg",
-        reason="grandma-api's check converts real audio files through ffmpeg",
+        reason=(
+            "grandma-api's check converts real audio files through ffmpeg, and MCPs "
+            "media-review-mcp's measures real clips with ffmpeg and ffprobe"
+        ),
         install={"apt-get": "sudo apt-get install -y ffmpeg"},
         uninstall={"apt-get": "sudo apt-get remove -y ffmpeg"},
     ),
