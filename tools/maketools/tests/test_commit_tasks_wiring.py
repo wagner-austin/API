@@ -134,3 +134,31 @@ def test_pre_push_asks_first_over_each_range_and_reads_only_what_git_hands_it() 
     # remote escapes it; only the mirror's own push ends earlier.
     assert start < text.index('case "$NWO" in')
     assert text.index("exit 0\nfi\n\n# Read git") < start
+
+
+def test_pre_push_asks_push_wiki_pins_over_every_line_before_any_remote_check() -> None:
+    """MCPs board tasks 242cc1af and e4889f5c: a push that leaves a wiki pin
+    stale is refused here as in every mirrored repository, the gate run as
+    MCPs' origin/main carries it, with nothing around the call that skips it
+    or absorbs its refusal (set -eu ends the hook on it)."""
+    text = (ROOT / ".githooks" / "pre-push").read_text(encoding="utf-8")
+    start = text.index("# NO PUSH LEAVES A WIKI PIN STALE")
+    end = text.index("# PUBLISHED TIPS", start)
+    stanza = [line for line in text[start:end].split("\n") if not line.lstrip().startswith("#")]
+    call = (
+        '"$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" push-wiki-pins "$REPO" '
+        "$PIN_UPDATES < /dev/null"
+    )
+    assert call in stanza
+    assert '    PIN_UPDATES="$PIN_UPDATES $pin_local_sha:$pin_remote_sha:$pin_remote_ref"' in stanza
+    assert _variables_read(stanza) == [
+        "HOOK_PYTHON",
+        "PIN_UPDATES",
+        "PUSH_INPUT",
+        "REPO",
+        "pin_local_sha",
+        "pin_remote_ref",
+        "pin_remote_sha",
+    ]
+    assert "set -eu" in _executable(".githooks/pre-push")
+    assert text.index("# EVERY COMMIT NAMES ITS TASK") < start < text.index('case "$NWO" in')
