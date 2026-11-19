@@ -62,6 +62,7 @@ session-audit acts on that host, locally when it is the machine it runs on.
 
 from __future__ import annotations
 
+import pathlib
 import re
 from typing import Final, TypedDict
 
@@ -110,17 +111,22 @@ TARGET_MISSING_CODE: Final = "RESTART_TARGET_MISSING"
 #: inbox socket, run as session-audit message (MCPs board task 394b7148).
 #: The words are the queue's own
 #: :class:`DispatchCommand` members, so one vocabulary names them.
-SESSION_COMMANDS: Final[tuple[DispatchCommand, ...]] = (
-    DispatchCommand.RESTART_SESSION,
-    DispatchCommand.REVIVE_SESSION,
-    DispatchCommand.KILL_SESSION,
-    DispatchCommand.KILL_SESSION_HARD,
-    DispatchCommand.COMPACT_SESSION,
-    DispatchCommand.EXIT_SESSION,
-    DispatchCommand.MOVE_SESSION,
-    DispatchCommand.HANDOFF_SESSION,
-    DispatchCommand.MESSAGE_SESSION,
-)
+#: Each session verb's run-id prefix, the session-audit mode its closing
+#: detail names, and whether its submitter label becomes an argv element; an
+#: approved exit runs the graceful kill's mode under its own verb.
+SESSION_VERBS: Final[dict[DispatchCommand, tuple[str, str, bool]]] = {
+    DispatchCommand.RESTART_SESSION: ("restart", "rollover", False),
+    DispatchCommand.REVIVE_SESSION: ("revive", "revive", True),
+    DispatchCommand.KILL_SESSION: ("kill", "kill", True),
+    DispatchCommand.KILL_SESSION_HARD: ("kill", "kill", True),
+    DispatchCommand.COMPACT_SESSION: ("compact", "compact", True),
+    DispatchCommand.EXIT_SESSION: ("exit", "kill", True),
+    DispatchCommand.MOVE_SESSION: ("move", "move", True),
+    DispatchCommand.HANDOFF_SESSION: ("handoff", "handoff", True),
+    DispatchCommand.MESSAGE_SESSION: ("message", "message", False),
+}
+
+SESSION_COMMANDS: Final[tuple[DispatchCommand, ...]] = tuple(SESSION_VERBS)
 
 #: Detail prefix for a message-session row that names no message -- a
 #: queue that has stopped pinning the verb to its message (MCPs board task
@@ -291,102 +297,106 @@ def session_invocation(
             :func:`task_refusal`, so each names a routing defect rather than
             guessing.
     """
-    root = release["root"]
-    release_id = release["release"]
-    revision = release["revision"]
+    argv = _verb_argv(
+        release["root"], command, session_target, requested_by, host, task_id, message_id
+    )
+    verb, mode, types_requester = SESSION_VERBS[command]
+    return SessionInvocation(
+        verb=verb,
+        mode=mode,
+        argv=argv,
+        types_requester=types_requester,
+        release=release["release"],
+        revision=release["revision"],
+    )
+
+
+def _verb_argv(
+    root: pathlib.Path,
+    command: DispatchCommand,
+    session_target: str,
+    requested_by: str,
+    host: str,
+    task_id: str | None,
+    message_id: int | None,
+) -> tuple[str, ...]:
+    """The one session-audit invocation of a verb carrying a target and a requester.
+
+    Args:
+        root: The verified release's checkout.
+        command: The queue row's command.
+        session_target: The session UUID.
+        requested_by: The queue row's ``submitted_by``.
+        host: The node the session runs on.
+        task_id: The row's task, which only a handoff carries.
+        message_id: The row's message, which only a message-session carries.
+
+    Returns:
+        The argv.
+    """
     if command is DispatchCommand.RESTART_SESSION:
-        return SessionInvocation(
-            verb="restart",
-            mode="rollover",
-            argv=restart_argv(root, host, session_target),
-            types_requester=False,
-            release=release_id,
-            revision=revision,
-        )
+        return restart_argv(root, host, session_target)
     if command is DispatchCommand.REVIVE_SESSION:
-        return SessionInvocation(
-            verb="revive",
-            mode="revive",
-            argv=revive_argv(root, host, session_target, requested_by),
-            types_requester=True,
-            release=release_id,
-            revision=revision,
-        )
+        return revive_argv(root, host, session_target, requested_by)
     if command in (DispatchCommand.KILL_SESSION, DispatchCommand.KILL_SESSION_HARD):
-        return SessionInvocation(
-            verb="kill",
-            mode="kill",
-            argv=kill_argv(
-                root,
-                host,
-                session_target,
-                requested_by,
-                hard=command is DispatchCommand.KILL_SESSION_HARD,
-            ),
-            types_requester=True,
-            release=release_id,
-            revision=revision,
-        )
+        hard = command is DispatchCommand.KILL_SESSION_HARD
+        return kill_argv(root, host, session_target, requested_by, hard=hard)
     if command is DispatchCommand.COMPACT_SESSION:
-        return SessionInvocation(
-            verb="compact",
-            mode="compact",
-            argv=compact_argv(root, host, session_target, requested_by),
-            types_requester=True,
-            release=release_id,
-            revision=revision,
-        )
+        return compact_argv(root, host, session_target, requested_by)
     if command is DispatchCommand.EXIT_SESSION:
         # The graceful kill's keystrokes, idle re-read and pane close: an
         # approved self-exit is the same act, and the queue's verb is what
         # the ledger records it by (MCPs 5aa8ed06). Its one difference is
         # --exit: a headless run that already ended has met its exit, where
         # a kill of it ends nothing (MCPs board task 7829e947).
-        return SessionInvocation(
-            verb="exit",
-            mode="kill",
-            argv=kill_argv(root, host, session_target, requested_by, hard=False, exiting=True),
-            types_requester=True,
-            release=release_id,
-            revision=revision,
-        )
+        return kill_argv(root, host, session_target, requested_by, hard=False, exiting=True)
     if command is DispatchCommand.MOVE_SESSION:
-        return SessionInvocation(
-            verb="move",
-            mode="move",
-            argv=move_argv(root, host, session_target, requested_by),
-            types_requester=True,
-            release=release_id,
-            revision=revision,
-        )
+        return move_argv(root, host, session_target, requested_by)
+    return _carried_argv(root, command, session_target, requested_by, host, task_id, message_id)
+
+
+def _carried_argv(
+    root: pathlib.Path,
+    command: DispatchCommand,
+    session_target: str,
+    requested_by: str,
+    host: str,
+    task_id: str | None,
+    message_id: int | None,
+) -> tuple[str, ...]:
+    """The invocation of a verb carrying a row argument: a handoff's task or a message's id.
+
+    Args:
+        root: The verified release's checkout.
+        command: The queue row's command.
+        session_target: The session UUID.
+        requested_by: The queue row's ``submitted_by``.
+        host: The node the session runs on.
+        task_id: The row's task (already judged by :func:`task_refusal`).
+        message_id: The row's message (already judged by :func:`message_refusal`).
+
+    Returns:
+        The argv.
+
+    Raises:
+        ValueError: ``HANDOFF_TASK_MISSING`` or ``MESSAGE_ID_MISSING`` for a
+            row past its refusal with no argument, ``SESSION_COMMAND_UNKNOWN``
+            for a command that is not a session verb.
+    """
     if command is DispatchCommand.HANDOFF_SESSION:
         if task_id is None:
             raise ValueError(
                 f"{TASK_MISSING_CODE}: a handoff reached its invocation with no task, "
                 "past task_refusal"
             )
-        return SessionInvocation(
-            verb="handoff",
-            mode="handoff",
-            argv=handoff_argv(root, host, session_target, task_id, requested_by),
-            types_requester=True,
-            release=release_id,
-            revision=revision,
-        )
+        return handoff_argv(root, host, session_target, task_id, requested_by)
     if command is DispatchCommand.MESSAGE_SESSION:
         if message_id is None:
             raise ValueError(
                 f"{MESSAGE_MISSING_CODE}: a message-session reached its invocation with no "
                 "message, past message_refusal"
             )
-        return SessionInvocation(
-            verb="message",
-            mode="message",
-            argv=message_argv(root, host, session_target, message_id),
-            types_requester=False,
-            release=release_id,
-            revision=revision,
-        )
+        return message_argv(root, host, session_target, message_id)
     raise ValueError(f"{COMMAND_UNKNOWN_CODE}: {command.value!r} is not a session verb")
 
 
@@ -494,6 +504,7 @@ __all__ = [
     "SESSION_ENVIRONMENT_EXCLUDED",
     "SESSION_ENVIRONMENT_SET",
     "SESSION_TARGET_PATTERN",
+    "SESSION_VERBS",
     "TARGET_INVALID_CODE",
     "TARGET_MISSING_CODE",
     "TASK_INVALID_CODE",
