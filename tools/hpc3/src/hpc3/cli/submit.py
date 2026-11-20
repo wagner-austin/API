@@ -182,9 +182,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # the numbers this job produces come from that older code.
     for line in describe_drift(member.image_drift):
         _test_hooks.emit(line)
-    _test_hooks.emit(
-        f"watch: hpc3-watch --config {parsed[_config.CONFIG_FLAG]} --job {member.job_id}"
-    )
+    _test_hooks.emit(_config.watch_line(parsed, [member.job_id]))
     return 0
 
 

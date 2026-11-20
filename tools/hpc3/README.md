@@ -416,6 +416,16 @@ hpc3-trace     --config runs/hpc3.json --match 07ab4976…       # which job tra
 hpc3-cancel    --config runs/hpc3.json --job 55519937          # stop it, and say what actually stopped
 ```
 
+Every submitting command (`hpc3-submit`, `hpc3-sweep`, `hpc3-chain`,
+`hpc3-campaign`, `hpc3-image-build`) ends with a `watch:` line naming the
+jobs it started with `--until-done 1`. Run that command in the background
+(Claude Code's `run_in_background`): it follows accounting until every job is
+terminal, a preempted member included, and its exit wakes the session that
+submitted. That session is the one reader that both reaches HPC3, over the
+session host's VPN, and may; the board's wake pump has neither the ledger
+nor a route, so nothing else announces a job's end (MCPs board task
+62765171).
+
 Working examples of the documents are in [`examples/`](examples/).
 
 **Onboarding a project that does not exist yet** starts one step earlier, because

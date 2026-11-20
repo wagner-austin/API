@@ -100,10 +100,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"{describe_gpu_request(base['gpu'])} each, {base['minutes']} min"
     )
     _test_hooks.emit(f"logs {log_dir(root, project)}")
-    _test_hooks.emit(
-        f"watch: hpc3-watch --config {parsed[_config.CONFIG_FLAG]} --job "
-        + ",".join(member.job_id for member in submitted)
-    )
+    _test_hooks.emit(_config.watch_line(parsed, [member.job_id for member in submitted]))
     return 0
 
 

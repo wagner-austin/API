@@ -20,6 +20,7 @@ from __future__ import annotations
 import pathlib
 
 import pytest
+from platform_core import cli_args
 from platform_core.config import config_test_hooks
 from platform_core.error_codes_tooling import SessionLabelErrorCode
 from platform_core.errors import AppError
@@ -42,7 +43,8 @@ from platform_core.session_label import (
 
 from hpc3.cli import _test_hooks as cli_hooks
 from hpc3.cli import submit as submit_cli
-from hpc3.cli._config import submitter_label
+from hpc3.cli import watch as watch_cli
+from hpc3.cli._config import submitter_label, watch_line
 from hpc3.core import _test_hooks as core_hooks
 from tests.against_hpc3 import read_ledger
 from tests.conftest import (
@@ -218,3 +220,31 @@ class TestSubmitCliRecordsTheSubmitter:
         assert caught.value.code is SessionLabelErrorCode.LABEL_MISMATCH
         assert not (tmp_path / "ledger.jsonl").exists()
         assert not [command for command in fake_run.commands() if "sbatch" in command]
+
+
+class TestWatchLine:
+    """The wake every submitting command prints (MCPs board task 62765171).
+
+    The control duty's pump has neither the hpc3 ledger nor a route to HPC3,
+    so the session that submitted watches its own jobs: the line is the
+    command it runs in the background, followed until every job is terminal.
+    """
+
+    def test_it_names_the_workspace_every_job_and_follows_them_to_the_end(self) -> None:
+        line = watch_line({"--config": "runs/hpc3-abl.json"}, ["59854872_0", "59856145_2"])
+        assert line == (
+            "watch: hpc3-watch --config runs/hpc3-abl.json --job 59854872_0,59856145_2 "
+            "--until-done 1  # run it in the background: its exit wakes the session that submitted"
+        )
+
+    def test_the_command_before_the_comment_is_one_hpc3_watch_accepts(self) -> None:
+        # The note is a shell comment, so the line pastes as it prints: the
+        # words between the program and the "#" parse under hpc3-watch's own
+        # flag table, the one its main reads.
+        words = watch_line({"--config": "w.json"}, ["7_0", "7_1"]).split("  #")[0].split()
+        assert words[:2] == ["watch:", "hpc3-watch"]
+        assert cli_args.parse_single_flags(words[2:], watch_cli._FLAGS) == {
+            "--config": "w.json",
+            "--job": "7_0,7_1",
+            "--until-done": "1",
+        }

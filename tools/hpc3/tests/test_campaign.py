@@ -314,13 +314,20 @@ class TestTheCommand:
         fake_run.add("squeue --me", stdout="")
         self._ran(tmp_path, fake_run, finished=[_TR])
         script_healthy_cluster(fake_run)
+        arguments = self._document(tmp_path)
 
-        assert campaign_cli.main(self._document(tmp_path)) == 0
+        assert campaign_cli.main(arguments) == 0
         assert emitted[0] == "done      abl.bases-tr"
         # _1, not _0: the sparse array selects by DOCUMENT position, and az
         # is the document's second member -- the property that keeps the
         # task-to-member mapping identical across convergence passes.
         assert emitted[1] == "submitted 55519937_1 abl.bases-az"
+        # The resubmitted member is the one job this pass started, so it is
+        # the one the session is woken for (MCPs board task 62765171).
+        assert emitted[-2] == (
+            f"watch: hpc3-watch --config {arguments[1]} --job 55519937_1 --until-done 1  "
+            "# run it in the background: its exit wakes the session that submitted"
+        )
         assert emitted[-1] == "1 done, 0 in flight, 1 submitted, 1 remaining"
 
     def test_only_the_missing_member_reaches_the_ledger(
@@ -347,6 +354,8 @@ class TestTheCommand:
         assert campaign_cli.main(self._document(tmp_path)) == 0
         assert emitted[-1] == "2 done, 0 in flight, 0 submitted, 0 remaining"
         assert not any("sbatch" in command for command in fake_run.commands())
+        # Nothing was started, so there is nothing to be woken for.
+        assert [line for line in emitted if line.startswith("watch:")] == []
 
     def test_a_member_a_live_job_is_writing_is_left_alone(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str], frozen_clock: str

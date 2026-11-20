@@ -102,10 +102,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # halfway needs to know the difference between "blocked" and "gone".
     _test_hooks.emit("a failed stage cancels the ones after it (--kill-on-invalid-dep)")
     _test_hooks.emit(f"logs {log_dir(root, project)}")
-    _test_hooks.emit(
-        f"watch: hpc3-watch --config {parsed[_config.CONFIG_FLAG]} --job "
-        + ",".join(member.job_id for member in submitted)
-    )
+    _test_hooks.emit(_config.watch_line(parsed, [member.job_id for member in submitted]))
     return 0
 
 

@@ -182,6 +182,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         # where a member's module may have moved on: said once per pass.
         for line in describe_drift(merge_drifts([record.image_drift for record in submitted])):
             _test_hooks.emit(line)
+        # The members in flight were submitted by an earlier pass, which
+        # printed their own watch; these are the jobs this pass started.
+        _test_hooks.emit(_config.watch_line(parsed, [record.job_id for record in submitted]))
 
     _test_hooks.emit(
         f"{len(plan['done'])} done, {len(plan['in_flight'])} in flight, "

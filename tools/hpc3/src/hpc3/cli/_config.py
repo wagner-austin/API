@@ -160,10 +160,43 @@ def submitter_label() -> str:
     )
 
 
+WAKE_NOTE = "# run it in the background: its exit wakes the session that submitted"
+"""What every submitting command says after its watch command."""
+
+
+def watch_line(parsed: dict[str, str], job_ids: list[str]) -> str:
+    """The command that wakes the submitting session when its jobs end.
+
+    Shared by every entry point that submits, so each prints the same wake.
+    The session that submitted is the one reader that both reaches HPC3,
+    over the session host's VPN, and may (MCPs board task 62765171): the
+    control duty's wake pump has neither the ledger nor a route, and no
+    fleet machine relays through the session host. ``--until-done 1``
+    follows accounting until every job is terminal, a preempted member
+    included, then exits, and a command run in the background wakes its
+    session when it exits. The note is a shell comment, so the line pastes
+    as it prints.
+
+    Args:
+        parsed: The command line, for the workspace it named.
+        job_ids: Every job the command submitted, in submission order.
+
+    Returns:
+        ``watch: hpc3-watch --config <cfg> --job <ids> --until-done 1``
+        and :data:`WAKE_NOTE`.
+    """
+    return (
+        f"watch: hpc3-watch --config {parsed[CONFIG_FLAG]} --job {','.join(job_ids)} "
+        f"--until-done 1  {WAKE_NOTE}"
+    )
+
+
 __all__ = [
     "CONFIG_FLAG",
+    "WAKE_NOTE",
     "load_workspace",
     "load_workspace_connection",
     "stack_file_text",
     "submitter_label",
+    "watch_line",
 ]

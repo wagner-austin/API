@@ -102,7 +102,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     _test_hooks.emit(f"submitted {job_id} {label}")
     _test_hooks.emit(f"  building {image_dir}/{image_name}")
     _test_hooks.emit(f"  logs {image_dir}/build-{job_id}.out")
-    _test_hooks.emit(f"watch: hpc3-watch --config {parsed[_config.CONFIG_FLAG]} --job {job_id}")
+    _test_hooks.emit(_config.watch_line(parsed, [job_id]))
     return 0
 
 
