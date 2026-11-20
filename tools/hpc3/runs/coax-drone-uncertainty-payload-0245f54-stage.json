@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-uncertainty-payload-0245f54.tar",
+      "sha256": "c7ff73315a7b6d23d4afb8a51931b2e06cd2ce0c3799078ae3bd098e88dd5c6f",
+      "size_bytes": 277688320
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone 0245f54b8fbe30287462ba66d50f016136ffdb33, a clean git worktree of that commit",
+    "selection": "tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner --format=gnu of pyproject.toml, calc/budget, wiki/sources and exports/challenge/optimum-{coax-blade,coax-unequal-blade,tandem-blade,single-blade}-2028.csv",
+    "why": "two sweeps on one archive: the 2028 layouts' uncertainty sweep, each of four layouts held at its committed optimum and screened at 4096 draws of nine uncertain inputs (challenge documents identity dda74c143ccfc656b3e34b3773a7c813ffef8409f4f94f68b0c846806ef8cbf0), and the demo redesign sweep rerun at its current documents (identity 1528d80959208cc99135e279f4e8ec76e9964a14f76cac2e7ca48d5f0c34a3a0); each member unpacks this archive into node-local TMPDIR and imports calc.budget from it",
+    "note": "board task e6dfef4d-3221-4558-9dc9-a8bdecbb4e21, criterion A5; the commit is on origin branch redesign-4to1-1115"
+  }
+}

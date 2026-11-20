@@ -100,3 +100,46 @@ e49f71045fe0bb52b2668633702435d25272dc60dd3b13a20824e1b4bcb9ad59  uncertainty/0d
 8f6d08c6bc8073ce682ebc1424f5981375202e8b3fba0c58a65b1347dad5de32  uncertainty/0d2c452/shard-5-of-8.json
 04bb1249ac6e8a4205f0b137bbcaa05a48964115a2fab2d22ce4d99ef14d5dc6  uncertainty/0d2c452/shard-6-of-8.json
 07dfa4a14d5afb166bb0d916583f6be3c3046f4d14208787125240607c7738fe  uncertainty/0d2c452/shard-7-of-8.json
+
+# One archive for two sweeps of board task e6dfef4d: the 2028 layouts'
+# uncertainty sweep (calc/budget/data/uncertainty-challenge.json, documents
+# identity dda74c143ccfc656b3e34b3773a7c813ffef8409f4f94f68b0c846806ef8cbf0)
+# and the redesign sweep rerun at its current documents (identity
+# 1528d80959208cc99135e279f4e8ec76e9964a14f76cac2e7ca48d5f0c34a3a0). It is
+# `tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner
+# --format=gnu` of pyproject.toml, calc/budget, wiki/sources and the four
+# exports/challenge/optimum-*-2028.csv at coax-drone
+# 0245f54b8fbe30287462ba66d50f016136ffdb33 (calc/budget tree
+# b1a4aa6f9894f83423122108b602319718d16c22), on origin branch
+# redesign-4to1-1115, since the layout sweep reads each optimum. Recorded
+# 2026-11-20 from the staged archive and again from a second tar of a clean
+# worktree of that commit piped straight to sha256sum; both printed this
+# digest.
+
+c7ff73315a7b6d23d4afb8a51931b2e06cd2ce0c3799078ae3bd098e88dd5c6f  coax-drone-uncertainty-payload-0245f54.tar
+
+# Array 59854861 (coax-drone-challenge-uncertainty-0245f54.json) completed
+# all eight members in 1043-1082 s on hpc3-20-21, hpc3-17-07 and hpc3-17-05.
+# Array 59854872 (coax-drone-uncertainty-0245f54.json) completed shards 0, 1
+# and 7; the free partition preempted the other five after 153 s, and
+# hpc3-campaign resubmitted exactly those as array 59856145, which completed
+# them. Each shard's SHA-256 was read on the cluster and again after
+# download, identical, and coax-drone commits these bytes under
+# exports/challenge-uncertainty and exports/uncertainty.
+
+5fbb8c68ae51b22bba90968d815c01391fff8df99835b0f76bac0e09082e6a6e  challenge-uncertainty/0245f54/shard-0-of-8.json
+2d158a0d9b5b573ece186d405ab53534a7627ada176f8d42f463435fe459a31b  challenge-uncertainty/0245f54/shard-1-of-8.json
+9ab8aaeb6b9c1d423e2ad685bb2e248f3cbb5de94e37f98fc480f851c6852b21  challenge-uncertainty/0245f54/shard-2-of-8.json
+8b49faa79507ffa31791c6badacd4ff1acc9a10fe83a088be3fa6b40b831ecdf  challenge-uncertainty/0245f54/shard-3-of-8.json
+c924e1722fdaf48d468d81804164cef3506a3d0665d321a0aa8c7cd577dd0bb4  challenge-uncertainty/0245f54/shard-4-of-8.json
+44a91fe33f810243132ec7134c636daa0d05fb4e8894a3930736c9ccd584aac8  challenge-uncertainty/0245f54/shard-5-of-8.json
+75275e55ba9c1c610dad22963de3a99c4badeccae904e3bd77e6b0e38a4d8296  challenge-uncertainty/0245f54/shard-6-of-8.json
+e8aba42288553095e8ebd207674ba2d225f5a30d9a66463a188c0cb6adce962e  challenge-uncertainty/0245f54/shard-7-of-8.json
+8bc51082fec96b0a4aec8d76d5e52a5181bbe4f45da517b136fb10c765e1fa31  uncertainty/0245f54/shard-0-of-8.json
+d7d22f11abd2dd9ab543d1036d436c9439683864340b1b6d43d2b007319812be  uncertainty/0245f54/shard-1-of-8.json
+435903c6047b2aede17ec924e338283cff47dd7923aad4bc5939fe5c7362ecc1  uncertainty/0245f54/shard-2-of-8.json
+ce47138e63c4cb2a3065dbd6bc5fdd48f6380ec4fd156addf300ec2687b5b5fd  uncertainty/0245f54/shard-3-of-8.json
+cc49d392ebd5047b06004ab9520f4d030a44978d0f6ebaf9d594407f0158a12f  uncertainty/0245f54/shard-4-of-8.json
+692aa38ad1406420468158cf7836e65f9081e5e258a11270b1ddd23915a61e32  uncertainty/0245f54/shard-5-of-8.json
+caa590e86ad827fef8c375c78de4546a9125df7e9eda5ce197090c16faaf0d35  uncertainty/0245f54/shard-6-of-8.json
+1e64847da88ffc0ad2971b14344f0e158f80da27784c3bf7485556a444a381df  uncertainty/0245f54/shard-7-of-8.json
