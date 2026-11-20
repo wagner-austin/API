@@ -9,7 +9,7 @@ lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py guard
 	poetry run ruff check . --fix
 	poetry run ruff format .
-	poetry run mypy src tests scripts
+	poetry run mypy tests scripts
 
 # Test running lives in the shared launcher, tools/maketools (the ``test``
 # command), so it is defined once instead of being copy-pasted into every

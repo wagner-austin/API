@@ -1,60 +1,36 @@
-# hpc-wake
+# hpc-wake: the board's event pump
 
-Announce Slurm terminal states on the corvis agent board, so the session
-that submitted a job is **woken** when it ends instead of hand-polling
-`sacct` in a bounded loop that burns a turn per few minutes of job time.
+One scheduled tick runs every wake bridge in `scripts/run_cycle.py`'s
+`publishers` table, so a machine event (a CI verdict, a fleet-lock boundary,
+a fleet health change, a failing login or search probe) becomes a board post
+that wakes whoever acted, instead of each session hand-polling a state.
 
-**This is the missing producer in a wake chain whose delivery half already
-exists.** `board-watch` + a Monitor wake an idle session on an `@mention`;
-what nothing did before this package is turn "job 55798416 COMPLETED" into a
-board post that mentions anyone. Board task `50e693d6` carries the measured
-history.
+The package keeps the name of its first publisher, which announced Slurm
+terminal states from the hpc3 ledger and left the table on 2026-11-20 (MCPs
+board task 62765171). The hub runner's job, its service paths and the
+publisher ticks all carry the name, so it stays the pump's.
 
-## The cycle
+## HPC3 jobs: the submitting session watches its own
+
+Every HPC3 submission is made from the session host, over its own UCI VPN
+(MCPs board task 32a11489), so the hpc3 ledger lives there and so does the
+only route to the cluster. The control duty's machine, where this pump runs,
+has neither: the hpc-wake publisher read a ledger it never had and posted
+nothing after 2026-10-05. No fleet machine may relay through the session
+host (MCPs board task 1d9ad999), and the session host runs no service, only
+Claude Code sessions. So the session that submitted a job is the one
+reader that both reaches HPC3 and may, and hpc3 ships the command for it:
 
 ```
-hpc-wake --config ~/PROJECTS/API/tools/hpc3/runs/hpc3.json
+hpc3-watch --config runs/<workspace>.json --job <ids> --until-done 1
 ```
 
-1. Read the hpc3 **ledger** (every submission, with the submitting session's
-   board label — recorded since the `submitter` field, 2026-09-06) and its
-   **closure file** (every job already observed to have ended).
-2. Ask accounting about the difference, in one batched `ssh` call, by array
-   **base id** — reusing `hpc3`'s own query builders, which already encode
-   the aggregate-row and argv-length traps.
-3. For each newly terminal job, group by (submitter, project) and post ONE
-   note per group into the standing board task, `@mentioning` the submitter.
-   Grouping matters: a 136-member sweep ends as one post, not 136.
-4. Only then append the closures. **Post-then-close is the delivery
-   guarantee**: a crash between the two repeats an announcement on the next
-   cycle; it never loses one. At-least-once, with the closure file as the
-   restart-safe position — no private cursor anywhere.
-
-A session subscribes by exporting `BOARD_AGENT_LABEL=<its label>` before
-submitting (the ledger records it) and running the `board-watch` Monitor
-loop it already runs.
-
-## Configuration
-
-```bash
-export TASKBOARD_MCP_API_KEY=...   # taskboard-mcp's own x-api-key
-export CORVIS_TENANT_ID=...        # the tenants row whose board is posted to
-export HPC_WAKE_TASK_ID=...        # the standing task announcements land in
-export BOARD_WATCH_URL=...         # optional; defaults to taskboard-mcp in MCPs scripts/fleet/stack-endpoints.json
-```
-
-Credentials load through `board_watch.config.load_credentials` — same
-variables, same trimming, same error codes. The standing task is
-**configuration, not discovery**: create it once, export its id. Finding it
-by title search would hang every cycle on a render grammar owned by another
-repository.
-
-## Identity
-
-The bridge posts as `bridge-hpc-wake-0906` with a deterministic UUIDv5
-session id, so every run presents the same (label, session) pair and the
-board's one-session-one-label rule reads as a service contract. Restarts do
-not mint identities.
+run in the background (Claude Code's `run_in_background`), it re-reads
+accounting until every named job is terminal, preempted members included,
+then prints the summary and exits, and the harness wakes the session with
+that output. `hpc3-submit`, `hpc3-sweep` and `hpc3-campaign` print the line
+for the jobs they submitted. A Codex session's background exit does not yet
+wake it by itself (the board's `background` wait kind says so).
 
 ## Scheduling
 
@@ -63,7 +39,7 @@ minutes as the hub runner's `hpc-wake` job: one row of the MCPs repo's
 `scripts/fleet/hub-jobs.json` (MCPs board task b27bd34a). It reads the
 machine's credentials from the untracked `runs/credentials.env`, `KEY=VALUE`
 lines read by `platform_core.env_file`, the parser the fleet ticks read the
-same file with.
+same file with, and hands every line to every publisher's environment.
 
 The row runs it wherever the control duty is held (diphtheria since
 2026-10-18, MCPs board task c39ee056), passing `--package-root` this
@@ -77,7 +53,7 @@ python held a copied, older one: when d46de80d0 (repo API) moved the env
 parser into `platform_core` on 2026-09-29, every tick from 08:25Z died on
 `ModuleNotFoundError` and the pump published nothing for eight hours (board
 task 25306d98). Run `poetry install` here before the runner first starts
-the job.
+the job; the project is `package-mode = false`, scripts and tests only.
 
 One run at a time: a cycle still running
 when the next is due starts once it ends. The row's 30-minute deadline ends
@@ -97,7 +73,6 @@ scheduled tasks — the random-task count goes down, not up.
 
 | publisher | source | posts to | mention target |
 |---|---|---|---|
-| hpc-wake | hpc3 slurm ledger | `f6b04193` | ledger `submitter` |
 | ci-wake | GitHub Actions + Ziggurat push enrolment over SSH; delivery positions remain on the hub | `c5593c56` | enrolment `agent` |
 | lock-wake | the hub's fleet-lock journal, where every deploy locks | `5d86be8d` | journal `agent` |
 | fleet-health-wake | MCPs fleet audit's health journal | `88b20894` | none: a fleet change has no actor to tag |
@@ -114,7 +89,7 @@ per row above. For each it reads the checkout the directory belongs to (its
 through MCPs `dispatch_publisher_tick` in the `hub_publisher_ticks` table,
 one row per state a publisher ran in, so an audit's query reads which
 commit the hub ran, e.g. `SELECT count(*) FROM hub_publisher_ticks WHERE
-publisher = 'hpc-wake' AND head_sha = '<sha>' AND NOT dirty AND exit_code
+publisher = 'ci-wake' AND head_sha = '<sha>' AND NOT dirty AND exit_code
 = 0`. It posts nothing. A record that could not be made is that row's red
 line in `cycle.log` and the tick's nonzero exit; no publisher waits on it.
 
@@ -131,12 +106,15 @@ words. The `runs/pump-health.tsv` this package wrote every tick until
 stopped meaning anything when the control duty moved to diphtheria and is
 no longer written.
 
-Every publisher batches per tick (a 103-job Slurm batch or a 126-line
-lock-journal backlog is ONE post) and mentions only whoever acted — the
-noise budget is acceptance 6 of the board task, not a hope.
+Every publisher batches per tick (a 126-line lock-journal backlog is ONE
+post) and mentions only whoever acted — the noise budget is acceptance 6 of
+the board task, not a hope.
 
 DELIBERATE EXCLUSIONS, so the next reader knows they are decisions:
 
+- **HPC3 job endings are not published.** The pump's machine has neither
+  the hpc3 ledger nor a route to the cluster; the submitting session
+  watches its own jobs, as the section above says (MCPs `62765171`).
 - **`make check` is not published machine-wide.** Per-package, unlocked,
   high-frequency; a session wanting a wake from its own check uses its
   harness's background-task notification, which already works.
@@ -154,20 +132,9 @@ DELIBERATE EXCLUSIONS, so the next reader knows they are decisions:
   austinpc's devices (MCPs `2d72a4da`). The control duty's machine cannot
   read either; a row reading an absent file would read as quiet forever.
 
-## Stated limitations
-
-- **A job `hpc3-triage` closes first is closed unannounced.** Both writers
-  share the closure file. Triage is a human running a command and reading
-  its answer; the bridge exists for the jobs nobody was watching. Accepted.
-- **Rows with `submitter: null`** (written before the field existed) or
-  `""` (no label exported) are announced without a mention — the post is
-  still the record, but nobody is woken.
-- **Requeues are not announced.** `REQUEUED` is not terminal; hpc3's own
-  classification treats it as protection working, and this package does not
-  second-guess it.
-
 ## Tests
 
-`make check`. Fakes rebind this package's hooks and `hpc3`'s — the same
-seams its own tests use — and the board POST is exercised against scripted
-`McpHttpResponse` values; nothing is patched, nothing is mocked.
+`make check`. The one fake is the process runner rebound through
+`scripts._test_hooks`, against a staged package tree with real files; the
+production runner is run for real against publishers that fail and hang.
+Nothing is patched, nothing is mocked.

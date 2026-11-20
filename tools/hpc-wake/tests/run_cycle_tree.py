@@ -53,7 +53,6 @@ def make_runner() -> Generator[RecordingRunner, None, None]:
     """
     fake = RecordingRunner(
         [
-            Completed("hpc-out\n", "hpc-err\n", 0),
             Completed("ci-out\n", "ci-err\n", 0),
             Completed("lock-out\n", "lock-err\n", 0),
             Completed("health-out\n", "health-err\n", 0),
@@ -97,10 +96,10 @@ def cycle_argv(root: pathlib.Path) -> list[str]:
 
 GOOD_ENV = "\n".join(
     [
-        "# hpc-wake credentials. UNTRACKED.",
+        "# wake pump credentials. UNTRACKED.",
         "TASKBOARD_MCP_API_KEY=key-value",
         "",
         "CORVIS_TENANT_ID=tenant-value",
-        "HPC_WAKE_TASK_ID=task-value",
+        "CI_WAKE_TASK_ID=task-value",
     ]
 )

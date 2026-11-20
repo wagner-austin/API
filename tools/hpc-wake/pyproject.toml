@@ -5,20 +5,15 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry]
 name = "hpc-wake"
 version = "0.1.0"
-description = "Announce Slurm terminal states on the agent board, so the session that submitted a job is woken when it ends"
+description = "The board's event pump: one scheduled tick runs every wake bridge in its publishers table"
 authors = ["Austin Wagner <austinwagner@msn.com>"]
-packages = [
-  { include = "hpc_wake", from = "src" },
-]
+package-mode = false
 readme = "README.md"
-include = ["src/hpc_wake/py.typed"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
 typing-extensions = "^4.12.2"
 platform-core = { path = "../../libs/platform_core", develop = true }
-hpc3 = { path = "../hpc3", develop = true }
-board-watch = { path = "../board-watch", develop = true }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.2.0"
@@ -27,9 +22,6 @@ mypy = "^2.4.1"
 ruff = "^0.17.5"
 pytest-cov = "^7.1.0"
 pytest-xdist = "^3.8.0"
-
-[tool.poetry.scripts]
-hpc-wake = "hpc_wake.cli.wake:entrypoint"
 
 [tool.mypy]
 python_version = "3.11"
@@ -44,8 +36,7 @@ check_untyped_defs = true
 no_implicit_reexport = true
 show_error_codes = true
 pretty = true
-files = ["src", "tests", "scripts"]
-mypy_path = ["src"]
+files = ["tests", "scripts"]
 explicit_package_bases = true
 disallow_any_unimported = true
 disallow_any_expr = true
@@ -55,7 +46,7 @@ disallow_any_explicit = true
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-src = ["src", "tests", "scripts"]
+src = ["tests", "scripts"]
 exclude = [".venv"]
 
 [tool.ruff.lint]
@@ -75,7 +66,7 @@ mypy-init-return = true
 "typing.TypeAlias" = { msg = "Do not use TypeAlias; use Literal types or expand unions explicitly." }
 
 [tool.coverage.run]
-source = ["src", "scripts"]
+source = ["scripts"]
 omit = []
 branch = true
 

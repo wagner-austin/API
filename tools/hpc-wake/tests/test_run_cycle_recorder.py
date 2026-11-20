@@ -36,7 +36,7 @@ class TestTheRecorderRow:
     def test_it_runs_last_with_each_publisher_s_exit_and_directory(
         self, tmp_path: pathlib.Path, runner: RecordingRunner
     ) -> None:
-        runner.results[1] = Completed("", "actions api refused\n", 7)
+        runner.results[0] = Completed("", "actions api refused\n", 7)
         root = staged_root(tmp_path, GOOD_ENV)
 
         run_cycle.main(cycle_argv(root))

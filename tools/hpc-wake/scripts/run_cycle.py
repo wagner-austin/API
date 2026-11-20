@@ -107,6 +107,14 @@ def publishers(workspace: pathlib.Path, python: str) -> tuple[Publisher, ...]:
     the control duty's machine cannot read; rcs-pair-watch is a devices row
     of MCPs' hub runner, and the tunnel retires with austinpc's devices.
 
+    The table's first row was the hpc-wake publisher, which announced Slurm
+    terminal states from the hpc3 ledger (MCPs board task 62765171). Every
+    submission is made from the session host over its own UCI VPN, so the
+    ledger is there and the control duty's machine has neither it nor a
+    route to HPC3; the row posted nothing after 2026-10-05. The submitting
+    session now watches its own jobs with ``hpc3-watch --until-done 1`` run
+    in the background, whose exit wakes it.
+
     The session host's journals are read with their cursors in the control
     duty's state directory, ``fleet-mcp/state``, which MCPs' hub-mounts.json
     mounts from the control export on whichever machine holds control: a
@@ -124,11 +132,6 @@ def publishers(workspace: pathlib.Path, python: str) -> tuple[Publisher, ...]:
     journals = str(workspace)
     state = f"{journals}/fleet-mcp/state"
     return (
-        {
-            "name": "hpc-wake",
-            "args": ("poetry", "run", "hpc-wake", "--config", "../hpc3/runs/hpc3.json"),
-            "cwd": ".",
-        },
         # ci-wake (board 21:02Z, bridge-ci-wake-0909): GitHub Actions -> board,
         # with the pre-push enrolment ledger supplying the @mention target the
         # Actions API cannot know. Its standing task id rides runs/credentials.env as
@@ -332,10 +335,10 @@ def arguments_from(tokens: Sequence[str]) -> PumpArguments:
 
 _LOG_LIMIT_BYTES = 1_000_000
 
-#: Wall-clock bound on one publisher. Twenty minutes: twice the longest
-#: deadline any publisher holds inside itself (hpc3's ten-minute cluster
-#: command, which the hpc-wake publisher's ssh rides), so no honest run is
-#: cut short, and still FINITE. Before it the pump had none, and a
+#: Wall-clock bound on one publisher. Twenty minutes, set as twice the
+#: longest deadline a publisher then held inside itself (hpc3's ten-minute
+#: cluster command, which the retired hpc-wake publisher's ssh rode), so no
+#: honest run is cut short, and still FINITE. Before it the pump had none, and a
 #: publisher that never returned would have held every later tick forever,
 #: the shape that drained the fleet queue for three days in September 2026.
 PUBLISHER_WALL_SECONDS: Final[int] = 1200

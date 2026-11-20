@@ -26,7 +26,7 @@ from tests.run_cycle_tree import (
 )
 
 #: The rows of one tick: every publisher, then the recorder.
-ROWS = 9
+ROWS = 8
 
 
 def maketools(command: str) -> list[str]:
@@ -100,7 +100,6 @@ class TestMain:
         assert header.startswith("== 20") and header.endswith("Z")
         # Each row's marker, then its stdout, then its stderr, in table order.
         assert [tuple(sections[i : i + 3]) for i in range(0, len(sections), 3)] == [
-            ("-- hpc-wake", "hpc-out", "hpc-err"),
             ("-- ci-wake", "ci-out", "ci-err"),
             ("-- lock-wake", "lock-out", "lock-err"),
             ("-- fleet-health-wake", "health-out", "health-err"),
@@ -136,7 +135,6 @@ class TestMain:
 
         commands = [(list(args), cwd) for args, cwd, _ in runner.calls]
         assert commands[:-1] == [
-            (["poetry", "run", "hpc-wake", "--config", "../hpc3/runs/hpc3.json"], root.resolve()),
             (
                 [
                     "poetry",
@@ -209,7 +207,7 @@ class TestMain:
         env = runner.calls[0][2]
         assert all(call_env == env for _, _, call_env in runner.calls)
         assert env["TASKBOARD_MCP_API_KEY"] == "key-value"
-        assert env["HPC_WAKE_TASK_ID"] == "task-value"
+        assert env["CI_WAKE_TASK_ID"] == "task-value"
         # The parent environment rides along — a scheduled task still needs
         # PATH and friends to find poetry at all. pytest's own marker is the
         # witness: the framework sets PYTEST_CURRENT_TEST in THIS process's
@@ -221,7 +219,7 @@ class TestMain:
     def test_a_failing_first_publisher_does_not_stop_the_second(
         self, tmp_path: pathlib.Path, runner: RecordingRunner
     ) -> None:
-        runner.results[0] = Completed("", "cluster unreachable\n", 3)
+        runner.results[0] = Completed("", "actions api refused\n", 3)
         root = staged_root(tmp_path, GOOD_ENV)
 
         assert run_cycle.main(cycle_argv(root)) == 3
@@ -230,7 +228,7 @@ class TestMain:
     def test_a_failing_second_publisher_reddens_the_tick(
         self, tmp_path: pathlib.Path, runner: RecordingRunner
     ) -> None:
-        runner.results[1] = Completed("", "actions api refused\n", 7)
+        runner.results[1] = Completed("", "journal unreadable\n", 7)
         root = staged_root(tmp_path, GOOD_ENV)
 
         assert run_cycle.main(cycle_argv(root)) == 7
@@ -264,13 +262,14 @@ class TestMain:
 
 
 class TestPublishers:
-    def test_the_inventory_is_the_eight_rows_in_publication_order(self) -> None:
+    def test_the_inventory_is_the_seven_rows_in_publication_order(self) -> None:
         """Pinned as data: a publisher added or removed shows up HERE, and
         board task 9406cfd9's rule -- publishers join this table, never
-        become sibling scheduled tasks -- has a diff to point at."""
+        become sibling scheduled tasks -- has a diff to point at. The
+        hpc-wake publisher left it (MCPs board task 62765171): the control
+        duty's machine has neither the hpc3 ledger nor a route to HPC3."""
         rows = run_cycle.publishers(WORKSPACE, PYTHON)
         assert [p["name"] for p in rows] == [
-            "hpc-wake",
             "ci-wake",
             "lock-wake",
             "fleet-health-wake",
