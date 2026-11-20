@@ -8,7 +8,11 @@ ok", and the Windows project left the registry. This decodes the real
 registry to require exactly one project over the directory, on Linux,
 carrying ``hooks`` (the route file and the pinned tools the check runs on)
 and nothing that would isolate the build from the account whose route file
-the live suites read.
+the live suites read. It declares ``base_branch`` main (MCPs board task
+9c456c33): the package's check runs the mutation step, which measures what
+the commit adds against ``refs/remotes/origin/main``, and fleet job
+cda32861 refused it ``MUTATION_BASE_UNAVAILABLE`` while the entry declared
+none, so the stage held one root commit.
 """
 
 from __future__ import annotations
@@ -38,4 +42,5 @@ def test_linux_alone_checks_the_hooks_package() -> None:
         path="packages/claude-hooks",
         install=(),
         companions=(),
+        base_branch="main",
     )
