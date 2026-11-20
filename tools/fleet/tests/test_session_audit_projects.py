@@ -8,7 +8,12 @@ it. On 2026-10-21 the package dropped its Windows code ("well covnert any
 windows code to linux no back compat", the operator, 2026-10-20), so the
 Windows lane would check code that no longer exists. This decodes the real
 registry to require exactly one project over the directory, on a Linux
-node with the test database and the compiler its suites need.
+node with the test database and the compiler its suites need. It declares
+``base_branch`` main (MCPs board task bcf16d55): the package's check runs
+the mutation step, which measures what the commit adds against
+``refs/remotes/origin/main``, and with no base declared the stage holds
+one root commit and the step refuses ``MUTATION_BASE_UNAVAILABLE``, as it
+did for claude-hooks (fleet job cda32861).
 """
 
 from __future__ import annotations
@@ -32,6 +37,7 @@ PREPARE: Final[tuple[str, ...]] = ("make", "-s", "-C", "scripts/fleet-prepare")
 SOURCE: Final[ProjectSource] = ProjectSource(
     remote="https://github.com/wagner-austin/MCPs.git",
     path="packages/session-audit",
+    base_branch="main",
     install=(
         InstallStep(phase="install", argv=(*PREPARE, "install")),
         InstallStep(
