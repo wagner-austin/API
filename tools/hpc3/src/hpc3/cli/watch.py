@@ -11,7 +11,11 @@ billing partition reports the fraction that ``sbank`` rounds away.
 
 A comma-separated list becomes one ``sacct`` call, so every row in a sweep
 is read from the same moment. Ids that accounting does not know are reported
-by name at the end rather than silently omitted.
+by name at the end rather than silently omitted. An array is watched by its
+task ids, as a sweep's ``watch:`` line names them, or by its base id: the
+query asks by base and a pending aggregate row answers every task it names,
+because a task id alone reads as unknown while its array pends and the base
+alone never names a row once the array exists (array 59867212, 2026-11-20).
 
 ``--until-done 1`` re-reads accounting until every requested job reaches a
 terminal state, emitting a row only when a job's state CHANGES, then the
@@ -31,6 +35,7 @@ from platform_core.cli_boundary import run_cli
 from platform_core.cluster_layout import project_of
 
 from hpc3.cli import _config, _test_hooks
+from hpc3.contracts.array import answers, base_job_ids
 from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.status import JobState, JobStatus, gpu_hours, is_terminal, service_units
 from hpc3.contracts.workspace import Workspace, workspace_cluster
@@ -118,7 +123,9 @@ def _read_rows(host: str, requested: Sequence[str], cluster: ClusterFacts) -> li
 
     One sacct call for the whole set: six separate calls would observe six
     different moments, and a sweep's rows are only comparable if they came
-    from the same one.
+    from the same one. It asks by array base, as triage does, because
+    ``sacct -j <base>_<index>`` is empty while that task pends inside its
+    array's aggregate row (:mod:`hpc3.contracts.array`).
 
     Args:
         host: The cluster's SSH host alias.
@@ -126,13 +133,40 @@ def _read_rows(host: str, requested: Sequence[str], cluster: ClusterFacts) -> li
         cluster: The cluster whose facts decode the accounting output.
 
     Returns:
-        The accounting rows, in the order ``sacct`` returned them.
+        The rows answering a requested id (:func:`answers`), in the order
+        ``sacct`` returned them; the other tasks of a requested task's array
+        are left out.
 
     Raises:
-        AppError: If the remote command fails or the output is malformed.
+        AppError: If the remote command fails, the output is malformed, or
+            an aggregate id cannot be read.
     """
-    output = run_remote_batched(host, sacct_commands(requested))
-    return parse_sacct_output(output, cluster)
+    output = run_remote_batched(host, sacct_commands(base_job_ids(requested)))
+    return [
+        status
+        for status in parse_sacct_output(output, cluster)
+        if any(answers(status["job_id"], wanted) for wanted in requested)
+    ]
+
+
+def _unanswered(requested: Sequence[str], rows: Sequence[JobStatus]) -> list[str]:
+    """Name the requested ids no accounting row answers.
+
+    Args:
+        requested: The job ids asked about.
+        rows: The rows :func:`_read_rows` returned.
+
+    Returns:
+        Each requested id no row answers, in the order requested.
+
+    Raises:
+        AppError: If an aggregate id cannot be read.
+    """
+    return [
+        wanted
+        for wanted in requested
+        if not any(answers(status["job_id"], wanted) for status in rows)
+    ]
 
 
 def _follow(
@@ -175,8 +209,8 @@ def _follow(
             if seen.get(status["job_id"]) != status["state"]:
                 seen[status["job_id"]] = status["state"]
                 _test_hooks.emit(format_status(status, cluster))
-        ids = {status["job_id"] for status in rows}
-        if all(is_terminal(status["state"]) for status in rows) and set(requested) <= ids:
+        settled = all(is_terminal(status["state"]) for status in rows)
+        if settled and _unanswered(requested, rows) == []:
             return rows
         _test_hooks.sleep(poll_seconds)
 
@@ -211,7 +245,7 @@ def _summarize(
     _test_hooks.emit(f"gpu-hours {total_gpu_hours:.2f}")
     _test_hooks.emit(f"states {tally}")
 
-    missing = sorted(set(requested) - {status["job_id"] for status in rows})
+    missing = sorted(_unanswered(requested, rows))
     if missing != []:
         # Reported rather than raised: the rows that came back are real and
         # worth showing. Silence about the rest is what would mislead.

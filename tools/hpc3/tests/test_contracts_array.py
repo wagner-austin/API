@@ -8,10 +8,13 @@ against invented strings tests a different cluster.
 
 from __future__ import annotations
 
+import itertools
+
 import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
 
 from hpc3.contracts.array import (
+    answers,
     array_task_id,
     base_job_id,
     base_job_ids,
@@ -180,3 +183,48 @@ class TestRoundTrip:
         expression = format_array_indices(indices)
         expanded = expand_job_id(f"777_[{expression}%4]")
         assert expanded == tuple(array_task_id("777", index) for index in indices)
+
+
+class TestAnswers:
+    """Which accounting row answers a requested id.
+
+    The ids are array 59867212, eight tasks on the free partition, read from
+    HPC3's accounting on 2026-11-20: ``sacct -j 59867212`` printed rows
+    ``59867212_0`` to ``59867212_7`` and never one named ``59867212``.
+    """
+
+    def test_a_plain_job_answers_its_own_id(self) -> None:
+        assert answers("55519937", "55519937")
+        assert not answers("55519937", "55519938")
+
+    def test_a_task_row_answers_its_own_task_and_no_other(self) -> None:
+        assert answers("59867212_3", "59867212_3")
+        assert not answers("59867212_3", "59867212_4")
+
+    def test_a_pending_aggregate_answers_each_task_it_names(self) -> None:
+        """``sacct -j 59867212_0`` is empty while the array pends; the
+        aggregate is the only row standing for task 0."""
+        assert answers("59867212_[0-7]", "59867212_0")
+        assert answers("59867212_[0-7]", "59867212_7")
+        assert not answers("59867212_[1-7]", "59867212_0")
+
+    def test_every_row_of_an_array_answers_its_base(self) -> None:
+        """No row is ever named by the base once the array exists, so a
+        request for the base is answered by its tasks and its aggregate."""
+        assert answers("59867212_7", "59867212")
+        assert answers("59867212_[0-7]", "59867212")
+        assert not answers("59867213_0", "59867212")
+
+    def test_a_task_does_not_answer_for_the_whole_array(self) -> None:
+        assert not answers("59867212", "59867212_0")
+
+    def test_an_aggregate_answers_exactly_the_tasks_it_was_submitted_as(self) -> None:
+        """Every index subset of a six-task array: the aggregate the cluster
+        prints for it answers its base and each of its tasks, and no task
+        outside it."""
+        for size in range(1, 7):
+            for indices in itertools.combinations(range(6), size):
+                aggregate = f"777_[{format_array_argument(indices, 2)}]"
+                assert answers(aggregate, "777")
+                for index in range(6):
+                    assert answers(aggregate, array_task_id("777", index)) is (index in indices)

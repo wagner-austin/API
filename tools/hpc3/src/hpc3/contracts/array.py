@@ -252,7 +252,34 @@ def expand_job_id(job_id: str) -> tuple[str, ...]:
     return _expand_bracket(base, expression, job_id)
 
 
+def answers(reported_id: str, requested_id: str) -> bool:
+    """Say whether an accounting row answers a request for one job id.
+
+    A task id is answered by its own row and, while it pends, by the
+    aggregate that names it. A plain id is answered by its own row and,
+    when it is an array's base, by every row of that array: once an array
+    exists no row carries the base alone (``sacct -j 59867212`` printed
+    ``59867212_0`` to ``59867212_7`` and nothing named ``59867212``, HPC3
+    2026-11-20), so matching the base literally waits forever.
+
+    Args:
+        reported_id: The id as ``sacct`` printed it.
+        requested_id: A plain or task id a caller asked about.
+
+    Returns:
+        True when the row stands for the requested job or task.
+
+    Raises:
+        AppError: With ``ARRAY_ID_UNPARSABLE`` when ``reported_id`` is an
+            aggregate :func:`expand_job_id` cannot read.
+    """
+    if "_" in requested_id:
+        return requested_id in expand_job_id(reported_id)
+    return base_job_id(reported_id) == requested_id
+
+
 __all__ = [
+    "answers",
     "array_task_id",
     "base_job_id",
     "base_job_ids",

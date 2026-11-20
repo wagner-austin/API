@@ -410,3 +410,96 @@ class TestFollowMode:
         assert code == 0
         assert slept == [60]
         assert "states COMPLETED=2" in emitted
+
+
+#: Array 59867212's accounting, read with ``sacct -j 59867212 -n -P -o
+#: JobID,JobName,Partition,State,ElapsedRaw,AllocTRES,NodeList -X`` on HPC3
+#: 2026-11-20 after its eight tasks failed. The pending aggregate is the shape
+#: ``contracts/array.py`` records for a queued array, at this array's indices.
+_ARRAY_PENDING = (
+    "59867212_[0-7]|coax-drone.challenge-uncertainty-4f1c46b|free|PENDING|0||None assigned\n"
+)
+_ARRAY_ELAPSED = (22, 19, 19, 19, 20, 18, 19, 17)
+_ARRAY_FAILED = "".join(
+    f"59867212_{index}|coax-drone.challenge-uncertainty-4f1c46b|free|FAILED|{elapsed}|"
+    "billing=1,cpu=1,mem=4G,node=1|hpc3-l18-01\n"
+    for index, elapsed in enumerate(_ARRAY_ELAPSED)
+)
+_ARRAY_MEMBERS = ",".join(f"59867212_{index}" for index in range(8))
+
+
+class TestArrayFollow:
+    """The watch: line a sweep prints names its array's tasks, and a session
+    waits on it to be woken. On array 59867212 it failed both ways: the task
+    ids were ruled unknown after five reads while the array pended, and the
+    base id was waited on for five hours after every task had failed."""
+
+    def _follow(self, tmp_path: pathlib.Path, jobs: str) -> tuple[int, list[float]]:
+        """Follow ``jobs`` to terminal with the sleep hook recorded.
+
+        Args:
+            tmp_path: Directory holding the workspace.
+            jobs: The ``--job`` value.
+
+        Returns:
+            The exit code and the waits requested.
+        """
+        recorded: list[float] = []
+        original = _test_hooks.sleep
+        _test_hooks.sleep = recorded.append
+        try:
+            code = watch_cli.main([*_watch_args(tmp_path, jobs), "--until-done", "1"])
+        finally:
+            _test_hooks.sleep = original
+        return code, recorded
+
+    def test_task_ids_wait_through_the_pending_aggregate(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """Five pending reads is past the unknown-id limit; the aggregate
+        answers every task, so none of them counts as unknown."""
+        for _ in range(5):
+            fake_run.add("sacct", stdout=_ARRAY_PENDING, once=True)
+        fake_run.add("sacct", stdout=_ARRAY_FAILED)
+        code, slept = self._follow(tmp_path, _ARRAY_MEMBERS)
+        assert code == 0
+        assert slept == [60, 60, 60, 60, 60]
+        assert all("sacct -j 59867212 " in call.remote_command for call in fake_run.calls)
+        assert "states FAILED=8" in emitted
+        assert not any(line.startswith("NOT FOUND") for line in emitted)
+
+    def test_the_base_id_returns_once_every_task_is_terminal(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        started = "59867212_7|coax-drone.challenge-uncertainty-4f1c46b|free|RUNNING|5|" + (
+            "billing=1,cpu=1,mem=4G,node=1|hpc3-l18-01\n"
+        )
+        fake_run.add("sacct", stdout=_ARRAY_PENDING, once=True)
+        fake_run.add("sacct", stdout=started + _ARRAY_PENDING.replace("[0-7]", "[0-6]"), once=True)
+        fake_run.add("sacct", stdout=_ARRAY_FAILED)
+        code, slept = self._follow(tmp_path, "59867212")
+        assert code == 0
+        assert slept == [60, 60]
+        assert "states FAILED=8" in emitted
+
+    def test_watched_tasks_finish_without_waiting_on_the_rest_of_the_array(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """Task 3 still sits in the aggregate on the first read, so the wait
+        holds; task 5 running or not is not what was asked about."""
+        first = _ARRAY_FAILED.splitlines(keepends=True)[0]
+        fake_run.add("sacct", stdout=first + _ARRAY_PENDING.replace("[0-7]", "[1-7]"), once=True)
+        fake_run.add("sacct", stdout=_ARRAY_FAILED)
+        code, slept = self._follow(tmp_path, "59867212_0,59867212_3")
+        assert code == 0
+        assert slept == [60]
+        assert "states FAILED=2" in emitted
+
+    def test_a_task_the_array_never_had_is_named(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        fake_run.add("sacct", stdout=_ARRAY_FAILED)
+        code = watch_cli.main(_watch_args(tmp_path, "59867212_0,59867212_9"))
+        assert code == 0
+        assert "NOT FOUND 59867212_9" in emitted
+        assert "states FAILED=1" in emitted
