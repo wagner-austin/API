@@ -75,6 +75,13 @@ client, and test.sh then runs every verb and refusal of watched-run.sh
 against a real client under xvfb-run, quick-run's host.sh calling only some
 of them. Until it was declared no node or CI ran that suite.
 
+quest-reference (MCPs board task ad70ea01) runs the Quest Helper reference
+adapter's own make check in the same image: it fetches the Quest Helper
+source the Plugin Hub publishes, compiles it against RuneLite, and holds the
+adapter to its full line and branch gate. The observer's check ran it as a
+subproject (8 tests, lines 123/123, branches 38/38 at osrs-lab 283a9bc6), but
+until it was declared no fleet line could name its own verdict.
+
 character-site (MCPs board task 6f9947b1) runs the Jagex character page
 driver's own make check in the same image: its tests start a real headed
 Chromium, Playwright's own and the Google Chrome stable package the image
@@ -134,6 +141,7 @@ DIRECTORIES: Final[tuple[str, ...]] = (
     "mutation-history",
     "observer",
     "observer-input-coverage",
+    "quest-reference",
     "quick-run",
     "recorder",
     "recorder-release",

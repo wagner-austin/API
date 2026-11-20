@@ -1595,6 +1595,17 @@ close, restore) against a real client under xvfb-run. quick-run's `host.sh`
 calls only some of those verbs, and until this entry no node or CI ran the
 suite. Same tags and workers as quick-run.
 
+**`osrs-lab/quest-reference`** (MCPs board task ad70ea01, 2026-11-20) is the
+Quest Helper reference adapter's own `make check`, run in the same image: it
+fetches the unmodified Quest Helper source the RuneLite Plugin Hub publishes,
+compiles it against the newest RuneLite release, resolves every RuneLite
+reference its classes make, and holds the adapter, the shop item highlights
+of a purchase step among what it exports, to a full line and branch gate. The
+observer's check runs it as a subproject: inside fleet job 62eecd0e at
+osrs-lab 283a9bc6 on serendipity its 8 tests passed at lines 123/123 and
+branches 38/38, but until this entry no fleet line could name its own
+verdict. Same tags and workers as the observer.
+
 **`coax-drone/site`** (MCPs board task c88f1f08, 2026-11-12) is coax-drone's
 site directory's own `make check`, the pages lift.austinwagner.org serves: it
 installs the site's pinned TypeScript, type definitions, Playwright and
