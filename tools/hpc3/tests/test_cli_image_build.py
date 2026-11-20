@@ -112,7 +112,10 @@ class TestItSubmitsAndRecords:
         _healthy(fake_run)
         image_build_cli.main(_args(tmp_path))
         assert emitted[3].startswith("watch: hpc3-watch --config ")
-        assert emitted[3].endswith("--job 55645549")
+        assert emitted[3].endswith(
+            "--job 55645549 --until-done 1  "
+            "# run it in the background: its exit wakes the session that submitted"
+        )
 
 
 class TestWhatItRefuses:

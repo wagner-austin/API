@@ -320,7 +320,10 @@ class TestSubmitCli:
         # summary, which is the property this test is about. Indexing it by
         # position made the test fail when a line was added ABOVE it, which
         # is not a regression in what it claims to check.
-        assert emitted[-1].endswith("--job 55519937")
+        assert emitted[-1].endswith(
+            "--job 55519937 --until-done 1  "
+            "# run it in the background: its exit wakes the session that submitted"
+        )
         assert emitted[-1].startswith("watch: hpc3-watch --config ")
 
     def test_a_project_requiring_certified_inputs_refuses_an_unvouched_one(

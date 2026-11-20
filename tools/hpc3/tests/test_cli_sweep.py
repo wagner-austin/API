@@ -100,7 +100,10 @@ class TestSweepCli:
             "submitted 101_1 abl.rung-s1",
             "submitted 101_2 abl.rung-s2",
         ]
-        assert emitted[-1].endswith("--job 101_0,101_1,101_2")
+        assert emitted[-1].endswith(
+            "--job 101_0,101_1,101_2 --until-done 1  "
+            "# run it in the background: its exit wakes the session that submitted"
+        )
 
     def test_it_reports_where_every_members_log_landed(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str], frozen_clock: str

@@ -127,7 +127,13 @@ class TestChainCli:
         _healthy(fake_run)
 
         chain_cli.main(_args(tmp_path))
-        assert any(line.endswith("--job 101,102") for line in emitted)
+        assert any(
+            line.endswith(
+                "--job 101,102 --until-done 1  "
+                "# run it in the background: its exit wakes the session that submitted"
+            )
+            for line in emitted
+        )
 
     def test_every_stage_reaches_the_ledger(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, frozen_clock: str
