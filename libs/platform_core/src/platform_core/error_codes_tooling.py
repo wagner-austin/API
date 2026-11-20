@@ -296,8 +296,9 @@ class CommitScopeErrorCode(ErrorCodeBase):
 class BoardBridgeErrorCode(ErrorCodeBase):
     """What ANY bridge announcing terminal work on the board can get wrong.
 
-    Shared by ``tools/hpc-wake`` and ``tools/fleet-wake`` through
-    :mod:`platform_core.board`, so the two cannot describe the same condition
+    Shared by every bridge that reads its identity and standing task through
+    :mod:`platform_core.board` (``tools/ci-wake``, ``tools/lock-wake``,
+    ``tools/fleet-health-wake``), so no two describe the same condition
     differently. A bridge's own domain failures stay in its own enum below --
     this holds only what the shared code raises.
     """
@@ -306,25 +307,6 @@ class BoardBridgeErrorCode(ErrorCodeBase):
     # discovered -- an announcement posted to a guessed task is one nobody
     # subscribed to, which reads exactly like the bridge working.
     TASK_ID_MISSING = "TASK_ID_MISSING"
-
-
-class HpcWakeErrorCode(ErrorCodeBase):
-    """Announcing Slurm terminal states on the agent board.
-
-    A sibling of :class:`BoardWatchErrorCode` for the same reason that is a
-    sibling of :class:`FleetErrorCode`: the failures live at this package's
-    own layer. Transport is :class:`McpClientErrorCode`'s, credentials are
-    :class:`BoardWatchErrorCode`'s (the bridge loads them through the same
-    reader), the cluster's are :class:`Hpc3ErrorCode`'s, and everything a
-    bridge shares with the fleet bridge is :class:`BoardBridgeErrorCode`'s.
-    What is left is what only this package can get wrong.
-    """
-
-    # A terminal accounting row for a job the ledger never recorded. The
-    # query is BUILT from the ledger, so this is a contract violation --
-    # answering it with a skip would hide whichever expansion bug produced
-    # it behind a quiet cycle.
-    JOB_UNKNOWN_TO_LEDGER = "JOB_UNKNOWN_TO_LEDGER"
 
 
 class CiWakeErrorCode(ErrorCodeBase):
@@ -542,7 +524,6 @@ __all__ = [
     "BoardWatchErrorCode",
     "CiWakeErrorCode",
     "Hpc3ErrorCode",
-    "HpcWakeErrorCode",
     "LockWakeErrorCode",
     "MaketoolsErrorCode",
     "McpClientErrorCode",
