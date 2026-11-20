@@ -27,6 +27,10 @@
     {
       "name": "pytest-timeout",
       "version": "2.4.0"
+    },
+    {
+      "name": "cosmic-ray",
+      "version": "8.7.0"
     }
   ]
 }
