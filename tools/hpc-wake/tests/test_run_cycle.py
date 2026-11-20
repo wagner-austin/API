@@ -318,7 +318,8 @@ class TestMainBlock:
             if saved_module is not None:
                 sys.modules[module_name] = saved_module
         assert caught.value.code == 0
-        assert runner.calls[0][1] == root.resolve()
+        # The first row, ci-wake, runs in its sibling package.
+        assert runner.calls[0][1] == (root / "../ci-wake").resolve()
         assert len(runner.calls) == ROWS
         assert (root / "runs" / "cycle.log").read_text(encoding="utf-8").startswith("== ")
 
