@@ -227,6 +227,16 @@ class TestTheShScriptRunsForReal:
         seal(staged / "MCPs")
         seal(root / "cache" / "MCPs")
         (target / "linked").symlink_to(root / "cache" / "MCPs", target_is_directory=True)
+        # The two modes loki's stranded run held under its .pytest-tmp (MCPs
+        # board task 1526ece1): 0355 can be written and searched but not
+        # listed, so neither find nor rm reads its entries, and 0655 can be
+        # listed but not searched, so its entries cannot be reached.
+        basetemp = target / "packages" / "maketools" / ".pytest-tmp" / "basetemp"
+        for name, mode in (("repository", 0o355), ("candidate", 0o655)):
+            nested = basetemp / name / "objects"
+            nested.mkdir(parents=True)
+            (nested / "pack").write_text("pack\n", encoding="utf-8")
+            (basetemp / name).chmod(mode)
         return target
 
     def retire(self, root: pathlib.Path) -> None:

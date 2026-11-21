@@ -288,16 +288,25 @@ def retire_script(
         The script's text. ``mv`` is guarded because a run cancelled before
         its build started wrote no transcript; ``rm -rf`` and ``rm -f`` need
         no guard for what is already gone, and ``-f`` removes the read-only
-        objects of the repository staged there. ``-f`` does not remove an
-        entry of a directory without its write bit, so each of the run's own
-        directories lacking it gets it back first (MCPs board task 05dd6588):
-        since MCPs f27b4822e seals release payloads read-only, every MCPs
-        packages/maketools run leaves fixture releases sealed under its
-        ``.pytest-tmp``, and from 2026-10-23T23:26Z to 2026-10-24T03:51Z the
-        retires of 15 such runs on six nodes stopped at ``rm -rf``, stranding
-        them. Neither ``find`` nor ``rm`` follows a link, so a linked
-        companion is untouched. Every step tolerates what an earlier attempt
-        already did, so a retire that failed part way succeeds when rerun.
+        objects of the repository staged there. ``rm -rf`` empties a
+        directory only with all three of its owner's bits: read to list its
+        entries, search to reach them and write to unlink them. So each of the
+        run's own directories lacking any of the three gets all three back
+        first, each as ``find`` reaches it and before it descends, since
+        ``find`` cannot list a directory it may not read either (``-exec ...
+        ;``, never a batched ``+``). The write bit alone came first (MCPs
+        board task 05dd6588): since MCPs f27b4822e seals release payloads
+        read-only, every MCPs packages/maketools run leaves fixture releases
+        sealed under its ``.pytest-tmp``, and from 2026-10-23T23:26Z to
+        2026-10-24T03:51Z the retires of 15 such runs on six nodes stopped at
+        ``rm -rf``, stranding them. The read bit followed (MCPs board task
+        1526ece1): on 2026-11-20T14:14Z loki's retire of
+        MCPs-packages-maketools-loki-1795212710 stopped at that ``find``, on
+        two ``.pytest-tmp`` directories of mode 0355, and left 1.2 GB no
+        later pass removed. Neither ``find`` nor ``rm`` follows a link, so a
+        linked companion is untouched. Every step tolerates what an earlier
+        attempt already did, so a retire that failed part way succeeds when
+        rerun.
     """
     target = names.dispatch_directory(stage_root, run_id)
     log = shlex.quote(names.log_path(target))
@@ -308,7 +317,7 @@ def retire_script(
         f"if [ -e {log} ]; then mv -f {log} {shlex.quote(retained)}; fi",
         *sh_retire_lines(target=target, retained=results),
         f"if [ -d {enclosure} ]; then "
-        f"find {enclosure} -type d ! -perm -u=w -exec chmod u+w {{}} +; fi",
+        f"find {enclosure} -type d ! -perm -u=rwx -exec chmod u+rwx {{}} \\; ; fi",
         f"rm -rf {enclosure}",
         "rm -f " + " ".join(shlex.quote(script) for script in scripts),
     ]
