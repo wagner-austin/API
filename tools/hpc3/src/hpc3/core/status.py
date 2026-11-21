@@ -20,9 +20,10 @@ from collections.abc import Sequence
 from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONValue
 
+from hpc3.contracts.array import answers, base_job_ids
 from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.status import JobStatus, decode_job_status
-from hpc3.core.remote import token_batches
+from hpc3.core.remote import run_remote_batched, token_batches
 
 SACCT_FIELDS = ("JobID", "JobName", "Partition", "State", "ElapsedRaw", "AllocTRES", "NodeList")
 """Columns requested from ``sacct``, in the order this module parses them."""
@@ -207,6 +208,41 @@ def parse_sacct_output(output: str, cluster: ClusterFacts) -> list[JobStatus]:
     return [parse_sacct_row(line, cluster) for line in output.splitlines() if line.strip() != ""]
 
 
+def read_answering_rows(
+    host: str, requested: Sequence[str], cluster: ClusterFacts
+) -> list[JobStatus]:
+    """Read one accounting snapshot of the rows that answer the requested job ids.
+
+    One sacct call for the whole set: separate calls would observe separate
+    moments, and a sweep's rows are only comparable if they came from the
+    same one. It asks by array base, because ``sacct -j <base>_<index>`` is
+    empty while that task pends inside its array's aggregate row
+    (:mod:`hpc3.contracts.array`); hpc3-watch and hpc3-cancel both read
+    through it, and each had failed on a pending array before (MCPs board
+    tasks db3f2420 and 0f8a181b).
+
+    Args:
+        host: The cluster's SSH host alias.
+        requested: The job ids asked about.
+        cluster: The cluster whose facts decode the accounting output.
+
+    Returns:
+        The rows answering a requested id (:func:`~hpc3.contracts.array.answers`),
+        in the order ``sacct`` returned them; the other tasks of a requested
+        task's array are left out.
+
+    Raises:
+        AppError: If the remote command fails, the output is malformed, or
+            an aggregate id cannot be read.
+    """
+    output = run_remote_batched(host, sacct_commands(base_job_ids(requested)))
+    return [
+        status
+        for status in parse_sacct_output(output, cluster)
+        if any(answers(status["job_id"], wanted) for wanted in requested)
+    ]
+
+
 __all__ = [
     "SACCT_FIELDS",
     "parse_elapsed_seconds",
@@ -214,5 +250,6 @@ __all__ = [
     "parse_sacct_row",
     "parse_state",
     "parse_tres_int",
+    "read_answering_rows",
     "sacct_commands",
 ]

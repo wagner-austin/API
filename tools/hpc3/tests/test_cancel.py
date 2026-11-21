@@ -31,6 +31,21 @@ def _row(job_id: str, state: str, *, elapsed: int = 60) -> str:
     return f"{job_id}|arm|free-gpu|{state}|{elapsed}|billing=8,cpu=8,gres/gpu=1|n1"
 
 
+#: The accounting query by the array's base. A query by member id ('sacct -j 59896625_0 ...')
+#: matches no rule and so answers empty, as HPC3 answers it while the members pend inside the
+#: aggregate.
+BASE_QUERY_59896625 = "sacct -j 59896625 "
+#: Array 59896625's one accounting row while pending, as hpc3-watch read it on HPC3 2026-11-21.
+PENDING_59896625 = (
+    "59896625_[0-7]|coax-drone.challenge-uncertainty-63cb514|free|PENDING|0||None assigned\n"
+)
+#: The same array after it was cancelled while pending, read with sacct -X on HPC3 2026-11-21.
+CANCELLED_59896625 = (
+    "59896625_[0-7]|coax-drone.challenge-uncertainty-63cb514|free"
+    "|CANCELLED by 2422328|0||None assigned\n"
+)
+
+
 class TestCancel:
     def test_a_running_job_is_reported_as_stopped(self, fake_run: FakeRun) -> None:
         """RUNNING before, CANCELLED after -- the real sequence, not one answer twice."""
@@ -80,6 +95,61 @@ class TestCancel:
         fake_run.add("sacct", stdout="")
         assert cancel("hpc3", ["999"]) == []
 
+    def test_a_pending_array_asked_by_its_member_ids_is_found_cancelled_and_reported_stopped(
+        self, fake_run: FakeRun
+    ) -> None:
+        """Array 59896625 on HPC3, 2026-11-21: accounting printed only the aggregate both times.
+
+        ``sacct -j 59896625_0`` is empty while task 0 pends inside the aggregate, so the before
+        and after reads ask by base, and the member ids go to ``scancel`` as given.
+        """
+        members = [f"59896625_{index}" for index in range(8)]
+        fake_run.add(BASE_QUERY_59896625, stdout=PENDING_59896625, once=True)
+        fake_run.add(BASE_QUERY_59896625, stdout=CANCELLED_59896625)
+        outcomes = cancel("hpc3", members)
+
+        commands = fake_run.commands()
+        assert commands[0].startswith("sacct -j 59896625 ")
+        assert commands[1] == "scancel " + " ".join(members)
+        assert commands[2].startswith("sacct -j 59896625 ")
+        assert [(outcome.job_id, outcome.state, outcome.was_running) for outcome in outcomes] == [
+            ("59896625_[0-7]", "CANCELLED", True)
+        ]
+
+    def test_a_row_that_splits_after_the_cancel_was_live_where_its_members_were(
+        self, fake_run: FakeRun
+    ) -> None:
+        """A pending aggregate may read as per-task rows after; each task keeps its live state."""
+        before = _row("200_[0-1]", "PENDING", elapsed=0) + "\n" + _row("300", "COMPLETED") + "\n"
+        after = (
+            _row("200_0", "CANCELLED", elapsed=0)
+            + "\n"
+            + _row("200_1", "CANCELLED", elapsed=0)
+            + "\n"
+            + _row("300", "COMPLETED")
+            + "\n"
+        )
+        fake_run.add("sacct", stdout=before, once=True)
+        fake_run.add("sacct", stdout=after)
+        outcomes = cancel("hpc3", ["200", "300"])
+        assert [(outcome.job_id, outcome.was_running) for outcome in outcomes] == [
+            ("200_0", True),
+            ("200_1", True),
+            ("300", False),
+        ]
+
+    def test_a_row_is_not_live_on_another_jobs_state(self, fake_run: FakeRun) -> None:
+        """Only a before row naming one of the after row's own tasks counts, not any live row."""
+        before = _row("400_0", "RUNNING") + "\n" + _row("400_1", "COMPLETED") + "\n"
+        after = _row("400_0", "CANCELLED") + "\n" + _row("400_1", "COMPLETED") + "\n"
+        fake_run.add("sacct", stdout=before, once=True)
+        fake_run.add("sacct", stdout=after)
+        outcomes = cancel("hpc3", ["400_0", "400_1"])
+        assert [(outcome.job_id, outcome.was_running) for outcome in outcomes] == [
+            ("400_0", True),
+            ("400_1", False),
+        ]
+
 
 class TestSummarise:
     def test_it_separates_stopped_from_already_over(self, fake_run: FakeRun) -> None:
@@ -121,6 +191,17 @@ class TestCancelCli:
             "102 already finished as COMPLETED",
             "stopped 1, already finished 1",
         ]
+
+    def test_a_pending_array_cancelled_by_member_ids_reads_as_stopped(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """The 59896625 call that answered 'sacct knows no job' after its scancel had run."""
+        fake_run.add(BASE_QUERY_59896625, stdout=PENDING_59896625, once=True)
+        fake_run.add(BASE_QUERY_59896625, stdout=CANCELLED_59896625)
+        members = ",".join(f"59896625_{index}" for index in range(8))
+
+        assert cancel_cli.main(self._args(tmp_path, members)) == 0
+        assert emitted == ["59896625_[0-7] stopped CANCELLED", "stopped 1, already finished 0"]
 
     def test_it_cancels_on_the_host_the_workspace_names(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]

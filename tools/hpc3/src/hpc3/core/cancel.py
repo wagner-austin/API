@@ -16,10 +16,11 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from hpc3.contracts.array import expand_job_id
 from hpc3.contracts.cluster import ClusterFacts
-from hpc3.contracts.status import JobState
+from hpc3.contracts.status import JobState, JobStatus
 from hpc3.core import remote
-from hpc3.core.status import parse_sacct_output, sacct_commands
+from hpc3.core.status import read_answering_rows
 
 
 class CancelOutcome:
@@ -93,11 +94,16 @@ def cancel(host: str, job_ids: Sequence[str], cluster: ClusterFacts) -> list[Can
 
     Args:
         host: SSH destination.
-        job_ids: Slurm job ids to cancel. Never empty.
+        job_ids: Slurm job ids to cancel. Never empty. An array's task ids
+            are read by the array's base, as hpc3-watch reads them
+            (:func:`~hpc3.core.status.read_answering_rows`).
+        cluster: The cluster whose facts decode the accounting output.
 
     Returns:
-        One outcome per job that accounting knows, in the order accounting
-        reports them.
+        One outcome per accounting row answering a requested id after the
+        cancel, in the order accounting reports them. A wholly pending array
+        reads as its one aggregate row, so eight task ids can yield one
+        outcome.
 
     Raises:
         ValueError: If no job id is given. A bare ``scancel`` with no id
@@ -109,24 +115,45 @@ def cancel(host: str, job_ids: Sequence[str], cluster: ClusterFacts) -> list[Can
     if len(job_ids) == 0:
         raise ValueError("cancel requires at least one job id; a bare scancel takes everything")
 
-    before = {
-        status["job_id"]: status["state"]
-        for status in parse_sacct_output(
-            remote.run_remote_batched(host, sacct_commands(job_ids)), cluster
-        )
-    }
+    before = read_answering_rows(host, job_ids, cluster)
     for command in _scancel_commands(job_ids):
         remote.run_remote(host, command)
-    after = parse_sacct_output(remote.run_remote_batched(host, sacct_commands(job_ids)), cluster)
+    after = read_answering_rows(host, job_ids, cluster)
 
     return [
         CancelOutcome(
-            status["job_id"],
-            status["state"],
-            was_running=before.get(status["job_id"], JobState.COMPLETED) in _LIVE_BEFORE_CANCEL,
+            status["job_id"], status["state"], was_running=_was_live(status["job_id"], before)
         )
         for status in after
     ]
+
+
+def _was_live(job_id: str, before: Sequence[JobStatus]) -> bool:
+    """Say whether a row read after the cancel stood for work that was live before it.
+
+    A row's id can change across the cancel: a pending aggregate read before
+    (``59896625_[0-7]``) may read as the same aggregate or as one row per
+    task after. So the rows are matched by the tasks they stand for
+    (:func:`~hpc3.contracts.array.expand_job_id`), and a row was live when a
+    before row naming one of its tasks was.
+
+    Args:
+        job_id: The id of a row read after the cancel.
+        before: The rows read before it.
+
+    Returns:
+        True when a before row sharing one of its tasks was pending, running,
+        suspended, completing or requeued.
+
+    Raises:
+        AppError: With ``ARRAY_ID_UNPARSABLE`` when an aggregate id cannot be
+            read.
+    """
+    tasks = set(expand_job_id(job_id))
+    return any(
+        status["state"] in _LIVE_BEFORE_CANCEL and tasks & set(expand_job_id(status["job_id"]))
+        for status in before
+    )
 
 
 def summarise(outcomes: Sequence[CancelOutcome]) -> tuple[int, int]:

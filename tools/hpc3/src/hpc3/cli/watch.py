@@ -35,13 +35,12 @@ from platform_core.cli_boundary import run_cli
 from platform_core.cluster_layout import project_of
 
 from hpc3.cli import _config, _test_hooks
-from hpc3.contracts.array import answers, base_job_ids
+from hpc3.contracts.array import answers
 from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.status import JobState, JobStatus, gpu_hours, is_terminal, service_units
 from hpc3.contracts.workspace import Workspace, workspace_cluster
 from hpc3.core.budget import check_consumption
-from hpc3.core.remote import run_remote_batched
-from hpc3.core.status import parse_sacct_output, sacct_commands
+from hpc3.core.status import read_answering_rows
 
 _FLAGS = (_config.CONFIG_FLAG, "--job", "--until-done", "--poll-seconds")
 
@@ -118,43 +117,12 @@ def _budget_groups(
     return sorted(grouped.items()), unclaimed
 
 
-def _read_rows(host: str, requested: Sequence[str], cluster: ClusterFacts) -> list[JobStatus]:
-    """Read one accounting snapshot for the whole requested set.
-
-    One sacct call for the whole set: six separate calls would observe six
-    different moments, and a sweep's rows are only comparable if they came
-    from the same one. It asks by array base, as triage does, because
-    ``sacct -j <base>_<index>`` is empty while that task pends inside its
-    array's aggregate row (:mod:`hpc3.contracts.array`).
-
-    Args:
-        host: The cluster's SSH host alias.
-        requested: The job ids asked about.
-        cluster: The cluster whose facts decode the accounting output.
-
-    Returns:
-        The rows answering a requested id (:func:`answers`), in the order
-        ``sacct`` returned them; the other tasks of a requested task's array
-        are left out.
-
-    Raises:
-        AppError: If the remote command fails, the output is malformed, or
-            an aggregate id cannot be read.
-    """
-    output = run_remote_batched(host, sacct_commands(base_job_ids(requested)))
-    return [
-        status
-        for status in parse_sacct_output(output, cluster)
-        if any(answers(status["job_id"], wanted) for wanted in requested)
-    ]
-
-
 def _unanswered(requested: Sequence[str], rows: Sequence[JobStatus]) -> list[str]:
     """Name the requested ids no accounting row answers.
 
     Args:
         requested: The job ids asked about.
-        rows: The rows :func:`_read_rows` returned.
+        rows: The rows :func:`~hpc3.core.status.read_answering_rows` returned.
 
     Returns:
         Each requested id no row answers, in the order requested.
@@ -196,7 +164,7 @@ def _follow(
     seen: dict[str, JobState] = {}
     unknown_reads = 0
     while True:
-        rows = _read_rows(host, requested, cluster)
+        rows = read_answering_rows(host, requested, cluster)
         if rows == []:
             unknown_reads += 1
             if unknown_reads >= UNKNOWN_POLL_LIMIT:
@@ -301,7 +269,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if parsed.get("--until-done", "0") != "0":
         rows = _follow(host, requested, cluster, poll_seconds)
     else:
-        rows = _read_rows(host, requested, cluster)
+        rows = read_answering_rows(host, requested, cluster)
         if rows == []:
             raise ValueError(f"sacct knows no job in {requested} on {host}")
         for status in rows:
