@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-uncertainty-payload-f4fd724.tar",
+      "sha256": "1389e9be40b29ab7525d28f37cf2afb0fbd22d4f913c9d29bd952f3eadf3e6ed",
+      "size_bytes": 420300800
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone f4fd724e95e3fbd2fb5a84a0e6e6293e456e9332, a clean git worktree of that commit",
+    "selection": "tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner --format=gnu of pyproject.toml, calc/budget, wiki/sources and exports/challenge/optimum-{coax-blade,coax-unequal-blade,tandem-blade,single-blade}-2028.csv",
+    "why": "the 2028 layouts' uncertainty sweep with each AFDD structure law ranged by its own stated average error (hub 12.2%, body 8.7%, gear 8.4%, tail rotor 16.7%, drive shaft 16.0%) instead of one factor at the hub's 12.2%, which left the single rotor's tail rotor and shafts and the tandem's shaft narrower than NDARC states (challenge documents identity d1d844ea60767685e593726a1fac5d84194a80721a245dadf4b7a6d048f0a76e); each member unpacks this archive into node-local TMPDIR and imports calc.budget from it",
+    "note": "board task e6dfef4d-3221-4558-9dc9-a8bdecbb4e21, criterion A5, DECISION 732dadcb; the commit is on origin branch redesign-4to1-1120, a second build from another clean worktree of it gave the same digest, and it loads at that identity both under sedona's Python 3.13 and in Docker from the image's pinned base and requirements"
+  }
+}

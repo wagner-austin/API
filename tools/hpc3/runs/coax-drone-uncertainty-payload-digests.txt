@@ -212,3 +212,30 @@ d8eeaf4c7653af45694441fe2bf17538b8a7be01a4ffe784d842efb92e853d7a  challenge-unce
 0375f805a1621e7f6f8827d33496279d29a95c0816a48ee1236fa525a3d788c7  challenge-uncertainty/d8fa314/shard-5-of-8.json
 5fba5fdea26ec481479cd421d67e7b9f7beda3566ca4ecbf82060698189c736d  challenge-uncertainty/d8fa314/shard-6-of-8.json
 e559d4ca0632faeeed4221c566a2ff27032602dc59f6b57cbe3b1591bc1cef84  challenge-uncertainty/d8fa314/shard-7-of-8.json
+
+# The sweep with each AFDD structure law ranged by its own stated average
+# error (board task e6dfef4d, DECISION 732dadcb), after a judge found the one
+# technology factor at the hub's 12.2% left the single rotor's tail rotor and
+# shafts and the tandem's shaft narrower than NDARC states: the same tar
+# selection at coax-drone f4fd724e95e3fbd2fb5a84a0e6e6293e456e9332 (calc/budget
+# tree 184f05e137568c09f4854cc569f5521eaaae8624, on origin branch
+# redesign-4to1-1120), documents identity
+# d1d844ea60767685e593726a1fac5d84194a80721a245dadf4b7a6d048f0a76e, built
+# twice from clean worktrees to this digest and loaded at that identity both
+# by sedona's Python 3.13 and in Docker from the image's pinned base and
+# requirements.
+
+1389e9be40b29ab7525d28f37cf2afb0fbd22d4f913c9d29bd952f3eadf3e6ed  coax-drone-uncertainty-payload-f4fd724.tar
+
+# Its eight shards, from array 59892011, every member COMPLETED with none
+# preempted, read on the cluster under /pub/wagnera3/coax-drone/ and equal to
+# the files committed in coax-drone exports/challenge-uncertainty.
+
+9af94d7bc762f115b0dcb0d45c11b548b4c6ec483bbe851750928145b300fe1b  challenge-uncertainty/f4fd724/shard-0-of-8.json
+a8deb828aca663e5416e8b623d2a994bfd9239170b67fda4528b7ded6fc2110c  challenge-uncertainty/f4fd724/shard-1-of-8.json
+d4d160cf0f4b23bfb5eab49d1be41b92e2ed003256ab4fc11382df566221454a  challenge-uncertainty/f4fd724/shard-2-of-8.json
+9abeae2c32eb77d4cf028fc7462a925a46586b0e9143a86f1abd21bc05995a8b  challenge-uncertainty/f4fd724/shard-3-of-8.json
+50a1c1850479ac8f928ed0c1a83ba924e5fa0cb557bec1bd0d468f53c88d7f55  challenge-uncertainty/f4fd724/shard-4-of-8.json
+c9eb52c1445015b6b14598839238a387fcd456214db1ccf984c30ac471edf86b  challenge-uncertainty/f4fd724/shard-5-of-8.json
+b96d55dab808e93ef78831571fb4ede61f35a68012d1f8d2b4133662ddd4002d  challenge-uncertainty/f4fd724/shard-6-of-8.json
+135f5ed13507badefd09e5b48b38c7d1f8f9db6e4b6ad91dd6ff22f51c67214d  challenge-uncertainty/f4fd724/shard-7-of-8.json
