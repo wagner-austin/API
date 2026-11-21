@@ -160,7 +160,7 @@ def test_a_retire_that_fails_reports_its_transport_code(
     codes = [failure["code"]] if failure is not None else []
     assert codes == [code]
     assert attempt["answer"] == retire.UNANSWERED
-    assert retire.UNANSWERED == RetireAnswer(holder=None, freed_bytes=0)
+    assert RetireAnswer(holder=None, freed_bytes=0) == retire.UNANSWERED
 
 
 @pytest.mark.parametrize(
