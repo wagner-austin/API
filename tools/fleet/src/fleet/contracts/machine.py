@@ -45,7 +45,9 @@ refused rather than carried: loki, the last Windows machine, left the roster
 on 2026-10-25 and returns through enrolment once it runs NixOS.
 
 THIS PACKAGE DECODES WHAT IT READS. The identity fields only MCPs reads
-(``tailnetIp``, ``reachKey``, ``bootMac``, ``netbootWifi``, ``secureBoot``,
+(``architecture``, the CPU the NixOS flake builds each machine for, added
+by MCPs board task 3fcfe081, and ``tailnetIp``, ``reachKey``, ``bootMac``,
+``netbootWifi``, ``secureBoot``,
 ``installDisk``, ``disabledUntil``, ``tunnel``, ``guest``, ``duties``, ``standby``,
 ``ciWorkersPerRunner``, ``boot``, ``notes``) are decoded by MCPs
 ``fleet-mcp``'s registry decoder, which every fleet audit runs over this
