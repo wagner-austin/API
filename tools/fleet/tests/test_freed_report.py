@@ -236,3 +236,18 @@ class TestTheCommand:
 
         assert raised.value.code == 0
         assert endpoint.tools == ["task_post"]
+
+    def test_run_under_any_other_name_it_posts_nothing(self) -> None:
+        """Only ``__main__`` starts it: a name sorting before it, ``__a__``,
+        runs the module's body and nothing else."""
+        endpoint = FakeQueue([])
+        _test_hooks.http_post = endpoint
+        saved_module = sys.modules.pop("fleet.cli.freed_report", None)
+        try:
+            ran = runpy.run_module("fleet.cli.freed_report", run_name="__a__", alter_sys=False)
+        finally:
+            if saved_module is not None:
+                sys.modules["fleet.cli.freed_report"] = saved_module
+
+        assert ran["__name__"] == "__a__"
+        assert endpoint.tools == []

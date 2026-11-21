@@ -501,17 +501,20 @@ def retire_owed(
     if not owed:
         return
     live = live_runs(leases_path, ledger_path)
-    retired = 0
+    retired = False
     for run_id in owed:
         if run_id in live:
             continue
-        outcome = retire_or_owe(path, node, alias=alias, run_id=run_id)
-        if outcome is RetireOutcome.UNANSWERED:
-            # The node did not answer this one, so the rest wait for the
-            # next pass rather than each spending its own timeout.
-            break
-        if outcome is RetireOutcome.ENDED:
-            retired += 1
+        match retire_or_owe(path, node, alias=alias, run_id=run_id):
+            case RetireOutcome.UNANSWERED:
+                # The node did not answer this one, so the rest wait for the
+                # next pass rather than each spending its own timeout.
+                break
+            case RetireOutcome.ENDED:
+                retired = True
+            case _:
+                # In use: kept and owed, and the node's next run is sent.
+                continue
     if retired:
         cache_generations.remove_unused_on_node(node)
 

@@ -204,16 +204,15 @@ def settle(
     # A directory a process still uses is kept and owed the same way (MCPs
     # board task 1526ece1). The close logged the verdict; this line says what
     # followed it.
-    retired = retire_owed.retire_or_owe(
-        loaded.retires, node, alias=row["node"], run_id=row["run_id"]
-    )
-    if retired is retire_owed.RetireOutcome.ENDED:
-        cache_generations.remove_unused_on_node(node)
-        after = "its row is finished and its directory retired"
-    elif retired is retire_owed.RetireOutcome.IN_USE:
-        after = "its row is finished and the retire is owed while a process uses its directory"
-    else:
-        after = f"its row is finished and the retire is owed until {row['node']} answers"
+    match retire_owed.retire_or_owe(loaded.retires, node, alias=row["node"], run_id=row["run_id"]):
+        case retire_owed.RetireOutcome.ENDED:
+            cache_generations.remove_unused_on_node(node)
+            after = "its row is finished and its directory retired"
+        case retire_owed.RetireOutcome.IN_USE:
+            after = "its row is finished and the retire is owed while a process uses its directory"
+        case _:
+            # Unanswered: a later collect pass sends it.
+            after = f"its row is finished and the retire is owed until {row['node']} answers"
     return Collected(outcome=CollectOutcome.SETTLED, line=f"{encode_job_line(job)}: {after}")
 
 
