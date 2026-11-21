@@ -320,7 +320,7 @@ class TestTheShScriptRunsForReal:
             ),
             encoding="utf-8",
         )
-        homed = () if home is None else ("env", f"HOME={home.as_posix()}")
+        homed: tuple[str, ...] = () if home is None else ("env", f"HOME={home.as_posix()}")
         return subprocess.run(
             [*homed, "bash", script.as_posix()],
             capture_output=True,
