@@ -21,7 +21,7 @@ source_git_blobs:
   "tools/fleet/src/fleet/core/runner_reap_dropped.py": 99720a7f2a335f205c722df15154ecba8f792da0
   "tools/fleet/src/fleet/core/runner_reaper_render.py": 227d7a140ce000cd24092278131aa38039c4ff89
   "tools/fleet/tests/test_runner_placement_host.py": 04b55c10f12ad279b5d1ee39a9db6423fb98157d
-  "tools/fleet/registry/machines/lavender.json": 75849078ae55bb6b684fa6a06f6f2c96b22ee173
+  "tools/fleet/registry/machines/lavender.json": 07c90002a3ec156656918eaf9c96eafe6445f916
   "tools/fleet/registry/projects/tools/fleet-execution-runners.json": baeefbb12b207d6e5b71acd6fc7f60f8c6f99858
   "tools/fleet/runners.json": 43fe7f532c4f974ef67d16d9491aee7043fa84bf
 provenance:
@@ -29,7 +29,8 @@ provenance:
   - "2026-11-02 lavender pin review: the machine file's dispatch gained models null as its last key; the cited lines are unchanged; board task b9235198-f688-4eb2-8068-71377481e1d9."
   - "2026-11-05 runner pin review: lavender was reinstalled with the fleet's NixOS on 2026-11-03, which the opening now says from the machine file's notes (now line 25), and it serves seven runner installs, not eight, per runners.json; the job scope and reaper renders lost their Ubuntu provision functions (API 04c8dcf69), which none of this page's claims rested on, and every locator moved with its file; board task 1b7a7624-e767-42b4-a1d9-888b87d6fd32."
   - "2026-11-12 runner pin review: lavender.json's dispatch gained netns 2.3.6 and its notes at line 25 are unchanged; runners.json gave two of lavender's MCPs runners the mcps-fleet-ci label beside lavender, added pipx to the base packages and appended a sedona host, while lavender's installs at 11-61 are still the seven the page counts; board task 96ef0809-a111-4120-9d24-5b35bdc408bc."
-fact_checked: "2026-11-12"
+  - "2026-11-21 lavender pin review: lavender.json gained an architecture line (x86_64) after platform, which moves its notes from line 25 to line 26; both quoted passages of the notes stand verbatim there, and no other claim of the page rests on the file; board task 3fcfe081-16fb-4dab-bfbd-5b02f80f236a."
+fact_checked: "2026-11-21"
 confidence: high
 hubs: [infrastructure]
 ---
@@ -62,7 +63,7 @@ Every hub tick runs a reap pass that reads the roster **at the rolled ref**, rea
 **Offline is not dropped.** The first rolled pass, at 18:26:33Z on 2026-10-17, counted `offline busy=true` as dropped and ended two Workers GitHub still held, each failing on GitHub within two seconds. A listener out of touch reconnects and its job outlives it, so a runner GitHub reads busy is never reaped.[^offline]
 
 [^ci-slice]: `tools/fleet/src/fleet/contracts/runner_slice.py:44` -- `CI_SLICE_NAME = "runners.slice"`; `tools/fleet/runners.json:11-61` -- lavender's `"installs": [`, seven entries.
-[^reimage]: `tools/fleet/registry/machines/lavender.json:25` -- the machine's notes: "Reinstalled with the fleet's NixOS by the netboot installer from MCPs fleet-mcp/nixos at a192b06c3271 and adopted at 100.85.53.111 on 2026-11-03T05:57:14.156Z", and of the reimage before: "replacing the Windows machine and its WSL guest lavender-wsl, which no longer exist".
+[^reimage]: `tools/fleet/registry/machines/lavender.json:26` -- the machine's notes: "Reinstalled with the fleet's NixOS by the netboot installer from MCPs fleet-mcp/nixos at a192b06c3271 and adopted at 100.85.53.111 on 2026-11-03T05:57:14.156Z", and of the reimage before: "replacing the Windows machine and its WSL guest lavender-wsl, which no longer exist".
 [^why]: `tools/fleet/src/fleet/core/runner_job_scope_render.py:3-8` -- module docstring: "the slice sat at its ``MemoryHigh`` and every listener's calls to"
 [^low]: `tools/fleet/src/fleet/contracts/runner_slice.py:46-56` -- comment on `LISTENER_SLICE_NAME`: "the budget its jobs fill timed out its calls to GitHub (2026-10-02 and"
 [^listener-slice]: `tools/fleet/src/fleet/contracts/runner_slice.py:57-58` -- "This slice carries no bound. No dash, so it is no child of either."
