@@ -7,12 +7,17 @@ source_paths:
   - "src/hpc3/core/array_sbatch.py"
   - "src/hpc3/core/array_submit.py"
   - "src/hpc3/contracts/array.py"
+  - "src/hpc3/core/status.py"
+  - "src/hpc3/core/cancel.py"
 source_git_blobs:
   "src/hpc3/core/array_sbatch.py": "ed32f686a73e2ea8cc48d556d306a9d3d3fdb40a"
   "src/hpc3/core/array_submit.py": "205fb40432570438368f18ff26bcf9cbd8bee13a"
   "src/hpc3/contracts/array.py": "3ac2482e4cf1f25db5a90cbfc76de537e94c4811"
+  "src/hpc3/core/status.py": "fd21ac7b9f01b07ff1ea1d2596ed75058de0e5da"
+  "src/hpc3/core/cancel.py": "5ae784713ed19d522ac2a609c0beb3e1f49933d3"
 provenance:
   - "probe job 55678543 (free, --array=0-3%2), 2026-09-01"
+  - "hpc3-cancel of array 59896625 by its eight task ids while pending, HPC3, 2026-11-21: scancel ran, the after read found no row"
 fact_checked: 2026-10-16
 confidence: high
 ---
@@ -90,6 +95,17 @@ return one. The query has to be built from the array BASE id -- `sacct -j
 per-task row once they have run. `base_job_ids` is that reduction, and it
 also collapses a 60-task array into a single asked id. See
 [[triage-conditions]] and [[command-length-limits]].
+
+**hpc3-cancel asked by task id until 2026-11-21.** Given the eight task ids
+of array 59896625 while it pended, it ran `scancel`, which cancelled the
+array, and then read accounting by those task ids, found no row, and
+reported "sacct knows no job" for an array it had just stopped. Its before
+and after reads now go through `read_answering_rows`
+(`src/hpc3/core/status.py`), the same base-id query and answering filter
+hpc3-watch reads through. A row is counted as stopped work when a row read
+before the cancel that names one of its tasks was live, because a wholly
+pending aggregate can read back as the same aggregate or as per-task rows
+(`_was_live`, `src/hpc3/core/cancel.py`).
 
 ## What the ledger and audit now say
 

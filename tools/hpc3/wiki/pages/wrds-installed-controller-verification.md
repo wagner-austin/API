@@ -14,7 +14,7 @@ source_paths:
 source_git_blobs:
   "src/hpc3/cli/execution_inspect.py": "34bae47cd9986d76fd6fd73e944c239e2fdde156"
   "src/hpc3/core/execution_evidence.py": "bc3a48cbbc9b172c73430261d422cd2d15d6fbb1"
-  "src/hpc3/core/status.py": "2076960193a9b3b1322908b13f8abaeeaad58fd7"
+  "src/hpc3/core/status.py": "fd21ac7b9f01b07ff1ea1d2596ed75058de0e5da"
   "artifacts/wrds-controller-verification-20261028/provenance.json": "b678f473462c24db2cbd1e510ffe6c034e36a9bb"
   "artifacts/research-queue-verification-20261028/provenance.json": "3a968954ceb6b17ac3798dbf0861b744fa098ea4"
   "artifacts/research-queue-fresh-20261029/provenance.json": "da6266d1583b6ad0bab4a66f70de69aafdd8db83"
@@ -199,7 +199,7 @@ status belong to the API wiki's `wrds-baseline-readiness` page.[^inspect]
 
 [^inspect]: `src/hpc3/cli/execution_inspect.py:35` `main`; the module docstring states the two scopes.
 [^measure]: `src/hpc3/core/execution_evidence.py:77` `allocation_document`, `:154` `measure_inputs` and `:189` `measure`, which calls `measure_inputs` for its runtime and checksum checks.
-[^query]: `src/hpc3/core/status.py:33` `sacct_commands`; the recipe constructor named in provenance sets `requeue=False`. Upstream semantics are archived in tech-wiki pages `slurm-accounting-allocation-and-requeue-records` and `slurm-batch-success-and-artifact-evidence`.
+[^query]: `src/hpc3/core/status.py:34` `sacct_commands`; the recipe constructor named in provenance sets `requeue=False`. Upstream semantics are archived in tech-wiki pages `slurm-accounting-allocation-and-requeue-records` and `slurm-batch-success-and-artifact-evidence`.
 [^live]: `artifacts/wrds-controller-verification-20261028/provenance.json`, fields `attempts`, `controller_build_hashes` and `interpretation`; program-authored board reports named in provenance.
 [^repair]: API commit bda8ca2af532d89b301b56cc0b55a4346bb6e421, `research_execution.py` function `_require_trial` and regression `test_reordered_json_preserves_raw_admission_and_executes`; source and fleet evidence are named in provenance. API wiki `wrds-equity-research-protocol` records the separate monthly study and holdout requirements.
 [^wrds]: Board task 8a113204-42d0-41a0-8094-73776bae8846, program-authored post by load-report-8a113204 at 2026-10-28T19:57:42.310Z, native accounting and output digest lines.

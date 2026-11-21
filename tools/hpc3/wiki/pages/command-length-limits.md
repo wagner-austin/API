@@ -13,11 +13,11 @@ source_paths:
   - "src/hpc3/cli/triage.py"
 source_git_blobs:
   "src/hpc3/core/remote.py": "80dd48cea51b34dbd3746ae7c304c36c6ce51de1"
-  "src/hpc3/core/status.py": "2076960193a9b3b1322908b13f8abaeeaad58fd7"
+  "src/hpc3/core/status.py": "fd21ac7b9f01b07ff1ea1d2596ed75058de0e5da"
   "src/hpc3/core/squeue.py": "62002937c50a30b2a5032d082e3813d3a989b711"
   "src/hpc3/core/logs.py": "436b22a97e08bf32b046ea8e3b154796189ab614"
   "src/hpc3/core/campaign.py": "c9c4428b8cd03f5f218784bbed5ed41bb705f0fa"
-  "src/hpc3/core/cancel.py": "340fa0dbeb4c7445755bc1d087e5999964604b0d"
+  "src/hpc3/core/cancel.py": "5ae784713ed19d522ac2a609c0beb3e1f49933d3"
   "src/hpc3/cli/triage.py": "a6c3adb775f5f58d0f7cad82ceaabe3eae076f48"
 provenance:
   - "campaign existence probe truncated mid-loop, vhsearch2-r0, 2026-09-02"

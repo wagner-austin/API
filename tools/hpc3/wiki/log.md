@@ -186,3 +186,11 @@ Pages updated: node-local-scratch, cluster-facts hub, index.
 Notes: one shared mount owner, successful home-only and declared-shared probes,
 preserved import-order probe failures, and bounded scratch/isolation claims.
 Board task 0a0e5913; controller abb117967, native jobs 58776025 and 58776026.
+
+## [2026-11-21] hpc3-cancel | a pending array asked by its task ids
+Pages updated: job-arrays, command-length-limits, wrds-installed-controller-verification.
+Notes: hpc3-cancel of array 59896625 by its eight task ids cancelled the
+pending array, then reported "sacct knows no job". Its reads now share
+hpc3-watch's base-id query through read_answering_rows. The other two pages
+repin status.py and cancel.py, and the WRDS footnote moves to status.py:34.
+Board task 0f8a181b.
