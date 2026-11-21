@@ -44,6 +44,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import InvalidJsonError, JSONValue, dump_json_str, load_json_str
 
 from fleet.contracts.feed import FeedEvent, decode_feed_event, encode_feed_event
+from fleet.contracts.freed_record import FreedRecord, decode_freed_record, encode_freed_record
 from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry, encode_ledger_entry, is_live
 from fleet.contracts.node import LiveLoad
 from fleet.contracts.project import ProjectConfig
@@ -170,11 +171,26 @@ def _retire_record(path: pathlib.Path, number: int, line: str) -> RetireRecord:
     return decode_retire_record(_parse_line(path, number, line))
 
 
-#: The three files' readers, each decoding a line once per process
+def _freed_record(path: pathlib.Path, number: int, line: str) -> FreedRecord:
+    """Decode one freed record line.
+
+    Args:
+        path: The freed record file.
+        number: The line's 1-based number in it.
+        line: The line.
+
+    Returns:
+        The record.
+    """
+    return decode_freed_record(_parse_line(path, number, line))
+
+
+#: The files' readers, each decoding a line once per process
 #: (:mod:`fleet.core.record_tail`, MCPs board task a1f9d16d).
 _LEDGER: Final = record_tail.RecordTail(_ledger_row)
 _FEED: Final = record_tail.RecordTail(_feed_event)
 _RETIRES: Final = record_tail.RecordTail(_retire_record)
+_FREED: Final = record_tail.RecordTail(_freed_record)
 
 
 def read_ledger(path: pathlib.Path) -> tuple[LedgerEntry, ...]:
@@ -330,8 +346,34 @@ def append_retire(path: pathlib.Path, record: RetireRecord) -> None:
     _append_line(path, dump_json_str(encode_retire_record(record)))
 
 
+def read_freed(path: pathlib.Path) -> tuple[FreedRecord, ...]:
+    """Read every retire's freed bytes (:mod:`fleet.contracts.freed_record`).
+
+    Args:
+        path: The freed record file.
+
+    Returns:
+        Every line, in the order it was appended; none when the file is absent.
+
+    Raises:
+        JSONTypeError: If a line is not JSON or does not decode.
+    """
+    return _FREED.read(path)
+
+
+def append_freed(path: pathlib.Path, record: FreedRecord) -> None:
+    """Append what one retire freed.
+
+    Args:
+        path: The freed record file.
+        record: The line to record.
+    """
+    _append_line(path, dump_json_str(encode_freed_record(record)))
+
+
 __all__ = [
     "append_feed",
+    "append_freed",
     "append_ledger",
     "append_retire",
     "latest_rows",

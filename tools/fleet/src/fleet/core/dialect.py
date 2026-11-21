@@ -44,7 +44,6 @@ A COMMAND IS AN ARGUMENT VECTOR, NOT A LINE, since MCPs board task d69786fa
 
 from __future__ import annotations
 
-import posixpath
 import shlex
 
 from fleet.contracts.action_cache import STATUS_FRESH_MINUTES, STATUS_PATH
@@ -55,9 +54,9 @@ from fleet.contracts.runner_slice import CI_SLICE_NAME
 from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
-from fleet.core.check_results import retained_results_path, sh_results_lines, sh_retire_lines
+from fleet.core.check_results import sh_results_lines
 from fleet.core.linux_capacity_probe import CAPACITY_PROBE_BODY
-from fleet.core.linux_isolated_build import EXEC_HOME_LINE, exec_root, isolated_build_lines
+from fleet.core.linux_isolated_build import isolated_build_lines
 from fleet.core.linux_loopback import BUILD_EXPORTS, recipe_command
 from fleet.core.linux_observe_sessions import OBSERVE_SESSIONS_PYTHON
 from fleet.core.linux_toolchain_probe import TOOLCHAIN_PROBE_BODY
@@ -257,74 +256,6 @@ def make_directory_script(target: str) -> str:
         ``mkdir -p`` of it.
     """
     return checked_script((("mkdir", "-p", target),))
-
-
-def retire_script(
-    *, stage_root: str, run_id: str, retained: str, scripts: tuple[str, ...], isolated: bool
-) -> str:
-    """Keep a settled run's transcript, then remove its directories and scripts.
-
-    Run once the runner has read the transcript's tail, when a run has
-    finished, been stopped past its lease or been cancelled (MCPs board task
-    bfca20e6): nothing reads the export again, and a stage root that kept
-    every one filled diphtheria's disk. The run's transient unit needs no
-    removal: the launch starts it with ``--collect``, so the manager unloads
-    it when the build exits, failed or not.
-
-    Args:
-        stage_root: The node's declared stage root.
-        run_id: The dispatch; its enclosure (:func:`fleet.core.names.run_enclosure`)
-            goes whole, named by the run so no path can make it the stage root.
-        retained: Where its transcript is kept, under the stage root's logs
-            directory, which is created if absent; its check results go
-            beside it (:func:`fleet.core.check_results.sh_retire_lines`).
-        scripts: The scripts it left under the stage root, this one included.
-        isolated: Whether the node runs docker projects' builds as
-            execdocker; the run's copy in that user's home then goes too, as
-            root, which such a build removes itself only when it runs to its
-            end (:mod:`fleet.core.linux_isolated_build`).
-
-    Returns:
-        The script's text. ``mv`` is guarded because a run cancelled before
-        its build started wrote no transcript; ``rm -rf`` and ``rm -f`` need
-        no guard for what is already gone, and ``-f`` removes the read-only
-        objects of the repository staged there. ``rm -rf`` empties a
-        directory only with all three of its owner's bits: read to list its
-        entries, search to reach them and write to unlink them. So each of the
-        run's own directories lacking any of the three gets all three back
-        first, each as ``find`` reaches it and before it descends, since
-        ``find`` cannot list a directory it may not read either (``-exec ...
-        ;``, never a batched ``+``). The write bit alone came first (MCPs
-        board task 05dd6588): since MCPs f27b4822e seals release payloads
-        read-only, every MCPs packages/maketools run leaves fixture releases
-        sealed under its ``.pytest-tmp``, and from 2026-10-23T23:26Z to
-        2026-10-24T03:51Z the retires of 15 such runs on six nodes stopped at
-        ``rm -rf``, stranding them. The read bit followed (MCPs board task
-        1526ece1): on 2026-11-20T14:14Z loki's retire of
-        MCPs-packages-maketools-loki-1795212710 stopped at that ``find``, on
-        two ``.pytest-tmp`` directories of mode 0355, and left 1.2 GB no
-        later pass removed. Neither ``find`` nor ``rm`` follows a link, so a
-        linked companion is untouched. Every step tolerates what an earlier
-        attempt already did, so a retire that failed part way succeeds when
-        rerun.
-    """
-    target = names.dispatch_directory(stage_root, run_id)
-    log = shlex.quote(names.log_path(target))
-    enclosure = shlex.quote(names.run_enclosure(stage_root, run_id))
-    results = retained_results_path(stage_root, run_id)
-    lines = [
-        f"mkdir -p {shlex.quote(posixpath.dirname(retained))}",
-        f"if [ -e {log} ]; then mv -f {log} {shlex.quote(retained)}; fi",
-        *sh_retire_lines(target=target, retained=results),
-        f"if [ -d {enclosure} ]; then "
-        f"find {enclosure} -type d ! -perm -u=rwx -exec chmod u+rwx {{}} \\; ; fi",
-        f"rm -rf {enclosure}",
-        "rm -f " + " ".join(shlex.quote(script) for script in scripts),
-    ]
-    if isolated:
-        copy = exec_root(run_id)
-        lines += [EXEC_HOME_LINE, f'sudo -n rm -rf "{copy}" "{names.staging_directory(copy)}"']
-    return PROLOGUE + "".join(f"{line}\n" for line in lines)
 
 
 def digest_script(target: str) -> str:
@@ -564,7 +495,6 @@ __all__ = [
     "fleet_directory",
     "make_directory_script",
     "result_script",
-    "retire_script",
     "script_path",
     "stop_script",
     "write_command",

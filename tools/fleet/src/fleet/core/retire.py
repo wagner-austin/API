@@ -42,8 +42,19 @@ judges every generation, not the run's alone.
 
 from __future__ import annotations
 
+from typing import Final
+
+from platform_core.errors import FleetErrorCode
+from typing_extensions import TypedDict
+
 from fleet.contracts.node import NodeConfig
 from fleet.core import dialect, names, remote
+from fleet.core.retire_script import (
+    RetireAnswer,
+    answer_missing,
+    parse_retire_answer,
+    retire_script,
+)
 
 
 def runs_isolated(node: NodeConfig) -> bool:
@@ -59,9 +70,27 @@ def runs_isolated(node: NodeConfig) -> bool:
     return node["docker"] is not None
 
 
-def attempt_retire_on_node(node: NodeConfig, *, run_id: str) -> remote.RemoteOutcome:
+class RetireAttempt(TypedDict):
+    """What one retire sent to a node came to.
+
+    Attributes:
+        answer: The node's answer: the process that kept the run whole, or
+            the bytes its removal freed. :data:`UNANSWERED` when ``failure``
+            is set.
+        failure: ``None`` when the node answered; otherwise why it did not.
+    """
+
+    answer: RetireAnswer
+    failure: remote.RemoteFailure | None
+
+
+#: The answer an attempt carries beside a failure: no holder, nothing freed.
+UNANSWERED: Final = RetireAnswer(holder=None, freed_bytes=0)
+
+
+def attempt_retire_on_node(node: NodeConfig, *, run_id: str) -> RetireAttempt:
     """Keep one dispatch's transcript and remove its export and root scripts,
-    reporting a failure as a value.
+    unless a process uses them, reporting a failure as a value.
 
     Sent only by :mod:`fleet.core.retire_owed`, which records each retire
     done in the record that has owed it since the run's lease: a settle,
@@ -75,15 +104,17 @@ def attempt_retire_on_node(node: NodeConfig, *, run_id: str) -> remote.RemoteOut
         run_id: The dispatch.
 
     Returns:
-        The script's output, or the failure: ``NODE_UNREACHABLE`` when ssh
-        could not reach the node or timed out, ``DISPATCH_FAILED`` carrying
-        the node's own error when a file could not be moved or removed.
+        The node's answer (:func:`fleet.core.retire_script.parse_retire_answer`),
+        or the failure: ``NODE_UNREACHABLE`` when ssh could not reach the
+        node or timed out, ``DISPATCH_FAILED`` carrying the node's own error
+        when a file could not be moved or removed, or naming the line it
+        ended on when the script exited 0 without an answer.
     """
     stage_root = node["stage_root"]
-    return remote.attempt_script(
+    outcome = remote.attempt_script(
         node["host"],
         dialect.script_path(stage_root, names.retire_stem(run_id)),
-        dialect.retire_script(
+        retire_script(
             stage_root=stage_root,
             run_id=run_id,
             retained=names.retained_log_path(stage_root, run_id),
@@ -93,6 +124,17 @@ def attempt_retire_on_node(node: NodeConfig, *, run_id: str) -> remote.RemoteOut
             isolated=runs_isolated(node),
         ),
     )
+    failure = outcome["failure"]
+    if failure is not None:
+        return RetireAttempt(answer=UNANSWERED, failure=failure)
+    answer = parse_retire_answer(outcome["output"])
+    if answer is None:
+        missing = answer_missing(node["host"], outcome["output"])
+        return RetireAttempt(
+            answer=UNANSWERED,
+            failure=remote.RemoteFailure(code=FleetErrorCode.DISPATCH_FAILED, message=missing),
+        )
+    return RetireAttempt(answer=answer, failure=None)
 
 
-__all__ = ["attempt_retire_on_node", "runs_isolated"]
+__all__ = ["UNANSWERED", "RetireAttempt", "attempt_retire_on_node", "runs_isolated"]

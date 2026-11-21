@@ -34,6 +34,7 @@ from fleet.contracts.node import LiveLoad
 from fleet.core import _test_hooks, manifest, staging
 from fleet.core import _test_hooks_attempts as attempt_hooks
 from tests._registry import write_registry
+from tests._retire_answers import RETIRED_OUTPUT
 from tests._roll_reads import extracted_registry
 from tests._roster_fixtures import machine_document
 from tests._thread_fakes import in_order_executor
@@ -397,7 +398,7 @@ def retire_replies() -> list[_test_hooks.CommandResult]:
     """
     return [
         ok(""),  # retire: send the script
-        ok(""),  # retire: run it
+        ok(RETIRED_OUTPUT),  # retire: run it, its answer the bytes it freed
         ok(""),  # generations: send the script (MCPs board task 346abc45)
         ok(
             "cache-generations: /home/corvis/fleet/stage/cache/tools: none yet\n"

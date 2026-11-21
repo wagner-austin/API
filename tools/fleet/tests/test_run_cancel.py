@@ -31,6 +31,7 @@ from fleet.core import (
     names,
     records,
     retire,
+    retire_script,
     run_lease,
     staging,
 )
@@ -333,7 +334,7 @@ class TestCancel:
         node = loaded.workspace["nodes"][records.read_ledger(loaded.ledger)[0]["node"]]
         assert runner.stdin[0] == dialect.stop_script(DEMO_RUN_ID).encode("utf-8")
         stage_root = node["stage_root"]
-        retire_body = dialect.retire_script(
+        retire_body = retire_script.retire_script(
             stage_root=stage_root,
             run_id=DEMO_RUN_ID,
             retained=names.retained_log_path(stage_root, DEMO_RUN_ID),

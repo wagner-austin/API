@@ -39,6 +39,15 @@ ONE RUN'S RETIRE IS SENT IN ITS OWN TURN, held across the hub's runners
 done: a settle frees its lease before it retires, so a collect pass can find
 the same run owed and no longer live while the settle is still retiring it.
 
+A RUN A PROCESS STILL USES IS KEPT, AND STAYS OWED (MCPs board task 1526ece1).
+A lapsed lease and a closed ledger row do not prove a run's tree unused, so
+the node is asked (:mod:`fleet.core.retire_script`): a process with its
+working directory or an open file inside the run's enclosure keeps it whole,
+nothing is written, and the pass goes on to the node's next owed run; a stop
+or the hub's collect, which retire before the row closes, raise
+``RESOURCE_HELD`` for it. Every retire done appends the bytes its enclosure
+held to :data:`FREED_FILE` beside the record (:mod:`fleet.contracts.freed_record`).
+
 A retire the node ANSWERED and failed is a fault: it is recorded ``failed``
 and raised by name with the node's own error, and no pass sends it again,
 because a pass that resent it would end every serve after it the same way;
@@ -52,11 +61,13 @@ import contextlib
 import os
 import pathlib
 from collections.abc import Generator
+from enum import StrEnum
 from typing import Final
 
 from platform_core.errors import AppError, FleetErrorCode
 from platform_core.logging import get_logger
 
+from fleet.contracts.freed_record import FreedRecord
 from fleet.contracts.ledger import is_live
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.retire_record import RetireRecord, RetireState
@@ -78,6 +89,37 @@ RETIRES_FILE: Final = "retires.jsonl"
 
 #: Where each run's retire turn is held, beside the record.
 RETIRE_TURNS_DIRECTORY: Final = "retire-turns"
+
+#: What each retire done freed, beside the record (MCPs board task 1526ece1).
+FREED_FILE: Final = "freed.jsonl"
+
+
+class RetireOutcome(StrEnum):
+    """What one :func:`retire_or_owe` came to.
+
+    ``ended`` when the run owes nothing more: retired here, or already
+    retired or failed in another turn; ``unanswered`` when the node did not
+    answer, so its other owed runs wait for the next pass too; ``in-use``
+    when the node answered that a process uses the run's directory, which it
+    kept whole, so the run stays owed and the node's next run is sent.
+    """
+
+    ENDED = "ended"
+    UNANSWERED = "unanswered"
+    IN_USE = "in-use"
+
+
+def freed_path(path: pathlib.Path) -> pathlib.Path:
+    """Where the bytes each retire freed are recorded.
+
+    Args:
+        path: The retire record file.
+
+    Returns:
+        :data:`FREED_FILE` beside it.
+    """
+    return path.parent / FREED_FILE
+
 
 #: The turn one run's retire is sent and recorded in. Inside it a runner
 #: sends the retire script and runs it, two ssh calls of at most
@@ -208,14 +250,17 @@ def owe(path: pathlib.Path, *, alias: str, run_id: str) -> None:
     )
 
 
-def _retired(path: pathlib.Path, node: NodeConfig, *, alias: str, run_id: str) -> str:
-    """Record a run whose retire the node answered and did.
+def _retired(
+    path: pathlib.Path, node: NodeConfig, *, alias: str, run_id: str, freed_bytes: int
+) -> str:
+    """Record a run whose retire the node answered and did, and what it freed.
 
     Args:
         path: The retire record file.
         node: The node the run ran on.
         alias: That node's workspace name.
         run_id: The run.
+        freed_bytes: The bytes its enclosure held when removed.
 
     Returns:
         Where its transcript is now kept on the node.
@@ -228,7 +273,25 @@ def _retired(path: pathlib.Path, node: NodeConfig, *, alias: str, run_id: str) -
         state=RetireState.RETIRED,
         detail=f"its transcript is kept at {retained}",
     )
+    records.append_freed(
+        freed_path(path),
+        FreedRecord(run_id=run_id, node=alias, at_unix=_test_hooks.now(), freed_bytes=freed_bytes),
+    )
     return retained
+
+
+def _in_use(alias: str, run_id: str, holder: str) -> str:
+    """Say that a node kept a run whole because a process uses it.
+
+    Args:
+        alias: The node's workspace name.
+        run_id: The run.
+        holder: The ``/proc`` link and the path in the run it names.
+
+    Returns:
+        The sentence.
+    """
+    return f"retire {run_id} on {alias}: kept whole and still owed, a process uses it: {holder}"
 
 
 def retire_or_raise(path: pathlib.Path, node: NodeConfig, *, alias: str, run_id: str) -> str:
@@ -252,19 +315,27 @@ def retire_or_raise(path: pathlib.Path, node: NodeConfig, *, alias: str, run_id:
     Raises:
         AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` from the
             transport, the latter carrying the node's own error when a file
-            could not be moved or removed.
+            could not be moved or removed; or ``RESOURCE_HELD`` when a
+            process uses the run's directory, which the node kept whole.
     """
     with _turn(path, run_id):
         if _latest_state(path, run_id) is RetireState.RETIRED:
             return names.retained_log_path(node["stage_root"], run_id)
-        failure = retire.attempt_retire_on_node(node, run_id=run_id)["failure"]
+        attempt = retire.attempt_retire_on_node(node, run_id=run_id)
+        failure, answer = attempt["failure"], attempt["answer"]
         if failure is not None:
             raise AppError(failure["code"], failure["message"])
-        return _retired(path, node, alias=alias, run_id=run_id)
+        holder = answer["holder"]
+        if holder is not None:
+            raise AppError(FleetErrorCode.RESOURCE_HELD, _in_use(alias, run_id, holder))
+        return _retired(path, node, alias=alias, run_id=run_id, freed_bytes=answer["freed_bytes"])
 
 
-def retire_or_owe(path: pathlib.Path, node: NodeConfig, *, alias: str, run_id: str) -> bool:
-    """Retire a run whose row is closed, or leave it owed when the node did not answer.
+def retire_or_owe(
+    path: pathlib.Path, node: NodeConfig, *, alias: str, run_id: str
+) -> RetireOutcome:
+    """Retire a run whose row is closed, or leave it owed when the node did not
+    answer or a process uses it.
 
     For a node runner's settle, which retires after the queue close and the
     row's, and for :func:`retire_owed`. The run has been owed since its
@@ -279,9 +350,10 @@ def retire_or_owe(path: pathlib.Path, node: NodeConfig, *, alias: str, run_id: s
         run_id: The run.
 
     Returns:
-        True when the run owes nothing more: retired here, or ended by
-        another turn; False when the node did not answer and
-        :func:`retire_owed` retires it at a later pass.
+        :class:`RetireOutcome`: ``ended`` when the run owes nothing more,
+        ``unanswered`` when the node did not answer, ``in-use`` when a
+        process uses its directory; :func:`retire_owed` retires either of the
+        last two at a later pass, writing nothing now.
 
     Raises:
         AppError: ``DISPATCH_FAILED`` with the node's own error when it
@@ -292,12 +364,18 @@ def retire_or_owe(path: pathlib.Path, node: NodeConfig, *, alias: str, run_id: s
         ended = _latest_state(path, run_id)
         if ended is RetireState.RETIRED or ended is RetireState.FAILED:
             _log.info("retire %s on %s: already %s in another turn", run_id, alias, ended)
-            return True
-        failure = retire.attempt_retire_on_node(node, run_id=run_id)["failure"]
+            return RetireOutcome.ENDED
+        attempt = retire.attempt_retire_on_node(node, run_id=run_id)
+        failure, answer = attempt["failure"], attempt["answer"]
         if failure is None:
-            _retired(path, node, alias=alias, run_id=run_id)
-            _log.info("retire %s on %s: done", run_id, alias)
-            return True
+            holder = answer["holder"]
+            if holder is not None:
+                _log.info("%s", _in_use(alias, run_id, holder))
+                return RetireOutcome.IN_USE
+            freed = answer["freed_bytes"]
+            _retired(path, node, alias=alias, run_id=run_id, freed_bytes=freed)
+            _log.info("retire %s on %s: done, %d bytes freed", run_id, alias, freed)
+            return RetireOutcome.ENDED
         if failure["code"] is FleetErrorCode.NODE_UNREACHABLE:
             _log.info(
                 "retire %s on %s: the node did not answer; owed to the next collect pass: %s",
@@ -305,7 +383,7 @@ def retire_or_owe(path: pathlib.Path, node: NodeConfig, *, alias: str, run_id: s
                 alias,
                 failure["message"],
             )
-            return False
+            return RetireOutcome.UNANSWERED
         _record(
             path, alias=alias, run_id=run_id, state=RetireState.FAILED, detail=failure["message"]
         )
@@ -427,19 +505,24 @@ def retire_owed(
     for run_id in owed:
         if run_id in live:
             continue
-        if not retire_or_owe(path, node, alias=alias, run_id=run_id):
+        outcome = retire_or_owe(path, node, alias=alias, run_id=run_id)
+        if outcome is RetireOutcome.UNANSWERED:
             # The node did not answer this one, so the rest wait for the
             # next pass rather than each spending its own timeout.
             break
-        retired += 1
+        if outcome is RetireOutcome.ENDED:
+            retired += 1
     if retired:
         cache_generations.remove_unused_on_node(node)
 
 
 __all__ = [
+    "FREED_FILE",
     "RETIRES_FILE",
     "RETIRE_TURN",
     "RETIRE_TURNS_DIRECTORY",
+    "RetireOutcome",
+    "freed_path",
     "live_runs",
     "owe",
     "owe_again",

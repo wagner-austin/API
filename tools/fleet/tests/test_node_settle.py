@@ -147,6 +147,10 @@ class TestASettleLogsEachFactOnce:
                 [UNANSWERED_RETIRE],
                 "its row is finished and the retire is owed until lavender answers",
             ),
+            (
+                [ok(""), ok(f"in-use /proc/4242/cwd /home/corvis/fleet/stage/{DEMO_RUN_ID}\n")],
+                "its row is finished and the retire is owed while a process uses its directory",
+            ),
         ],
     )
     def test_the_verdict_once_then_what_followed(

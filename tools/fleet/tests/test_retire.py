@@ -19,6 +19,13 @@ from fleet.contracts.node import NodeConfig
 from fleet.core import _test_hooks, dialect, names, retire
 from fleet.core.dialect import PROLOGUE
 from fleet.core.linux_isolated_build import EXEC_HOME_LINE
+from fleet.core.retire_script import (
+    SCAN_BLIND,
+    RetireAnswer,
+    parse_retire_answer,
+    retire_script,
+)
+from tests._retire_answers import RETIRED_BYTES
 from tests.conftest import DEMO_RUN_ID, FakeRun, failed, ok, retire_replies
 
 #: The stage root, as the roster declares it.
@@ -65,7 +72,7 @@ def _retire_script(*, isolated: bool) -> str:
     Returns:
         The script's text.
     """
-    return dialect.retire_script(
+    return retire_script(
         stage_root=STAGE_ROOT,
         run_id=DEMO_RUN_ID,
         retained=names.retained_log_path(STAGE_ROOT, DEMO_RUN_ID),
@@ -93,7 +100,9 @@ def test_it_sends_the_retire_to_the_stage_root_runs_it_and_names_the_kept_transc
 
     outcome = retire.attempt_retire_on_node(_node(), run_id=DEMO_RUN_ID)
 
-    assert outcome["failure"] is None
+    assert outcome == retire.RetireAttempt(
+        answer=RetireAnswer(holder=None, freed_bytes=RETIRED_BYTES), failure=None
+    )
     kept = names.retained_log_path(STAGE_ROOT, DEMO_RUN_ID)
     assert kept == f"{STAGE_ROOT}/logs/{DEMO_RUN_ID}.log"
     # The script sent and run, and no generations' removal: each caller
@@ -124,6 +133,7 @@ def test_a_node_running_isolated_builds_retires_the_run_s_execdocker_copy_too() 
     assert sent.endswith(
         f'{EXEC_HOME_LINE}\nsudo -n rm -rf "$exec_home/fleet/stage/{DEMO_RUN_ID}" '
         f'"$exec_home/fleet/stage/{DEMO_RUN_ID}.stage"\n'
+        'echo "freed ${freed%%[[:space:]]*}"\n'
     )
 
 
@@ -144,10 +154,53 @@ def test_a_retire_that_fails_reports_its_transport_code(
     that answered and failed (fleet.core.retire_owed), so both are values."""
     _test_hooks.run = FakeRun([ok(""), result])
 
-    failure = retire.attempt_retire_on_node(_node(), run_id=DEMO_RUN_ID)["failure"]
+    attempt = retire.attempt_retire_on_node(_node(), run_id=DEMO_RUN_ID)
 
+    failure = attempt["failure"]
     codes = [failure["code"]] if failure is not None else []
     assert codes == [code]
+    assert attempt["answer"] == retire.UNANSWERED
+
+
+@pytest.mark.parametrize(
+    ("output", "answer"),
+    [
+        (
+            f"in-use /proc/7/cwd {STAGE_ROOT}/r/r\n",
+            RetireAnswer(holder=f"/proc/7/cwd {STAGE_ROOT}/r/r", freed_bytes=0),
+        ),
+        (
+            "in-use /proc/7/fd/3 /s/r/log with space\n",
+            RetireAnswer(holder="/proc/7/fd/3 /s/r/log with space", freed_bytes=0),
+        ),
+        ("moved\nfreed 0\n", RetireAnswer(holder=None, freed_bytes=0)),
+        ("freed 1234\n", RetireAnswer(holder=None, freed_bytes=1234)),
+        ("", None),
+        ("freed\n", None),
+        ("freed -3\n", None),
+        ("freed 12 bytes\n", None),
+        ("in-use /proc/7/cwd relative\n", None),
+        ("in-use /proc/self/cwd /s\n", None),
+        ("freed 1\nmoved\n", None),
+    ],
+)
+def test_the_answer_is_the_last_line_and_nothing_else(
+    output: str, answer: RetireAnswer | None
+) -> None:
+    assert parse_retire_answer(output) == answer
+
+
+def test_an_answer_missing_is_a_dispatch_failure_naming_the_line() -> None:
+    _test_hooks.run = FakeRun([ok(""), ok("half\n")])
+
+    attempt = retire.attempt_retire_on_node(_node(), run_id=DEMO_RUN_ID)
+
+    assert attempt["answer"] == retire.UNANSWERED
+    assert attempt["failure"] == {
+        "code": FleetErrorCode.DISPATCH_FAILED,
+        "message": "node-1's retire ended without its answer: its last line was 'half', "
+        "not 'in-use <link> <target>' or 'freed <bytes>'",
+    }
 
 
 def seal(release: pathlib.Path) -> None:
@@ -239,16 +292,23 @@ class TestTheShScriptRunsForReal:
             (basetemp / name).chmod(mode)
         return target
 
-    def retire(self, root: pathlib.Path) -> None:
+    def run_retire(
+        self, root: pathlib.Path, *, home: pathlib.Path | None = None
+    ) -> subprocess.CompletedProcess[str]:
         """Render the retire for ``root`` and run it by its own path, as a node does.
 
         Args:
             root: The stage root.
+            home: A ``HOME`` for the script, whose ``.local/bin`` the
+                prologue puts first on ``PATH``; this process's when None.
+
+        Returns:
+            What bash did.
         """
         stage_root = root.as_posix()
         script = pathlib.Path(root / f"{names.retire_stem(DEMO_RUN_ID)}.sh")
         script.write_text(
-            dialect.retire_script(
+            retire_script(
                 stage_root=stage_root,
                 run_id=DEMO_RUN_ID,
                 retained=names.retained_log_path(stage_root, DEMO_RUN_ID),
@@ -260,14 +320,89 @@ class TestTheShScriptRunsForReal:
             ),
             encoding="utf-8",
         )
-        ran = subprocess.run(
-            ["bash", script.as_posix()],
+        homed = () if home is None else ("env", f"HOME={home.as_posix()}")
+        return subprocess.run(
+            [*homed, "bash", script.as_posix()],
             capture_output=True,
             text=True,
             check=False,
             timeout=120,
         )
+
+    def retire(self, root: pathlib.Path) -> str:
+        """Run the retire for ``root``, which must succeed.
+
+        Args:
+            root: The stage root.
+
+        Returns:
+            Its standard output.
+        """
+        ran = self.run_retire(root)
         assert ran.returncode == 0, ran.stderr
+        return ran.stdout
+
+    def test_a_process_in_the_tree_keeps_it_whole_until_it_ends(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A shell left in the run's tree: nothing is moved or removed while it lives."""
+        target = self.lay_out(tmp_path, transcript=True)
+        process = subprocess.Popen(["sleep", "300"], cwd=target / "packages")
+        answer = parse_retire_answer(self.retire(tmp_path))
+        process.kill()
+        process.wait(timeout=10)
+
+        assert answer == RetireAnswer(
+            holder=f"/proc/{process.pid}/cwd {(target / 'packages').as_posix()}", freed_bytes=0
+        )
+        assert (target / f"{names.RESULT_NAME}.log").is_file()
+        assert (tmp_path / f"{names.retire_stem(DEMO_RUN_ID)}.sh").is_file()
+        assert not (tmp_path / "logs").exists()
+
+        freed = parse_retire_answer(self.retire(tmp_path))
+
+        assert freed is not None and freed["holder"] is None and freed["freed_bytes"] > 0
+        assert not target.exists()
+        assert self.outside_modes(tmp_path) == [0o555, 0o555]
+
+    def test_an_open_file_in_the_tree_keeps_it_whole(self, tmp_path: pathlib.Path) -> None:
+        target = self.lay_out(tmp_path, transcript=False)
+        held = target / names.RESULT_NAME
+        with held.open("rb") as handle:
+            process = subprocess.Popen(["sleep", "300"], stdin=handle)
+        answer = parse_retire_answer(self.retire(tmp_path))
+        process.kill()
+        process.wait(timeout=10)
+
+        assert answer == RetireAnswer(
+            holder=f"/proc/{process.pid}/fd/0 {held.as_posix()}", freed_bytes=0
+        )
+        assert held.is_file()
+        self.retire(tmp_path)
+        assert not target.exists()
+        assert self.outside_modes(tmp_path) == [0o555, 0o555]
+
+    def test_a_find_that_cannot_read_proc_links_fails_the_retire_and_touches_nothing(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A ``find`` without ``-printf``, standing first on ``PATH``, reads
+        no link: the retire stops by name rather than answering that nothing
+        uses the run."""
+        target = self.lay_out(tmp_path, transcript=True)
+        home = tmp_path / "home"
+        shim = home / ".local" / "bin" / "find"
+        shim.parent.mkdir(parents=True)
+        shim.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        shim.chmod(0o755)
+
+        ran = self.run_retire(tmp_path, home=home)
+
+        assert ran.returncode == 1
+        assert ran.stderr.startswith(f"{SCAN_BLIND}: find read /proc/")
+        assert ran.stdout == ""
+        assert (target / f"{names.RESULT_NAME}.log").is_file()
+        assert self.outside_modes(tmp_path) == [0o555, 0o555]
+        self.retire(tmp_path)
 
     def test_it_keeps_the_transcript_and_removes_the_tree_and_the_run_s_root_scripts(
         self, tmp_path: pathlib.Path

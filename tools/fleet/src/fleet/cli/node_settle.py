@@ -201,10 +201,17 @@ def settle(
     # waiting on housekeeping (fleet.core.retire, MCPs board task 8993c306).
     # A node that did not answer owes the retire to a later collect pass,
     # which removes the unread generations after it (MCPs board task 8776b828).
-    # The close logged the verdict; this line says what followed it.
-    if retire_owed.retire_or_owe(loaded.retires, node, alias=row["node"], run_id=row["run_id"]):
+    # A directory a process still uses is kept and owed the same way (MCPs
+    # board task 1526ece1). The close logged the verdict; this line says what
+    # followed it.
+    retired = retire_owed.retire_or_owe(
+        loaded.retires, node, alias=row["node"], run_id=row["run_id"]
+    )
+    if retired is retire_owed.RetireOutcome.ENDED:
         cache_generations.remove_unused_on_node(node)
         after = "its row is finished and its directory retired"
+    elif retired is retire_owed.RetireOutcome.IN_USE:
+        after = "its row is finished and the retire is owed while a process uses its directory"
     else:
         after = f"its row is finished and the retire is owed until {row['node']} answers"
     return Collected(outcome=CollectOutcome.SETTLED, line=f"{encode_job_line(job)}: {after}")
