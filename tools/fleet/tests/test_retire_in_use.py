@@ -8,14 +8,13 @@ script, its ssh carried out on this machine by the real subprocess run, so
 the script's ``/proc`` scan is what decides. A held lease sends nothing; a
 lapsed lease with the process alive keeps the directory and the run owed;
 the process ended, the next pass removes it and records the bytes it held,
-counted here by summing every entry's apparent size, as ``du -sb`` does.
+the sizes of the two files the fixture wrote, worked by hand.
 The scripted-answer cases beside them pin what each answer makes the record
 say, and that an answer missing is a fault, never a retire.
 """
 
 from __future__ import annotations
 
-import os
 import pathlib
 import subprocess
 from collections.abc import Generator, Sequence
@@ -67,20 +66,9 @@ def _on_this_machine(
     )
 
 
-def _apparent_bytes(root: pathlib.Path) -> int:
-    """Every entry's apparent size under ``root``, itself included: ``du -sb``'s count.
-
-    Args:
-        root: The directory.
-
-    Returns:
-        The sum of ``st_size`` over it and everything beneath it.
-    """
-    total = root.lstat().st_size
-    for parent, directories, files in os.walk(root):
-        for name in (*directories, *files):
-            total += (pathlib.Path(parent) / name).lstat().st_size
-    return total
+#: What the fixture's export holds, worked by hand: build/out.bin's 70000
+#: bytes and the result file's "0\n", its directories not counted.
+EXPORT_BYTES = 70_000 + 2
 
 
 def _lease(run_id: str, *, expires: int) -> Lease:
@@ -156,7 +144,6 @@ class TestARealProcessKeepsItsRun:
 
         # The process ended: the next pass removes the run and records what
         # its enclosure held.
-        held = _apparent_bytes(enclosure)
         holder.kill()
         holder.wait(timeout=10)
         _pass(path, runs, at)
@@ -164,10 +151,12 @@ class TestARealProcessKeepsItsRun:
         assert retire_owed.owed_on(path, alias="lavender") == ()
         assert records.read_freed(retire_owed.freed_path(path)) == (
             FreedRecord(
-                run_id=DEMO_RUN_ID, node="lavender", at_unix=DEMO_NOW + 601, freed_bytes=held
+                run_id=DEMO_RUN_ID,
+                node="lavender",
+                at_unix=DEMO_NOW + 601,
+                freed_bytes=EXPORT_BYTES,
             ),
         )
-        assert held > 70_000
 
 
 class TestEachAnswer:

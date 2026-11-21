@@ -18,9 +18,15 @@ reads its own working directory the same way and stops with a named error
 when that fails, so a node whose ``find`` cannot read the links fails the
 retire rather than answering that nothing uses the run.
 
-THE BYTES ARE COUNTED BEFORE THE REMOVAL, by ``du -sb`` of the enclosure once
-its directories are listable again, and printed as the answer, so the hub
-records what each retire freed (:mod:`fleet.contracts.freed_record`).
+THE BYTES ARE COUNTED BEFORE THE REMOVAL, once the enclosure's directories
+are listable again: the apparent size of every entry in it that is not a
+directory, as ``find -printf '%s'`` reads each and ``awk`` sums them, printed
+as the answer so the hub records what each retire freed
+(:mod:`fleet.contracts.freed_record`). Not ``du -sb``, whose count of a
+directory's own size differs by implementation: on serendipity it counted
+none, 70002 bytes for a tree whose entries' sizes, directories included,
+sum to 82290 (fleet job 2690db78). Each step's status is its own, so a
+``find`` that fails fails the retire rather than reading as fewer bytes.
 """
 
 from __future__ import annotations
@@ -154,14 +160,15 @@ def retire_script(
         "freed=0",
         f"if [ -d {enclosure} ]; then "
         f"find {enclosure} -type d ! -perm -u=rwx -exec chmod u+rwx {{}} \\; ; "
-        f"freed=$(du -sb {enclosure}); fi",
+        f"sizes=$(find {enclosure} ! -type d -printf '%s\\n'); "
+        "freed=$(printf '%s\\n' \"$sizes\" | awk '{ s += $1 } END { print s + 0 }'); fi",
         f"rm -rf {enclosure}",
         "rm -f " + " ".join(shlex.quote(script) for script in scripts),
     ]
     if isolated:
         copy = exec_root(run_id)
         lines += [EXEC_HOME_LINE, f'sudo -n rm -rf "{copy}" "{names.staging_directory(copy)}"']
-    lines.append(f'echo "{FREED_WORD} ${{freed%%[[:space:]]*}}"')
+    lines.append(f'echo "{FREED_WORD} $freed"')
     return PROLOGUE + "".join(f"{line}\n" for line in lines)
 
 

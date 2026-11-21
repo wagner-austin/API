@@ -62,8 +62,9 @@ CALLED: Final[frozenset[str]] = frozenset(
 #: since MCPs bb5b71db0. The 23rd is
 #: :func:`fleet.core.main_history.held_heads`'s ``dispatch_main_heads``
 #: (MCPs board task ecd088e0), which fleet-mcp must serve before the roll
-#: that calls it.
-CALL_SITES: Final[int] = 23
+#: that calls it. The 24th is :mod:`fleet.cli.freed_report`'s ``task_post``
+#: of the per-node bytes retires freed (MCPs board task 1526ece1).
+CALL_SITES: Final[int] = 24
 
 
 def constants(tree: ast.Module) -> dict[str, str]:

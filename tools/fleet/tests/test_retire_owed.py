@@ -147,7 +147,10 @@ class TestASettleRetire:
         runner = FakeRun(retire_replies()[:2])
         _test_hooks.run = runner
 
-        assert retire_owed.retire_or_owe(path, node(), alias="lavender", run_id=DEMO_RUN_ID)
+        assert (
+            retire_owed.retire_or_owe(path, node(), alias="lavender", run_id=DEMO_RUN_ID)
+            is retire_owed.RetireOutcome.ENDED
+        )
 
         assert len(runner.calls) == 2
         retired = records.read_retires(path)[1]
@@ -162,7 +165,10 @@ class TestASettleRetire:
         retire_owed.owe(path, alias="lavender", run_id=DEMO_RUN_ID)
         _test_hooks.run = FakeRun([ok(""), timed_out(remote.SSH_TIMEOUT_SECONDS)])
 
-        assert not retire_owed.retire_or_owe(path, node(), alias="lavender", run_id=DEMO_RUN_ID)
+        assert (
+            retire_owed.retire_or_owe(path, node(), alias="lavender", run_id=DEMO_RUN_ID)
+            is retire_owed.RetireOutcome.UNANSWERED
+        )
 
         assert _states(path) == [(DEMO_RUN_ID, "lavender", RetireState.OWED)]
         assert retire_owed.owed_on(path, alias="lavender") == (DEMO_RUN_ID,)
@@ -247,7 +253,10 @@ class TestOneRunsTurn:
         settle = _InTurn(retire_replies()[:2], lock=lock)
         _test_hooks.run = settle
 
-        assert retire_owed.retire_or_owe(path, node(), alias="lavender", run_id=DEMO_RUN_ID)
+        assert (
+            retire_owed.retire_or_owe(path, node(), alias="lavender", run_id=DEMO_RUN_ID)
+            is retire_owed.RetireOutcome.ENDED
+        )
 
         assert settle.held == [True, True]
         assert not lock.exists()
@@ -291,7 +300,10 @@ class TestOneRunsTurn:
         nothing = FakeRun([])
         _test_hooks.run = nothing
 
-        assert retire_owed.retire_or_owe(path, node(), alias="lavender", run_id=DEMO_RUN_ID)
+        assert (
+            retire_owed.retire_or_owe(path, node(), alias="lavender", run_id=DEMO_RUN_ID)
+            is retire_owed.RetireOutcome.ENDED
+        )
 
         assert nothing.calls == []
         assert len(records.read_retires(path)) == 2

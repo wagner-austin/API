@@ -22,8 +22,10 @@ class FreedRecord(TypedDict):
         run_id: The dispatch whose enclosure it removed.
         node: The node's workspace name.
         at_unix: When the retire was recorded, whole seconds since the epoch.
-        freed_bytes: What ``du -sb`` counted in the enclosure before its
-            removal; 0 for an enclosure an earlier attempt already removed.
+        freed_bytes: The apparent sizes of every entry in the enclosure
+            that is not a directory, summed before its removal
+            (:mod:`fleet.core.retire_script`); 0 for an enclosure an earlier
+            attempt already removed.
     """
 
     run_id: str
