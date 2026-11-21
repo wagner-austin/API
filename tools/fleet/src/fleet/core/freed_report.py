@@ -11,7 +11,7 @@ a board task (``python -m fleet.cli.freed_report``).
 from __future__ import annotations
 
 import datetime
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 
 from typing_extensions import TypedDict
 
@@ -33,7 +33,7 @@ class NodeFreed(TypedDict):
 
 
 def node_totals(
-    records: Iterable[FreedRecord], *, since_unix: int, nodes: Sequence[str]
+    records: Sequence[FreedRecord], *, since_unix: int, nodes: Sequence[str]
 ) -> tuple[NodeFreed, ...]:
     """Total each node's retires recorded at or after an instant.
 
