@@ -191,6 +191,23 @@ def test_no_machine_declares_netboot_wifi_and_every_machine_says_whether_it_does
     assert [name for name, m in machines.items() if m["netbootWifi"] is True] == []
 
 
+def test_every_machine_declares_its_architecture() -> None:
+    # MCPs board task 3fcfe081: the flake builds each machine for the system
+    # its file names, so the key is in every file; fleet-mcp's decoder alone
+    # reads it (machine.py's THIS PACKAGE DECODES WHAT IT READS). The two
+    # clients are Android phones, read with phone_devices on 2026-11-21 as a
+    # Galaxy S23 Ultra SM-S918U1 (Snapdragon 8 Gen 2) and a Pixel 8 G9BQD
+    # (Tensor G3), 64-bit ARM by their published specifications; every PC
+    # before the first Raspberry Pi is x86_64.
+    machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
+    phones = {"lapis-lazuli", "pixelate"}
+    assert len(machines) == 14
+    assert phones <= set(machines)
+    assert {name: m.get("architecture") for name, m in machines.items()} == {
+        name: "aarch64" if name in phones else "x86_64" for name in machines
+    }
+
+
 def test_every_netbooted_machine_says_whether_its_firmware_enforces_secure_boot() -> None:
     # MCPs board task 433ad455: a netboot install enrolls the fleet's keys and
     # leaves Secure Boot enforced, except where the firmware cannot. sedona's
