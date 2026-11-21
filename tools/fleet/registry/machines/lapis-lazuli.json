@@ -1,6 +1,7 @@
 {
   "role": "client",
   "platform": "linux",
+  "architecture": "aarch64",
   "user": null,
   "enabled": true,
   "disabledUntil": null,

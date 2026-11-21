@@ -1,6 +1,7 @@
 {
   "role": "hub",
   "platform": "linux",
+  "architecture": "x86_64",
   "user": "corvis",
   "enabled": true,
   "disabledUntil": null,
