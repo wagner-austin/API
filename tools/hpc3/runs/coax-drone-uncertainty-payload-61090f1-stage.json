@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-uncertainty-payload-61090f1.tar",
+      "sha256": "b5b06023571bf201c8a868339111540d614ae9ba86fc463d6b362bc003bbb75a",
+      "size_bytes": 420280320
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone 61090f12982dd30a63aa92252454970a0c43352b, a clean git worktree of that commit",
+    "selection": "tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner --format=gnu of pyproject.toml, calc/budget, wiki/sources and exports/challenge/optimum-{coax-blade,coax-unequal-blade,tandem-blade,single-blade}-2028.csv",
+    "why": "the 2028 layouts' uncertainty sweep rerun after array 59867212 refused every sample: the 4f1c46b payload compared each layout's recomputed optimum to its report exactly, and the image's Python 3.11 recomputed the equal coaxial one a digit off what Python 3.13 wrote; this commit holds that read-back and the range check to the 1e-9 the published exports are held to (challenge documents identity e3a7d95089bd334a02048f1fc947a4d306129fcd7517d0fd0120b1be6c6e012f, unchanged); each member unpacks this archive into node-local TMPDIR and imports calc.budget from it",
+    "note": "board task e6dfef4d-3221-4558-9dc9-a8bdecbb4e21, criterion A5; the commit is on origin branch redesign-4to1-1120, and a second build from another clean worktree of it gave the same digest"
+  }
+}

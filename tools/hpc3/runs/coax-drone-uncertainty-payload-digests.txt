@@ -143,3 +143,72 @@ cc49d392ebd5047b06004ab9520f4d030a44978d0f6ebaf9d594407f0158a12f  uncertainty/02
 692aa38ad1406420468158cf7836e65f9081e5e258a11270b1ddd23915a61e32  uncertainty/0245f54/shard-5-of-8.json
 caa590e86ad827fef8c375c78de4546a9125df7e9eda5ce197090c16faaf0d35  uncertainty/0245f54/shard-6-of-8.json
 1e64847da88ffc0ad2971b14344f0e158f80da27784c3bf7485556a444a381df  uncertainty/0245f54/shard-7-of-8.json
+
+# The 2028 layouts' uncertainty sweep again (board task e6dfef4d, criterion
+# A5), after operator ruling 4b389e0a replaced every guessed input with a
+# captured or computed one: documents identity
+# e3a7d95089bd334a02048f1fc947a4d306129fcd7517d0fd0120b1be6c6e012f, the same
+# tar selection as above at coax-drone 4f1c46ba801fdca5fcde3349b4f2b05bbcc9ebb7
+# (calc/budget tree 54180ad1f961459446a3cf82899fa6d7e9dbd0cf), built twice
+# from clean worktrees of that commit to this digest.
+
+d0e3d502b1313d593bb1763a9f679cd4914544f24710852269fb1dd5f894cc9c  coax-drone-uncertainty-payload-4f1c46b.tar
+
+# Array 59867212 (coax-drone-challenge-uncertainty-4f1c46b.json) failed all
+# eight members in 17-22 s on hpc3-l18-01 with CHALLENGE_OPTIMUM_STALE before
+# any sample: the image's Python 3.11 recomputed the equal coaxial optimum's
+# remaining mass one digit off the value Python 3.13 wrote, and the read-back
+# compared them exactly. coax-drone 61090f12982dd30a63aa92252454970a0c43352b
+# (calc/budget tree db2ddea3287c67b026ea0937fdb7fdb9279fceee, on origin branch
+# redesign-4to1-1120) holds that read-back and the range check to the 1e-9 the
+# published exports are held to; its archive, the same selection with the same
+# documents identity, was built twice from clean worktrees to this digest and
+# loaded in Docker from the image's pinned base and requirements.
+
+b5b06023571bf201c8a868339111540d614ae9ba86fc463d6b362bc003bbb75a  coax-drone-uncertainty-payload-61090f1.tar
+
+# Array 59881801 (coax-drone-challenge-uncertainty-61090f1.json) completed
+# shards 1, 3, 6 and 7 in 512-541 s; the free partition preempted the other
+# four after 249 s and hpc3-campaign resubmitted exactly those as array
+# 59882297, which completed them in 470-546 s. Each shard's SHA-256 was read
+# on the cluster and again after download, identical. They are not
+# published: the equal coaxial and the single rotor were refused on 4041 of
+# 4096 draws and the tandem on 3709, all AIRFOIL_RANGE, and only the drawn
+# air temperature separated refused from screened (screened only above 302.2
+# K and 301.3 K of the 291.05-302.35 K August normals), so coax-drone
+# d8fa31425d8e6ced99c6fade2d4a608dbe7368ff requires every optimum to trim at
+# the envelope's cold end as well and the sweep runs again on those optima.
+
+2a07fdbb8b7b61488f4a84aa8597c5906e2a6ec7c19239c9263b36c633b9219e  challenge-uncertainty/61090f1/shard-0-of-8.json
+d6b0fc24ce380f7ce4cf5801d8189b40681df80422e0cd1575db9a897661991d  challenge-uncertainty/61090f1/shard-1-of-8.json
+c72a3def0098d981cd2b792001cfa013b343c74a10135cf4250d098676d6445c  challenge-uncertainty/61090f1/shard-2-of-8.json
+02267b234a12d3d7eadaed2a0c08f3e4ffe22cbdb124a85aba867157e13bd22b  challenge-uncertainty/61090f1/shard-3-of-8.json
+6572dce9d54212e048743053313a54c168a102894951a4d378fb80861d9a1727  challenge-uncertainty/61090f1/shard-4-of-8.json
+d9b56c45b1af7f0aba51738f68b2e471f28aa2e06be3ff8503c551d4acdc4a70  challenge-uncertainty/61090f1/shard-5-of-8.json
+83c05d113bf9a9d5a392a08e48bbde0a5f2ef597ca3cc659410b36f65630c261  challenge-uncertainty/61090f1/shard-6-of-8.json
+7e50ab6d3d65f543bfc1e015002b593f2c3f935902223a556bd0a91812f9b78e  challenge-uncertainty/61090f1/shard-7-of-8.json
+
+# The sweep on the envelope-screened optima: the same tar selection at
+# coax-drone d8fa31425d8e6ced99c6fade2d4a608dbe7368ff (calc/budget tree
+# a21514498c106f8aaeff71fca3d2b518bca224a2, on origin branch
+# redesign-4to1-1120), documents identity
+# 707ccf8c344a6ae535a739f94f5afcedd89fb657d69749c49afd3dc15fb0bf80, built
+# twice from clean worktrees to this digest and loaded at that identity both
+# by sedona's Python 3.13 and in Docker from the image's pinned base and
+# requirements.
+
+e6eb35336b91f188562a6bd85b31ebb517fa58e3b04587fa10a5c62dc3fb2e33  coax-drone-uncertainty-payload-d8fa314.tar
+
+# Its eight shards, from array 59885559 (shard 3) and array 59888046 (the
+# seven members the free partition preempted, resubmitted by hpc3-campaign),
+# read on the cluster under /pub/wagnera3/coax-drone/ and equal to the files
+# committed in coax-drone exports/challenge-uncertainty.
+
+24d4af6406b7a91754985527135799119879f876606f150c47f2131fa99686fc  challenge-uncertainty/d8fa314/shard-0-of-8.json
+f2cddb522a217d7db496c36b0432fb823d3c83d6dea001319115f5617a2856c9  challenge-uncertainty/d8fa314/shard-1-of-8.json
+d8eeaf4c7653af45694441fe2bf17538b8a7be01a4ffe784d842efb92e853d7a  challenge-uncertainty/d8fa314/shard-2-of-8.json
+84c3f721308de7394f3930022375a03826a456374f0b05d4f4506c0ac3c9d6ae  challenge-uncertainty/d8fa314/shard-3-of-8.json
+73c891dc894c96e81b0ece62fd9ecc55468fb15722e99494e057298713b1a207  challenge-uncertainty/d8fa314/shard-4-of-8.json
+0375f805a1621e7f6f8827d33496279d29a95c0816a48ee1236fa525a3d788c7  challenge-uncertainty/d8fa314/shard-5-of-8.json
+5fba5fdea26ec481479cd421d67e7b9f7beda3566ca4ecbf82060698189c736d  challenge-uncertainty/d8fa314/shard-6-of-8.json
+e559d4ca0632faeeed4221c566a2ff27032602dc59f6b57cbe3b1591bc1cef84  challenge-uncertainty/d8fa314/shard-7-of-8.json

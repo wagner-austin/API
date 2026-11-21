@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-uncertainty-payload-d8fa314.tar",
+      "sha256": "e6eb35336b91f188562a6bd85b31ebb517fa58e3b04587fa10a5c62dc3fb2e33",
+      "size_bytes": 420290560
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone d8fa31425d8e6ced99c6fade2d4a608dbe7368ff, a clean git worktree of that commit",
+    "selection": "tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner --format=gnu of pyproject.toml, calc/budget, wiki/sources and exports/challenge/optimum-{coax-blade,coax-unequal-blade,tandem-blade,single-blade}-2028.csv",
+    "why": "the 2028 layouts' uncertainty sweep on optima that trim across the site's August temperature envelope: arrays 59881801 and 59882297 found three of the earlier optima refused AIRFOIL_RANGE on every draw colder than 301.3 to 302.2 K, so this commit screens every case at the envelope's 291.05 K cold end too and re-optimizes (challenge documents identity 707ccf8c344a6ae535a739f94f5afcedd89fb657d69749c49afd3dc15fb0bf80); each member unpacks this archive into node-local TMPDIR and imports calc.budget from it",
+    "note": "board task e6dfef4d-3221-4558-9dc9-a8bdecbb4e21, criterion A5; the commit is on origin branch redesign-4to1-1120, and a second build from another clean worktree of it gave the same digest"
+  }
+}

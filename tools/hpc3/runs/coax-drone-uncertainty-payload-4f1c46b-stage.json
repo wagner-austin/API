@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-uncertainty-payload-4f1c46b.tar",
+      "sha256": "d0e3d502b1313d593bb1763a9f679cd4914544f24710852269fb1dd5f894cc9c",
+      "size_bytes": 420280320
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone 4f1c46ba801fdca5fcde3349b4f2b05bbcc9ebb7, a clean git worktree of that commit",
+    "selection": "tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner --format=gnu of pyproject.toml, calc/budget, wiki/sources and exports/challenge/optimum-{coax-blade,coax-unequal-blade,tandem-blade,single-blade}-2028.csv",
+    "why": "the 2028 layouts' uncertainty sweep rerun after operator ruling 4b389e0a replaced every guessed input with a captured or computed one: each of four layouts held at its committed optimum and screened at 4096 draws of its uncertain inputs (challenge documents identity e3a7d95089bd334a02048f1fc947a4d306129fcd7517d0fd0120b1be6c6e012f); each member unpacks this archive into node-local TMPDIR and imports calc.budget from it",
+    "note": "board task e6dfef4d-3221-4558-9dc9-a8bdecbb4e21, criterion A5; the commit is on origin branch redesign-4to1-1120, and a second build from another clean worktree of it gave the same digest"
+  }
+}
