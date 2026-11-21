@@ -12,7 +12,7 @@ source_paths:
 source_git_blobs:
   "src/hpc3/core/array_sbatch.py": "ed32f686a73e2ea8cc48d556d306a9d3d3fdb40a"
   "src/hpc3/core/array_submit.py": "205fb40432570438368f18ff26bcf9cbd8bee13a"
-  "src/hpc3/contracts/array.py": "3ac2482e4cf1f25db5a90cbfc76de537e94c4811"
+  "src/hpc3/contracts/array.py": "e123331e36dcd2faeea1a0ebd6e95162651359f0"
   "src/hpc3/core/status.py": "fd21ac7b9f01b07ff1ea1d2596ed75058de0e5da"
   "src/hpc3/core/cancel.py": "5ae784713ed19d522ac2a609c0beb3e1f49933d3"
 provenance:

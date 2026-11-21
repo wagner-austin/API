@@ -194,3 +194,11 @@ pending array, then reported "sacct knows no job". Its reads now share
 hpc3-watch's base-id query through read_answering_rows. The other two pages
 repin status.py and cancel.py, and the WRDS footnote moves to status.py:34.
 Board task 0f8a181b.
+
+## [2026-11-21] repin | contracts/array.py gained answers()
+Pages updated: job-arrays.
+Notes: f1e5c3457 (board task db3f2420) appended answers() to contracts/array.py
+and left job-arrays pinning the blob before it. The page's one claim about the
+file, that it owns the expansion, still holds: expand_job_id is unchanged and
+no line before the addition moved. Repinned to e123331e; found when
+push-wiki-pins refused the fleet roll. Board task 1526ece1.
