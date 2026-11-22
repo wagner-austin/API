@@ -100,11 +100,14 @@ class FakeQueue:
         arguments: Every arguments object it was sent, ``dispatch_tick``'s
             aside, in order.
         ticks: Every ``dispatch_tick`` arguments object, in order.
+        urls: The URL each call in ``tools`` was posted to, in order, so a
+            case can tell the board's endpoint from the queue's.
     """
 
     tools: list[str]
     arguments: list[JSONObject]
     ticks: list[JSONObject]
+    urls: list[str]
     _replies: list[str | ToolRefusal | Unanswered]
 
     def __init__(self, replies: Sequence[str | ToolRefusal | Unanswered]) -> None:
@@ -120,6 +123,7 @@ class FakeQueue:
         self.tools = []
         self.arguments = []
         self.ticks = []
+        self.urls = []
         self._replies = list(replies)
 
     def __call__(
@@ -154,6 +158,7 @@ class FakeQueue:
             return _framed({"content": [{"text": TICK_RECORDED}]})
         self.tools.append(tool)
         self.arguments.append(arguments)
+        self.urls.append(url)
         assert self._replies, f"unscripted queue call: {tool}"
         reply = self._replies.pop(0)
         if isinstance(reply, Unanswered):

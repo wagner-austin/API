@@ -16,14 +16,18 @@ import runpy
 import sys
 
 import pytest
-from platform_core.errors import AppError, FleetErrorCode
+from board_watch import _test_hooks as board_watch_hooks
+from board_watch import config as board_config
+from platform_core.error_codes_tooling import BoardWatchErrorCode
+from platform_core.errors import AppError
 from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str, load_json_str
+from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from fleet.cli import _config, freed_report
 from fleet.contracts.freed_record import FreedRecord, decode_freed_record, encode_freed_record
 from fleet.core import _test_hooks, records, retire_owed
 from fleet.core.freed_report import NodeFreed, node_totals, report_line
-from tests._queue_fakes import FakeEnv, FakeQueue, queue_env
+from tests._queue_fakes import FakeEnv, FakeQueue
 
 #: 2026-11-21T22:00:00Z, the window's start in these cases.
 SINCE = 1_795_298_400
@@ -127,6 +131,24 @@ def _hub_hostname() -> str:
     return "diphtheria"
 
 
+def _board_only() -> None:
+    """The taskboard's credentials and none of the dispatch queue's.
+
+    ``task_post`` is the board's tool: the first live run, posting with the
+    queue's credentials, was answered 'Tool task_post not found'. With no
+    queue variable set, a post routed to the queue is refused before it is
+    sent, so these cases fail on that route.
+    """
+    _test_hooks.env = FakeEnv({})
+    board_watch_hooks.env = FakeEnv(
+        {
+            board_config.API_KEY_VARIABLE: "board-key",
+            board_config.TENANT_ID_VARIABLE: "tenant",
+            board_config.URL_VARIABLE: DECLARED_TASKBOARD_URL,
+        }
+    )
+
+
 class TestTheCommand:
     def test_posts_the_totals_on_the_task_as_the_hub_runner(
         self, config_path: pathlib.Path
@@ -137,7 +159,7 @@ class TestTheCommand:
         records.append_freed(source, _line("old", "lavender", SINCE - 5, 7))
         endpoint = FakeQueue(["posted"])
         _test_hooks.http_post = endpoint
-        _test_hooks.env = queue_env()
+        _board_only()
         _test_hooks.hostname = _hub_hostname
 
         code = freed_report.main(
@@ -153,6 +175,7 @@ class TestTheCommand:
 
         assert code == 0
         assert endpoint.tools == ["task_post"]
+        assert endpoint.urls == [DECLARED_TASKBOARD_URL]
         assert endpoint.arguments == [
             {
                 "agent": "fleet-hub-diphtheria",
@@ -186,12 +209,13 @@ class TestTheCommand:
 
         assert endpoint.tools == []
 
-    def test_missing_credentials_are_refused_by_name_and_nothing_is_sent(
+    def test_missing_board_credentials_are_refused_by_name_and_nothing_is_sent(
         self, config_path: pathlib.Path
     ) -> None:
         endpoint = FakeQueue([])
         _test_hooks.http_post = endpoint
         _test_hooks.env = FakeEnv({})
+        board_watch_hooks.env = FakeEnv({})
 
         with pytest.raises(AppError) as raised:
             freed_report.main(
@@ -205,7 +229,7 @@ class TestTheCommand:
                 ]
             )
 
-        assert raised.value.code is FleetErrorCode.QUEUE_CREDENTIALS_MISSING
+        assert raised.value.code is BoardWatchErrorCode.API_KEY_MISSING
         assert endpoint.tools == []
 
     def test_running_it_as_a_module_actually_posts(self, config_path: pathlib.Path) -> None:
@@ -213,7 +237,7 @@ class TestTheCommand:
         and exit 0, a report the task never received."""
         endpoint = FakeQueue(["posted"])
         _test_hooks.http_post = endpoint
-        _test_hooks.env = queue_env()
+        _board_only()
         _test_hooks.hostname = _hub_hostname
         saved_argv = sys.argv
         saved_module = sys.modules.pop("fleet.cli.freed_report", None)
@@ -236,6 +260,7 @@ class TestTheCommand:
 
         assert raised.value.code == 0
         assert endpoint.tools == ["task_post"]
+        assert endpoint.urls == [DECLARED_TASKBOARD_URL]
 
     def test_run_under_any_other_name_it_posts_nothing(self) -> None:
         """Only ``__main__`` starts it: a name sorting before it, ``__a__``,

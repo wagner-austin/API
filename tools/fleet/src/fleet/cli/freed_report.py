@@ -5,7 +5,9 @@ Usage:
         --since 1795300000 --task 1526ece1-497d-4e67-8b48-4aba8f789c40
 
 Run on the hub whose runners retire the fleet's runs, with the credentials
-its pump hands every bridge (``FLEET_MCP_API_KEY`` and ``CORVIS_TENANT_ID``).
+its pump hands every bridge: the taskboard's (``TASKBOARD_MCP_API_KEY`` and
+``CORVIS_TENANT_ID``, :func:`board_watch.config.load_credentials`), since
+``task_post`` is the board's tool and the dispatch queue has none.
 It totals the freed record beside the retire record
 (:func:`fleet.core.retire_owed.freed_path`) per node from ``--since`` on
 (:mod:`fleet.core.freed_report`), prints the line, and posts it as a note on
@@ -22,6 +24,7 @@ import sys
 from collections.abc import Sequence
 from typing import Final
 
+from board_watch import config as board_config
 from platform_core import cli_args
 from platform_core.cli_boundary import run_cli
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
@@ -53,9 +56,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     Raises:
         ValueError: When a flag is unknown, repeated or missing its value,
             or ``--since`` is not whole seconds since the epoch.
-        AppError: ``QUEUE_CREDENTIALS_MISSING`` from
-            :func:`fleet.core.queue.load_credentials`, and any refusal of the
-            board's.
+        AppError: ``API_KEY_MISSING`` or ``TENANT_ID_MISSING`` from
+            :func:`board_watch.config.load_credentials`, and any refusal of
+            the board's.
         JSONTypeError: When a line of the freed record does not decode.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
@@ -71,7 +74,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         records.read_freed(source), since_unix=since, nodes=tuple(loaded.workspace["nodes"])
     )
     line = freed_report.report_line(totals, since_unix=since, source=str(source))
-    credentials = queue.load_credentials()
+    # task_post is the TASKBOARD's tool, not the dispatch queue's: the queue
+    # answered 'Tool task_post not found' on the first live run (MCPs board
+    # task 1526ece1), so the post takes the board's credentials, as the hub
+    # passes do (fleet.cli.hub_passes).
+    credentials = board_config.load_credentials()
     label, session = runner_identity(DispatchLane.HUB, _test_hooks.hostname())
     identity = queue.identity_arguments(label, session, str(pathlib.Path.cwd()))
     call_mcp_tool(
