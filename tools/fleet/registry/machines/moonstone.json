@@ -1,0 +1,25 @@
+{
+  "role": "worker",
+  "platform": "linux",
+  "architecture": "aarch64",
+  "user": "corvis",
+  "enabled": false,
+  "disabledUntil": null,
+  "duties": [],
+  "standby": [],
+  "ledger_observer": "fleet-arm",
+  "tailnetIp": "100.101.38.36",
+  "reachKey": null,
+  "bootMac": "d8:3a:dd:f8:2a:78",
+  "netbootWifi": false,
+  "secureBoot": null,
+  "installDisk": null,
+  "tunnel": null,
+  "guest": null,
+  "ciWorkersPerRunner": null,
+  "boot": {
+    "units": []
+  },
+  "notes": "A Raspberry Pi 4 Model B 8 GB on the home LAN, attached to the KVM; its wired MAC was read off its bootloader screen. Admitted for an SD-image install, approved by the operator on 2026-11-21 (MCPs board task 347413f4), to run a personal companion app under the fleet's managed NixOS and take no fleet work.",
+  "dispatch": "Admitted by the operator to be installed from an SD image: a Raspberry Pi the fleet provisions and manages with its NixOS and sends no fleet work. This line is its hold for good, not a pending measurement."
+}
