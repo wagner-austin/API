@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-uncertainty-payload-63cb514.tar",
+      "sha256": "de13f4b089a4a779b173386b1b38a85f5de06463eac927ff478abc5f75b98e27",
+      "size_bytes": 420321280
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone 63cb5143dd1cdff3210da1966e66bd6770bc534a, a clean git worktree of that commit",
+    "selection": "tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner --format=gnu of pyproject.toml, calc/budget, wiki/sources and exports/challenge/optimum-{coax-blade,coax-unequal-blade,tandem-blade,single-blade}-2028.csv",
+    "why": "the 2028 layouts' uncertainty sweep on manifests whose every basis note the loader now holds to its label (a sourced note to a pinned capture and a line in it, a computed note to a pinned capture and an existing function), which changed 91 notes and pinned four captures but no input value (challenge documents identity a03f371773e4635628bc8de325905afd451daa6ebc8a6edcd28ba4d5a1fed595); each member unpacks this archive into node-local TMPDIR and imports calc.budget from it",
+    "note": "board task e6dfef4d-3221-4558-9dc9-a8bdecbb4e21, criterion A5, after the audit's A1 rejection; the commit is on origin branch redesign-4to1-1120, a second build from another clean worktree of it gave the same digest, and it loads at that identity both under sedona's Python 3.13 and in Docker from the image's pinned base and requirements"
+  }
+}

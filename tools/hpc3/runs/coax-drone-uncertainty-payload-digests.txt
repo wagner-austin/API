@@ -239,3 +239,36 @@ d4d160cf0f4b23bfb5eab49d1be41b92e2ed003256ab4fc11382df566221454a  challenge-unce
 c9eb52c1445015b6b14598839238a387fcd456214db1ccf984c30ac471edf86b  challenge-uncertainty/f4fd724/shard-5-of-8.json
 b96d55dab808e93ef78831571fb4ede61f35a68012d1f8d2b4133662ddd4002d  challenge-uncertainty/f4fd724/shard-6-of-8.json
 135f5ed13507badefd09e5b48b38c7d1f8f9db6e4b6ad91dd6ff22f51c67214d  challenge-uncertainty/f4fd724/shard-7-of-8.json
+
+# The same sweep after the audit's A1 rejection, on manifests whose every
+# basis note the loader holds to its label: 91 notes gained a line, function or
+# label and four captures were pinned, no input value moved. The same tar
+# selection at coax-drone 63cb5143dd1cdff3210da1966e66bd6770bc534a (calc/budget
+# tree 1478236f1eaf732d59a1ddbce6c12c0afcd0c367, on origin branch
+# redesign-4to1-1120), documents identity
+# a03f371773e4635628bc8de325905afd451daa6ebc8a6edcd28ba4d5a1fed595, built
+# twice from clean worktrees to this digest and loaded at that identity both
+# by sedona's Python 3.13 and in Docker from the image's pinned base and
+# requirements.
+
+de13f4b089a4a779b173386b1b38a85f5de06463eac927ff478abc5f75b98e27  coax-drone-uncertainty-payload-63cb514.tar
+
+# Array 59899964 (coax-drone-challenge-uncertainty-63cb514.json) completed
+# shards 0, 3 and 4 in 1427-2015 s; the free partition preempted the other
+# five after 559-596 s and hpc3-campaign resubmitted exactly those as array
+# 59909292, which completed them in 961-1953 s. Each shard's SHA-256 was read
+# on the cluster and again after download, identical, and coax-drone commits
+# these bytes under exports/challenge-uncertainty. Against array 59892011's
+# shards only the documents identity differs, except in shard 1, rerun on an
+# AMD EPYC 7601 node (hpc3-l18-01) where every other member ran on Intel
+# AVX-512 nodes: 12 of its 2,048 remaining masses differ, by at most 3.6e-14
+# kg, and the combined layouts.csv is byte for byte the same.
+
+08b423446260c7a84d12d36b3cb6bafeca4bf1a3348001e22feb17037f8d196b  challenge-uncertainty/63cb514/shard-0-of-8.json
+fba2ceecbaf8f7f4b2e525db4a052a9dfc2d924eb1c3ba517279adab115d74ed  challenge-uncertainty/63cb514/shard-1-of-8.json
+ae7db495ff6415613408ffe82007c6ca1f62edb66b8b5fdc27b121149a04dac1  challenge-uncertainty/63cb514/shard-2-of-8.json
+5bd2eded670108f8be56a9de5d8ea57553dfdd99912d20aa1dc5d0f6b0d4fdd8  challenge-uncertainty/63cb514/shard-3-of-8.json
+ce01aba6d0b1cb327b0df54ddad3c6ed0724dd257a3aa6a08409841d6b6fe612  challenge-uncertainty/63cb514/shard-4-of-8.json
+5725993d13ee199e6baf087a674b5c8560ca5d6d67d510987210267109488a5b  challenge-uncertainty/63cb514/shard-5-of-8.json
+3a6e47b3d5a68e16662beb01fbc8906e9281f46f66c0c43538a84ca11434373c  challenge-uncertainty/63cb514/shard-6-of-8.json
+ff3aa797d335003cd0a251cad75591477119b6f678d55ca1b0f8bb36b7fcaa88  challenge-uncertainty/63cb514/shard-7-of-8.json

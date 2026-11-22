@@ -1,0 +1,66 @@
+{
+  "project": "coax-drone",
+  "name": "challenge-uncertainty-63cb514",
+  "minutes": 60,
+  "mem_gb": 4,
+  "image": {
+    "path": "/pub/wagnera3/coax-drone/images/v4/coax-drone.sif",
+    "sha256": "9d86f33feee12f5d455c789bcae42d3ada761302fea419e1b151f6d82d4b0ee4",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "experiment": {
+    "board_task": "e6dfef4d-3221-4558-9dc9-a8bdecbb4e21",
+    "coax_drone_commit": "63cb5143dd1cdff3210da1966e66bd6770bc534a",
+    "payload_sha256": "de13f4b089a4a779b173386b1b38a85f5de06463eac927ff478abc5f75b98e27",
+    "study": "calc/budget/data/uncertainty-challenge.json",
+    "samples": "4096",
+    "layouts": "4",
+    "shards": "8",
+    "documents_identity": "a03f371773e4635628bc8de325905afd451daa6ebc8a6edcd28ba4d5a1fed595"
+  },
+  "members": [
+    {
+      "suffix": "shard0of8",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-uncertainty-payload-63cb514.tar -C \"$W\"; cd \"$W\"; export PYTHONPATH=\"$W\"; python -c \"import sys, calc.budget as b; sys.exit(0 if b.__file__.startswith(sys.argv[1]) else 3)\" \"$W\"; mkdir -p /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514; python -c \"import sys; from calc.budget.challenge_uncertainty_cli import main; sys.exit(main())\" shard --repo-root \"$W\" --study calc/budget/data/uncertainty-challenge.json --shard 0 --shards 8 --out /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-0-of-8.json; test -s /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-0-of-8.json'",
+      "artifact": "/pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-0-of-8.json"
+    },
+    {
+      "suffix": "shard1of8",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-uncertainty-payload-63cb514.tar -C \"$W\"; cd \"$W\"; export PYTHONPATH=\"$W\"; python -c \"import sys, calc.budget as b; sys.exit(0 if b.__file__.startswith(sys.argv[1]) else 3)\" \"$W\"; mkdir -p /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514; python -c \"import sys; from calc.budget.challenge_uncertainty_cli import main; sys.exit(main())\" shard --repo-root \"$W\" --study calc/budget/data/uncertainty-challenge.json --shard 1 --shards 8 --out /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-1-of-8.json; test -s /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-1-of-8.json'",
+      "artifact": "/pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-1-of-8.json"
+    },
+    {
+      "suffix": "shard2of8",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-uncertainty-payload-63cb514.tar -C \"$W\"; cd \"$W\"; export PYTHONPATH=\"$W\"; python -c \"import sys, calc.budget as b; sys.exit(0 if b.__file__.startswith(sys.argv[1]) else 3)\" \"$W\"; mkdir -p /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514; python -c \"import sys; from calc.budget.challenge_uncertainty_cli import main; sys.exit(main())\" shard --repo-root \"$W\" --study calc/budget/data/uncertainty-challenge.json --shard 2 --shards 8 --out /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-2-of-8.json; test -s /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-2-of-8.json'",
+      "artifact": "/pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-2-of-8.json"
+    },
+    {
+      "suffix": "shard3of8",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-uncertainty-payload-63cb514.tar -C \"$W\"; cd \"$W\"; export PYTHONPATH=\"$W\"; python -c \"import sys, calc.budget as b; sys.exit(0 if b.__file__.startswith(sys.argv[1]) else 3)\" \"$W\"; mkdir -p /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514; python -c \"import sys; from calc.budget.challenge_uncertainty_cli import main; sys.exit(main())\" shard --repo-root \"$W\" --study calc/budget/data/uncertainty-challenge.json --shard 3 --shards 8 --out /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-3-of-8.json; test -s /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-3-of-8.json'",
+      "artifact": "/pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-3-of-8.json"
+    },
+    {
+      "suffix": "shard4of8",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-uncertainty-payload-63cb514.tar -C \"$W\"; cd \"$W\"; export PYTHONPATH=\"$W\"; python -c \"import sys, calc.budget as b; sys.exit(0 if b.__file__.startswith(sys.argv[1]) else 3)\" \"$W\"; mkdir -p /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514; python -c \"import sys; from calc.budget.challenge_uncertainty_cli import main; sys.exit(main())\" shard --repo-root \"$W\" --study calc/budget/data/uncertainty-challenge.json --shard 4 --shards 8 --out /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-4-of-8.json; test -s /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-4-of-8.json'",
+      "artifact": "/pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-4-of-8.json"
+    },
+    {
+      "suffix": "shard5of8",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-uncertainty-payload-63cb514.tar -C \"$W\"; cd \"$W\"; export PYTHONPATH=\"$W\"; python -c \"import sys, calc.budget as b; sys.exit(0 if b.__file__.startswith(sys.argv[1]) else 3)\" \"$W\"; mkdir -p /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514; python -c \"import sys; from calc.budget.challenge_uncertainty_cli import main; sys.exit(main())\" shard --repo-root \"$W\" --study calc/budget/data/uncertainty-challenge.json --shard 5 --shards 8 --out /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-5-of-8.json; test -s /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-5-of-8.json'",
+      "artifact": "/pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-5-of-8.json"
+    },
+    {
+      "suffix": "shard6of8",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-uncertainty-payload-63cb514.tar -C \"$W\"; cd \"$W\"; export PYTHONPATH=\"$W\"; python -c \"import sys, calc.budget as b; sys.exit(0 if b.__file__.startswith(sys.argv[1]) else 3)\" \"$W\"; mkdir -p /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514; python -c \"import sys; from calc.budget.challenge_uncertainty_cli import main; sys.exit(main())\" shard --repo-root \"$W\" --study calc/budget/data/uncertainty-challenge.json --shard 6 --shards 8 --out /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-6-of-8.json; test -s /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-6-of-8.json'",
+      "artifact": "/pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-6-of-8.json"
+    },
+    {
+      "suffix": "shard7of8",
+      "command": "bash -c 'set -eu; W=\"$TMPDIR/coax\"; mkdir -p \"$W\"; tar -xf /pub/wagnera3/coax-drone/payload/coax-drone-uncertainty-payload-63cb514.tar -C \"$W\"; cd \"$W\"; export PYTHONPATH=\"$W\"; python -c \"import sys, calc.budget as b; sys.exit(0 if b.__file__.startswith(sys.argv[1]) else 3)\" \"$W\"; mkdir -p /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514; python -c \"import sys; from calc.budget.challenge_uncertainty_cli import main; sys.exit(main())\" shard --repo-root \"$W\" --study calc/budget/data/uncertainty-challenge.json --shard 7 --shards 8 --out /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-7-of-8.json; test -s /pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-7-of-8.json'",
+      "artifact": "/pub/wagnera3/coax-drone/challenge-uncertainty/63cb514/shard-7-of-8.json"
+    }
+  ],
+  "resumes_from_checkpoint": false
+}
