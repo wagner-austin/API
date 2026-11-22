@@ -93,6 +93,22 @@ def _machines() -> JSONObject:
     return require_dict(shipped_document(), "machines")
 
 
+def _netbooted(machine: dict[str, JSONValue]) -> bool:
+    """Whether a netboot install reaches the machine.
+
+    One with a bootMac is network-booted into its install unless it is an
+    aarch64 Raspberry Pi, which boots its SD card's own firmware and is
+    installed from an SD image (MCPs board task afa9857e).
+
+    Args:
+        machine: One machine's file.
+
+    Returns:
+        True for an x86_64 machine with a bootMac.
+    """
+    return machine["bootMac"] is not None and machine["architecture"] == "x86_64"
+
+
 def _units(name: str) -> list[JSONObject]:
     """One machine's declared boot units.
 
@@ -198,13 +214,15 @@ def test_every_machine_declares_its_architecture() -> None:
     # clients are Android phones, read with phone_devices on 2026-11-21 as a
     # Galaxy S23 Ultra SM-S918U1 (Snapdragon 8 Gen 2) and a Pixel 8 G9BQD
     # (Tensor G3), 64-bit ARM by their published specifications; every PC
-    # before the first Raspberry Pi is x86_64.
+    # is x86_64. moonstone, the first Raspberry Pi (a Pi 4 Model B, its
+    # bootloader screen read through the KVM on 2026-11-22), is aarch64
+    # (MCPs board task 347413f4).
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
-    phones = {"lapis-lazuli", "pixelate"}
-    assert len(machines) == 14
-    assert phones <= set(machines)
+    arm = {"lapis-lazuli", "pixelate", "moonstone"}
+    assert len(machines) == 15
+    assert arm <= set(machines)
     assert {name: m.get("architecture") for name, m in machines.items()} == {
-        name: "aarch64" if name in phones else "x86_64" for name in machines
+        name: "aarch64" if name in arm else "x86_64" for name in machines
     }
 
 
@@ -214,12 +232,17 @@ def test_every_netbooted_machine_says_whether_its_firmware_enforces_secure_boot(
     # AMI FB09 enforces only on Gigabyte's factory keys, which reject the
     # fleet-signed image, and offers no way to add the fleet's certificate,
     # measured over the KVM on 2026-11-04. A machine no netboot install
-    # reaches (no bootMac) claims nothing; fleet-mcp's decoder requires the
-    # key and refuses a value on such a machine.
+    # reaches claims nothing: one with no bootMac, and an aarch64 Pi, which
+    # boots its SD card's own firmware (MCPs board task afa9857e); fleet-mcp's
+    # decoder requires the key and refuses a value on such a machine.
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     declared = {name: m["secureBoot"] for name, m in machines.items()}
     expected = {
-        name: None if m["bootMac"] is None else "unenforceable" if name == "sedona" else "enforced"
+        name: None
+        if not _netbooted(m)
+        else "unenforceable"
+        if name == "sedona"
+        else "enforced"
         for name, m in machines.items()
     }
     assert declared == expected
@@ -230,7 +253,8 @@ def test_measured_disk_serials_stay_pinned_and_only_boot_macs_have_disk_rules() 
     # roster selects. Keep the measured serials pinned; newly admitted
     # workers use only-disk, which refuses zero or multiple candidate disks.
     # fleet-mcp's decoder validates both rules and refuses a bootMac without
-    # a disk. Every other machine still carries null.
+    # a disk. Every other machine still carries null, an SD-image Pi's
+    # included, since no install chooses a disk on it.
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     named = {name: m["installDisk"] for name, m in machines.items() if m["installDisk"] is not None}
     assert {
@@ -245,7 +269,7 @@ def test_measured_disk_serials_stay_pinned_and_only_boot_macs_have_disk_rules() 
         "ziggurat": {"rule": "serial", "serial": ZIGGURAT_INSTALL_DISK},
     }
     assert sorted(name for name, m in machines.items() if m["installDisk"] is None) == sorted(
-        name for name, m in machines.items() if m["bootMac"] is None
+        name for name, m in machines.items() if not _netbooted(m)
     )
 
 
