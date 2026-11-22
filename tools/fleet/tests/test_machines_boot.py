@@ -238,11 +238,7 @@ def test_every_netbooted_machine_says_whether_its_firmware_enforces_secure_boot(
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     declared = {name: m["secureBoot"] for name, m in machines.items()}
     expected = {
-        name: None
-        if not _netbooted(m)
-        else "unenforceable"
-        if name == "sedona"
-        else "enforced"
+        name: None if not _netbooted(m) else "unenforceable" if name == "sedona" else "enforced"
         for name, m in machines.items()
     }
     assert declared == expected
