@@ -99,7 +99,9 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # registry lifted out of mcp-shared (MCPs board task 19bc6d34). 81
     # since MCPs/packages/public-portal, search-query-parser and
     # document-categories-codegen, lifted out of civic-sources (the same task).
-    assert len(prepared) == 81
+    # 82 since MCPs/packages/claude-hooks-linux, whose live watcher cases run
+    # a built taskboard and mcp-proxy (MCPs board task c35a9ac3).
+    assert len(prepared) == 82
     assert prepared["MCPs/scripts/ci-contracts"] == (
         InstallStep(phase="install", argv=(*PREPARE, "install")),
         InstallStep(
@@ -174,8 +176,10 @@ def test_a_test_database_step_names_its_container_and_its_phase() -> None:
     # c8cb0ac5); 31 since MCPs/execution-lead-lacrymal (MCPs board task
     # 770837b7); 32 since MCPs/execution-served-diphtheria, for its
     # usage-limit case (MCPs board task ea46a7a4); 33 since
-    # MCPs/instagram-mcp, for its scheduled publications (MCPs board task 4fd6d24a).
-    assert len(databases) == 33
+    # MCPs/instagram-mcp, for its scheduled publications (MCPs board task 4fd6d24a);
+    # 34 since MCPs/packages/claude-hooks-linux, for its live watcher cases'
+    # disposable board (MCPs board task c35a9ac3).
+    assert len(databases) == 34
     assert {step["phase"] for step in databases} == {"test-database"}
     assert {step["argv"][5:] for step in databases} == {("CONTAINER=corvis-fleet-testdb",)}
 
