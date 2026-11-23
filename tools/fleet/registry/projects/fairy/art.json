@@ -1,0 +1,21 @@
+{
+  "worker_ram_gb": 0.5,
+  "minimum_workers": 2,
+  "expected_minutes": 15,
+  "required_tags": [
+    "linux"
+  ],
+  "source": {
+    "remote": "https://github.com/wagner-austin/fairy.git",
+    "path": "art",
+    "base_branch": "main",
+    "install": [],
+    "companions": [
+      {
+        "remote": "https://github.com/wagner-austin/MCPs.git",
+        "ref": "main",
+        "directory": "MCPs"
+      }
+    ]
+  }
+}

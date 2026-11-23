@@ -1624,6 +1624,19 @@ The repository's root check, which needs FreeCAD's kernel, is the separate
 project `coax-drone` (06e04ed3f): its install step bootstraps the pinned
 FreeCAD environment and it stages MCPs beside the export as a companion.
 
+**`fairy/art`** (MCPs board task 5211b20a, 2026-11-23) is the fairy
+repository's art pipeline, the Python package that turns Gemini's 21:9
+masters into the 1600 x 720 plates the fairy's touchscreen shows and
+verifies every committed asset against its record. Its `make check` installs
+itself with poetry and reads mcp-shared-py and maketools from the MCPs
+companion, and its mutation step measures the commit against
+`origin/main`, so it declares `base_branch` `main`. Its Makefile takes zlib
+from the companion's fleet flake with `nix build`, because Pillow's wheels
+link the system's `libz.so.1` and a plate's PNG bytes depend on which zlib
+wrote them; every enabled worker measured on 2026-11-23 runs NixOS with nix
+on its PATH, so it needs only `linux`. Its 282 tests peaked at 261 MB
+resident in one process on ziggurat (fairy a0e1acc).
+
 ## A project that names its node: `node`
 
 A tag says what KIND of node a suite needs; a few suites need one particular
