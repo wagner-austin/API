@@ -1,16 +1,54 @@
 {
   "worker_ram_gb": 0.3,
   "minimum_workers": 2,
-  "expected_minutes": 5,
+  "expected_minutes": 10,
+  "exclusive_resources": [
+    "corvis-fleet-testdb"
+  ],
   "required_tags": [
     "linux",
-    "hooks"
+    "hooks",
+    "testdb",
+    "cxx"
   ],
   "source": {
     "remote": "https://github.com/wagner-austin/MCPs.git",
     "path": "packages/claude-hooks",
     "base_branch": "main",
-    "install": [],
+    "install": [
+      {
+        "phase": "install",
+        "argv": [
+          "make",
+          "-s",
+          "-C",
+          "scripts/fleet-prepare",
+          "install"
+        ]
+      },
+      {
+        "phase": "workspace-build",
+        "argv": [
+          "make",
+          "-s",
+          "-C",
+          "scripts/fleet-prepare",
+          "workspace-build",
+          "ROOTS=packages/db:taskboard-mcp:mcp-proxy"
+        ]
+      },
+      {
+        "phase": "test-database",
+        "argv": [
+          "make",
+          "-s",
+          "-C",
+          "scripts/fleet-prepare",
+          "test-database",
+          "CONTAINER=corvis-fleet-testdb"
+        ]
+      }
+    ],
     "companions": []
   }
 }

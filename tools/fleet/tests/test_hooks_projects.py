@@ -13,16 +13,29 @@ the live suites read. It declares ``base_branch`` main (MCPs board task
 the commit adds against ``refs/remotes/origin/main``, and fleet job
 cda32861 refused it ``MUTATION_BASE_UNAVAILABLE`` while the entry declared
 none, so the stage held one root commit.
+
+SINCE MCPs BOARD TASK c35a9ac3 the check also needs a disposable board:
+tests/test_board_wake_live.py runs board-wake.py's main over the real
+client against taskboard-mcp behind a real mcp-proxy, both from the staged
+tree's build, on the node's freshly cloned ``corvis_test``. So the entry
+installs the workspace, builds ``packages/db``, ``taskboard-mcp`` and
+``mcp-proxy`` with their dependencies, and readies the test database, as
+the session-audit entry does for its audit world. It requires ``testdb``
+and ``cxx`` beside ``hooks``, and holds ``corvis-fleet-testdb`` alone while
+it runs, since the database is the node's one test cluster's.
 """
 
 from __future__ import annotations
 
-from fleet.contracts.source import ProjectSource
+from fleet.contracts.source import InstallStep, ProjectSource
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace, require_project
 from tests._registry import shipped_document
 
 MCPS_REMOTE = "https://github.com/wagner-austin/MCPs.git"
+
+#: The commands the entry runs at the export root, in order, before the check.
+PREPARE = ("make", "-s", "-C", "scripts/fleet-prepare")
 
 
 def test_linux_alone_checks_the_hooks_package() -> None:
@@ -36,11 +49,27 @@ def test_linux_alone_checks_the_hooks_package() -> None:
     )
     assert hooks == ["MCPs/packages/claude-hooks-linux"]
     project = require_project(workspace, "MCPs/packages/claude-hooks-linux")
-    assert project["required_tags"] == (NodeTag.LINUX, NodeTag.HOOKS)
+    assert project["required_tags"] == (
+        NodeTag.LINUX,
+        NodeTag.HOOKS,
+        NodeTag.TESTDB,
+        NodeTag.CXX,
+    )
+    assert project["exclusive_resources"] == ("corvis-fleet-testdb",)
     assert project["source"] == ProjectSource(
         remote=MCPS_REMOTE,
         path="packages/claude-hooks",
-        install=(),
+        install=(
+            InstallStep(phase="install", argv=(*PREPARE, "install")),
+            InstallStep(
+                phase="workspace-build",
+                argv=(*PREPARE, "workspace-build", "ROOTS=packages/db:taskboard-mcp:mcp-proxy"),
+            ),
+            InstallStep(
+                phase="test-database",
+                argv=(*PREPARE, "test-database", "CONTAINER=corvis-fleet-testdb"),
+            ),
+        ),
         companions=(),
         base_branch="main",
     )
