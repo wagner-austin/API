@@ -272,3 +272,101 @@ ce01aba6d0b1cb327b0df54ddad3c6ed0724dd257a3aa6a08409841d6b6fe612  challenge-unce
 5725993d13ee199e6baf087a674b5c8560ca5d6d67d510987210267109488a5b  challenge-uncertainty/63cb514/shard-5-of-8.json
 3a6e47b3d5a68e16662beb01fbc8906e9281f46f66c0c43538a84ca11434373c  challenge-uncertainty/63cb514/shard-6-of-8.json
 ff3aa797d335003cd0a251cad75591477119b6f678d55ca1b0f8bb36b7fcaa88  challenge-uncertainty/63cb514/shard-7-of-8.json
+
+# The same sweep for board task 1cd17d51-bb7f-42ff-94f3-314c2c4c2bd8, after
+# each coaxial rotor was held to the stall limit on its own disk, the coaxial
+# optima were regenerated and every coaxial sample's loaded cruise is also
+# flown by strip theory. The same tar selection at coax-drone
+# 9ae786f158b39ca02b96e8ee43129d6cfc94d196 (calc/budget tree
+# 4d63615eac2bde7ee11e8ad8f60ff7a3a9686c12, on origin branch
+# per-rotor-stall-1123), documents identity
+# 87791c712ca12a0bdcce5c8d7b7619c372b44335cdd078d8474419beee8c3c99, built
+# twice from clean worktrees to this digest and loaded at that identity by
+# sedona's Python 3.13.
+
+a1272c72e0cf1235eb753750ab32ea399b0f3ff676eaa1f2429b7b42362e8a89  coax-drone-uncertainty-payload-9ae786f.tar
+
+# Array 59952013 (coax-drone-challenge-uncertainty-9ae786f.json) completed 4
+# of the 64 shards, the free partition preempted 37 and 23 FAILED on
+# ROTOR_LIFT_LINE: the coaxial cruise trim's lift-line band cycled between two
+# ends on either side of a measured E387 angle, sample 1040's equal coaxial
+# between 5.0599 and 5.0640 degrees, because lift_line's discrete fit jumped as
+# a band end passed a grid angle. None of its shards is published. The same tar
+# selection at coax-drone 1d06f18c6de1ef2ceea4207257ed84b5aad1a590 (calc/budget
+# tree fca30acd226b8c8854c4672771200ae17d9286f4, on origin branch
+# per-rotor-stall-1123), where lift_line fits its band continuously, has the
+# same documents identity 87791c712ca12a0bdcce5c8d7b7619c372b44335cdd078d8474419beee8c3c99,
+# since no study document changed; built twice from clean worktrees to this
+# digest and loaded at that identity by sedona's Python 3.13.
+
+eee8db4077d3d0f855c1a0109e19ba711420942dccf190fe6023183c82c5ba3a  coax-drone-uncertainty-payload-1d06f18.tar
+
+# Array 59953932 (coax-drone-challenge-uncertainty-1d06f18.json) completed all
+# 64 shards in 237 to 545 s on 14 free-partition nodes, none preempted. Each
+# shard's SHA-256 was read on the cluster and again after download, identical,
+# and coax-drone commits these bytes under exports/challenge-uncertainty.
+
+95c6a28005c5f59eb4b860d349ac99fe8614fcd55f85aa5973f080df3c315cbb  challenge-uncertainty/1d06f18/shard-0-of-64.json
+0bcce2d3aa3a90890be77d793077e834c589701870b031aa86d21e4cb5df7eaf  challenge-uncertainty/1d06f18/shard-1-of-64.json
+f22ab8d4451177f82d2e6bae0e008f4f205999746ee5a1f1844814f5962e6120  challenge-uncertainty/1d06f18/shard-2-of-64.json
+4b627effa72418e4118007b299bf2eb209709ad82b8b6c31dd965c651618ea8d  challenge-uncertainty/1d06f18/shard-3-of-64.json
+43a9753ff37827fbd98a04fe319ab2dfa97b262bba0aceb94272bf1e7d1fd3a2  challenge-uncertainty/1d06f18/shard-4-of-64.json
+b194d05b106ee9ec85b153b9114e1c9331d0f783b9e1b441aa28d840ad34ce66  challenge-uncertainty/1d06f18/shard-5-of-64.json
+67b7d1a21fc1733a713e6c5f8661c39d02c2fc2ebd1b538250a082282b1c05d6  challenge-uncertainty/1d06f18/shard-6-of-64.json
+16e69d16df8d54f1e5504902e2e8ea24b2320af7eda41a0d054f57d6eecff31e  challenge-uncertainty/1d06f18/shard-7-of-64.json
+3bfd196b456aca8de15628ac11f8d56f2003cd737884d45cd0f464a1ca795005  challenge-uncertainty/1d06f18/shard-8-of-64.json
+7491e1f882520f927b9bd4e05f23364fe4881b047712b1468e66a8f2cece13ff  challenge-uncertainty/1d06f18/shard-9-of-64.json
+18f58c9573fea4076a56a2f14ff38e5b67f6d9d24d57a34fb4c9d8efe806f78a  challenge-uncertainty/1d06f18/shard-10-of-64.json
+c026eb772be6195b62fcf245558fa59ea502730e688802137787dd1b1f9c59fe  challenge-uncertainty/1d06f18/shard-11-of-64.json
+d1cd954e9a125ca612a0ec8431eb3a71c24a528e32cf99c4f4add5123449e9c7  challenge-uncertainty/1d06f18/shard-12-of-64.json
+47e3a701dd07e092caea29fd85fffe087aa14d3048425e27f81936b3550f77b3  challenge-uncertainty/1d06f18/shard-13-of-64.json
+10c7e18cfd0e0e7e3fa3f0238c58d5e227543b9352fd3a64641c2c7e5d00cb99  challenge-uncertainty/1d06f18/shard-14-of-64.json
+de61f6dfa6cd06648c34b6dc47ddc14bc7483829af0243f1fc689c7a0e8df057  challenge-uncertainty/1d06f18/shard-15-of-64.json
+32d4317ec3444a14fc158e3628e68ab869e796157de16904703cf6319429dc6d  challenge-uncertainty/1d06f18/shard-16-of-64.json
+c3ec1f64432ed2632a11ad8a551caa366c586a9aadb900701eb346ba86878799  challenge-uncertainty/1d06f18/shard-17-of-64.json
+75f12f3b9bde613928d38fcc7c3f0a51fcb6c3629616fa97cc73141c0cf52b3b  challenge-uncertainty/1d06f18/shard-18-of-64.json
+bfa747b7b305f7385ba8021130613dd6c9a3c11d33bad97cfcbbdf8ad0023aec  challenge-uncertainty/1d06f18/shard-19-of-64.json
+f10700799e5bfa06c5e9da006f4a5b83822452283a8d7c9c9cc77fa8f7652876  challenge-uncertainty/1d06f18/shard-20-of-64.json
+697db7d510b80d842b785df0c082591bd3492fef08f264e7bb2bc2a54e23e336  challenge-uncertainty/1d06f18/shard-21-of-64.json
+841fdd263add1a743c3898238e736a75e0ec29f367b7df693807173d87ed3dd3  challenge-uncertainty/1d06f18/shard-22-of-64.json
+ae2ac56dd498d3c4dbc7a84e52cbd1f26095316c7526f4c681eee4e179ace286  challenge-uncertainty/1d06f18/shard-23-of-64.json
+9ac9c87acd2bf70c60b13a3dc3c00870cd97f3bc005a30e761b27b5a94ff50fa  challenge-uncertainty/1d06f18/shard-24-of-64.json
+c5380b2f70edd5034ae1f4d1c65b726a14d461c7d6acec77a1e17c0c887718c3  challenge-uncertainty/1d06f18/shard-25-of-64.json
+742af2f09db6028b415471612bd248b14ab29a00fab9076ae87547383bd2304c  challenge-uncertainty/1d06f18/shard-26-of-64.json
+99fbf07bdefe537f0e32695e39daa00242060f003591884b6899ebe7c94c0128  challenge-uncertainty/1d06f18/shard-27-of-64.json
+a28ff459c721d4b63a3aa519f4ac9e3754fa2aa7149ce39afd5c99b6dd799a46  challenge-uncertainty/1d06f18/shard-28-of-64.json
+0ae5b1c1a2a34ffb9ed66f35d28cded3faa87292d3fd24be0ffd01f283ce9285  challenge-uncertainty/1d06f18/shard-29-of-64.json
+edfb9fcbee20c907c74828a6e99aed2bbb0ccf18e271fda4a357a663ec75ca89  challenge-uncertainty/1d06f18/shard-30-of-64.json
+018e684e00fed8951c29c53e9368a684f97e61771511fc504be449a557c76dc3  challenge-uncertainty/1d06f18/shard-31-of-64.json
+4dfafb1e92adcf851180115ad42b4ebea0617124ab95f8cc292694f02eed506b  challenge-uncertainty/1d06f18/shard-32-of-64.json
+f888f71de690607f6abed1169a1910b6df46766d8e2f1dc412eceb595aa8827f  challenge-uncertainty/1d06f18/shard-33-of-64.json
+6850d65d5276052bb7236987dd2f8735324e939ecdd0f28602a6433babe32e9b  challenge-uncertainty/1d06f18/shard-34-of-64.json
+abe2748af7e0bdfcaafcddae909d127528440bebfa6efe9ebeaac0e3c0e69c02  challenge-uncertainty/1d06f18/shard-35-of-64.json
+672a31f0231342a5e3a9305ff239a4a775227493592df9f67d44df89e69888c6  challenge-uncertainty/1d06f18/shard-36-of-64.json
+999c0061a8d81dc5c6db97647df19cb55effd025f5771e09ddda4f064a3b37b3  challenge-uncertainty/1d06f18/shard-37-of-64.json
+6071bbad9be16051f425f425a137f8e0bf467dde40a893b0eca58801d58f35a9  challenge-uncertainty/1d06f18/shard-38-of-64.json
+a13f6bb6be92097639c0aa60f1880d0c2485347dc9fbad053372c75c9775de65  challenge-uncertainty/1d06f18/shard-39-of-64.json
+ccb1a5795c080ad6f17ce5a46ee363305525a786fad6d131e08242e61664d134  challenge-uncertainty/1d06f18/shard-40-of-64.json
+8a14f52404d7a54db2e2b92c1219eadf3c64ec69d78cb37440eee1a5fcd53506  challenge-uncertainty/1d06f18/shard-41-of-64.json
+7e14a6399013ca81f8b9d60ace1afe9d0e7f5aada2fbc37cf8ea33d3c3a403f5  challenge-uncertainty/1d06f18/shard-42-of-64.json
+8ec3f307f368649d08e9d852c1c52865320fd2c1e47f9e4a53d2965a8af4c9ad  challenge-uncertainty/1d06f18/shard-43-of-64.json
+fd693ad2e768811b368961ed3a6b629c89d5489565e595041a34d5e872bf2370  challenge-uncertainty/1d06f18/shard-44-of-64.json
+c1b3d69883d215265fb9a498bd2a09839d6c09e30456d186f1c21914eecc3b18  challenge-uncertainty/1d06f18/shard-45-of-64.json
+6d40817f05a3b662a2af40ba3122b00282a02ff4236ac4755fe0ee513fff4af6  challenge-uncertainty/1d06f18/shard-46-of-64.json
+e7275d66ae53ac677accbf7cebc50ca33bd4fb03acd725e1d1abfe8f33660f24  challenge-uncertainty/1d06f18/shard-47-of-64.json
+3af1c575bb24f76d0ca3f4b0094984a5aaaa3b6709a025401bb43a21142ab359  challenge-uncertainty/1d06f18/shard-48-of-64.json
+b45db99cfad19deb1cdf88219d1e51c4fb251762fa481384bb8d44cbdd3cf7f6  challenge-uncertainty/1d06f18/shard-49-of-64.json
+ac0cdd61982ac7d3ac57c66130b5dec4c0ad61780af6c4934d27e5e626e82d53  challenge-uncertainty/1d06f18/shard-50-of-64.json
+d33d13e58577f2a86ec0d751618536bb79a2682b3dabe04a25a8fe8574fc2b6d  challenge-uncertainty/1d06f18/shard-51-of-64.json
+7cd2f7111290c92c04890e89a83402c4f7248927942e8fc1af5b92176ad42ebb  challenge-uncertainty/1d06f18/shard-52-of-64.json
+961ad46d84837bb7d12db1d8264c5655d8bc309835bc9ce7c570faeb093c55ce  challenge-uncertainty/1d06f18/shard-53-of-64.json
+52b75f5d643a69f673aa5af11cd2cbeadb4b44fdb0a317512da483edd0937c56  challenge-uncertainty/1d06f18/shard-54-of-64.json
+ca91ccdf752faa68f2a8548bd21be0dc03e65981a0170db674432e9663a12958  challenge-uncertainty/1d06f18/shard-55-of-64.json
+de597a03761b02a8d2cd574eade0b26dda9a2a61c1ade53f36cd2bb47c618db3  challenge-uncertainty/1d06f18/shard-56-of-64.json
+b81535e4a7ca32c8dfd0c7de79d7437e50c6e4ef237a249e01cd05e38a8dbc83  challenge-uncertainty/1d06f18/shard-57-of-64.json
+2c97c58016e205eeb71826b2cfe041b3cb0d42ad6797906c9b45eb1dc0122b49  challenge-uncertainty/1d06f18/shard-58-of-64.json
+c6c37bafbac638906d1aadabc338d5c3a54976731ce45970fe52ad7866bb8e36  challenge-uncertainty/1d06f18/shard-59-of-64.json
+391f51379b6e043b1ba14c598d84fcc8e3b5d73c61abcc6b5515fe6d91ee6c60  challenge-uncertainty/1d06f18/shard-60-of-64.json
+4dc718aa91f12bc34ad7160086b42efc44350fe4472b442ed78af44ee6829e52  challenge-uncertainty/1d06f18/shard-61-of-64.json
+4390be04ac6b4231dea5e45f4fdba49e011b347f1210d37dcbfba2c7f378116f  challenge-uncertainty/1d06f18/shard-62-of-64.json
+6b0e911b9ee56e6ee02e08bbb6a393f083d638b4046ac0f7a8d119571fb09c45  challenge-uncertainty/1d06f18/shard-63-of-64.json

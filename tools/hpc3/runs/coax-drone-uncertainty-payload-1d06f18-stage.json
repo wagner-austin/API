@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-uncertainty-payload-1d06f18.tar",
+      "sha256": "eee8db4077d3d0f855c1a0109e19ba711420942dccf190fe6023183c82c5ba3a",
+      "size_bytes": 532879360
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone 1d06f18c6de1ef2ceea4207257ed84b5aad1a590, a clean git worktree of that commit",
+    "selection": "tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner --format=gnu of pyproject.toml, calc/budget, wiki/sources and exports/challenge/optimum-{coax-blade,coax-unequal-blade,tandem-blade,single-blade}-2028.csv",
+    "why": "the 2028 layouts' uncertainty sweep of payload 9ae786f rerun after array 59952013 stopped 23 shards on ROTOR_LIFT_LINE; lift_line now fits each band continuously, so the coaxial cruise trim's band iteration settles (challenge documents identity 87791c712ca12a0bdcce5c8d7b7619c372b44335cdd078d8474419beee8c3c99, unchanged); each member unpacks this archive into node-local TMPDIR and imports calc.budget from it",
+    "note": "board task 1cd17d51-bb7f-42ff-94f3-314c2c4c2bd8; the commit is on origin branch per-rotor-stall-1123, a second build from another clean worktree of it gave the same digest, and it loads at that identity under sedona's Python 3.13"
+  }
+}

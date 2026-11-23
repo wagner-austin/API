@@ -1,0 +1,16 @@
+{
+  "destination": "/pub/wagnera3/coax-drone/payload",
+  "files": [
+    {
+      "name": "coax-drone-uncertainty-payload-9ae786f.tar",
+      "sha256": "a1272c72e0cf1235eb753750ab32ea399b0f3ff676eaa1f2429b7b42362e8a89",
+      "size_bytes": 532879360
+    }
+  ],
+  "provenance": {
+    "source": "coax-drone 9ae786f158b39ca02b96e8ee43129d6cfc94d196, a clean git worktree of that commit",
+    "selection": "tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner --format=gnu of pyproject.toml, calc/budget, wiki/sources and exports/challenge/optimum-{coax-blade,coax-unequal-blade,tandem-blade,single-blade}-2028.csv",
+    "why": "the 2028 layouts' uncertainty sweep after each coaxial rotor was held to Bousman's stall limit on its own disk, the coaxial optima were regenerated under it, and every coaxial sample's loaded cruise is also flown by strip theory with each head phased for its flap lag (challenge documents identity 87791c712ca12a0bdcce5c8d7b7619c372b44335cdd078d8474419beee8c3c99); each member unpacks this archive into node-local TMPDIR and imports calc.budget from it",
+    "note": "board task 1cd17d51-bb7f-42ff-94f3-314c2c4c2bd8; the commit is on origin branch per-rotor-stall-1123, a second build from another clean worktree of it gave the same digest, and it loads at that identity under sedona's Python 3.13"
+  }
+}
