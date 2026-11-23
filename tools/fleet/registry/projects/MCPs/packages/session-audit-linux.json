@@ -1,7 +1,7 @@
 {
   "worker_ram_gb": 0.3,
   "minimum_workers": 3,
-  "expected_minutes": 8,
+  "expected_minutes": 18,
   "exclusive_resources": [
     "corvis-fleet-testdb"
   ],
