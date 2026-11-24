@@ -10,15 +10,15 @@ same calls against real pytest and cosmic-ray.
 from __future__ import annotations
 
 import shlex
+from pathlib import Path
 
 import pytest
 
-from maketools.mutation.context import MutationErrorCode, MutationStepError
+from maketools.mutation.context import MutationStepError
 from maketools.mutation.cosmic import RunOutcome, Site, WorkerOutcome
 from maketools.mutation.trials import (
     mutant_timeout,
     pytest_script,
-    run_baseline,
     run_environment,
     run_mutant,
     survived,
@@ -32,6 +32,12 @@ NAMED = ("tests/t.py::a", "tests/t.py::b[x y]")
 SITE = Site("src/p.py", 7, 4, "core/ReplaceComparisonOperator_Eq_Lt", 3)
 KILLED = SURVIVED.replace('"survived"', '"killed"')
 INCOMPETENT = KILLED.replace('"killed"', '"incompetent"')
+#: Where a baseline round's report goes, and the arguments that write it.
+REPORT = Path("/scratch/run/baseline-1.junit.xml")
+JUNIT = (
+    "--junitxml=/scratch/run/baseline-1.junit.xml -o junit_family=xunit1 "
+    "-o junit_duration_report=total"
+)
 
 
 def test_tests_run_without_the_check_locks_span_file_and_the_step_keeps_it() -> None:
@@ -40,51 +46,35 @@ def test_tests_run_without_the_check_locks_span_file_and_the_step_keeps_it() -> 
     assert context.environment == ENVIRONMENT
 
 
-def test_named_tests_run_in_one_process_with_the_mutants_flags() -> None:
+def test_named_tests_run_in_one_process_in_the_order_given() -> None:
     context = World(lambda argv: ok(), []).context()
-    assert pytest_script(context, NAMED) == (
+    assert pytest_script(context, NAMED, None) == (
         f"exec {PYTEST} -n 0 tests/t.py::a 'tests/t.py::b[x y]'"
     )
 
 
 def test_the_whole_suite_runs_with_the_packages_own_workers() -> None:
     context = World(lambda argv: ok(), []).context()
-    assert pytest_script(context, ()) == f"exec {PYTEST}"
+    assert pytest_script(context, (), None) == f"exec {PYTEST}"
+
+
+def test_a_baseline_round_writes_an_xunit1_report_beside_its_named_tests() -> None:
+    context = World(lambda argv: ok(), []).context()
+    assert pytest_script(context, NAMED, REPORT) == (
+        f"exec {PYTEST} {JUNIT} -n 0 tests/t.py::a 'tests/t.py::b[x y]'"
+    )
+    assert pytest_script(context, (), REPORT) == f"exec {PYTEST} {JUNIT}"
 
 
 def test_a_prepare_command_runs_before_pytest() -> None:
     context = World(lambda argv: ok(), []).context("python scripts/gen.py")
-    assert pytest_script(context, ()) == f"python scripts/gen.py && exec {PYTEST}"
+    assert pytest_script(context, (), None) == f"python scripts/gen.py && exec {PYTEST}"
 
 
 def test_a_mutants_timeout_is_three_baselines_rounded_up_plus_thirty_seconds() -> None:
+    # 3 x 10.2 = 30.6, up to 31, plus 30.
     assert mutant_timeout(10.2) == 61
     assert mutant_timeout(0.0) == 30
-
-
-def test_a_passing_baseline_sets_the_timeout_from_its_wall_time() -> None:
-    world = World(lambda argv: ok(), [100.0, 210.2])
-    assert run_baseline(world.context(), NAMED) == 361
-    assert world.calls == [
-        (["sh", "-c", f"exec {PYTEST} -n 0 tests/t.py::a 'tests/t.py::b[x y]'"], RUN_ENVIRONMENT)
-    ]
-
-
-def test_a_failing_baseline_is_refused_naming_its_tests() -> None:
-    world = World(lambda argv: failed(1, "E boom"), [100.0])
-    with pytest.raises(MutationStepError) as raised:
-        run_baseline(world.context(), NAMED)
-    assert str(raised.value) == (
-        "MUTATION_BASELINE_FAILED: tests/t.py::a tests/t.py::b[x y] failed unmutated, "
-        "exited 1: E boom"
-    )
-    assert raised.value.code == MutationErrorCode.BASELINE_FAILED
-
-
-def test_a_failing_whole_suite_baseline_is_named_as_the_whole_suite() -> None:
-    world = World(lambda argv: failed(2, "E boom"), [100.0])
-    with pytest.raises(MutationStepError, match=r"^MUTATION_BASELINE_FAILED: the whole suite "):
-        run_baseline(world.context(), ())
 
 
 def test_a_surviving_mutant_answers_the_line_it_put_in_place() -> None:

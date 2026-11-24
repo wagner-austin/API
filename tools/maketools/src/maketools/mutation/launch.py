@@ -1,7 +1,7 @@
 """API's boundary of the lifted mutation step, run after a passing suite (MCPs task e52e5148).
 
 The step's core (``context``, ``changes``, ``sites``, ``cosmic``, ``report``,
-``trials``, ``step``) is MCPs' ``mcp_shared_py.mutation``, lifted byte for
+``timing``, ``trials``, ``baseline``, ``step``) is MCPs' ``mcp_shared_py.mutation``, lifted byte for
 byte and pinned in ``tools/maketools/lift-lock.json``. It imports only the
 standard library, and everything that differs between the two repositories
 is bound here and nowhere else:
@@ -18,6 +18,14 @@ is bound here and nowhere else:
 - THE SPAN: a run that made mutants records its time as the check's
   ``mutation testing`` span (:mod:`maketools.bounded_spans`), which
   ``check-budget`` holds to its own bound instead of the five minutes.
+- THE BOUND (MCPs board task 3b386c0d): the step holds itself to that same
+  bound, read from :data:`~maketools.bounded_spans.SEPARATE_BOUNDS`, the one
+  table ``check-budget`` reads it from, so it is written once. MCPs' step
+  reads its own through maketools' ``span-bound`` because it runs as a child
+  of the launcher; here the launcher runs it in process. Once the bound has
+  passed with mutants left, the step starts no further trial and refuses
+  ``MUTATION_OVER_BOUND`` naming each one, so a check too large to mutate
+  ends inside its lease with the reason rather than at the lease's kill.
 
 ``run.py test --mutation`` (:func:`maketools.test_run.run_tests`) calls
 :func:`mutate_after_suite` with the package, its interpreter and the
@@ -47,6 +55,7 @@ from maketools import _test_hooks
 from maketools.bounded_spans import (
     MUTATION_BOUND_SECONDS,
     MUTATION_SPAN,
+    SEPARATE_BOUNDS,
     SPANS_ENVIRONMENT_KEY,
     record_span,
 )
@@ -294,7 +303,16 @@ def mutate_after_suite(
     hooks = mutation_hooks(project, run_dir)
     record = span_sink(environment)
     try:
-        return run_in_scratch(hooks, API_CODEC, project, python, "", environment, record)
+        return run_in_scratch(
+            hooks,
+            API_CODEC,
+            project,
+            python,
+            "",
+            environment,
+            record,
+            lambda: SEPARATE_BOUNDS[MUTATION_SPAN],
+        )
     except MutationStepError as refusal:
         raise AppError(MutationErrorCode(refusal.code.value), refusal.detail) from refusal
 

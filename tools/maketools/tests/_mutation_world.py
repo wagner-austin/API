@@ -14,6 +14,7 @@ runs the real bundle these stand in for.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from functools import partial
 from pathlib import Path
 
 from platform_core.json_utils import JSONValue
@@ -21,12 +22,19 @@ from platform_core.json_utils import JSONValue
 from maketools.mutation.context import MutationHooks, Ran, StepContext
 from maketools.mutation.launch import API_CODEC
 
+#: The bound a run of the world is given unless a test states another: the check's.
+CHECK_BOUND = 900
+
 PACKAGE = Path("/pkg")
 RUN_DIR = Path("/scratch/run")
 PYTHON = "/pkg/.venv/bin/python"
 COSMIC_RAY = "/pkg/.venv/bin/cosmic-ray"
 ENVIRONMENT = {"PATH": "/usr/bin", "CORVIS_CHECK_SPANS": "/tmp/spans"}
 RUN_ENVIRONMENT = {"PATH": "/usr/bin", "PYTHONDONTWRITEBYTECODE": "1"}
+
+#: The package's declaration of what coverage measures: ``src``, the root every
+#: changed file in these tests sits under (API's packages declare ``scripts`` too).
+PYPROJECT_TEXT = '[tool.coverage.run]\nsource = ["src"]\nbranch = true\n'
 
 
 def ok(stdout: str = "") -> Ran:
@@ -67,10 +75,11 @@ class World:
         self.answer = answer
         self.times = [*times]
         self.calls: list[tuple[list[str], dict[str, str]]] = []
-        self.files: dict[Path, str] = {}
+        self.files: dict[Path, str] = {PACKAGE / "pyproject.toml": PYPROJECT_TEXT}
         self.lines: list[str] = []
         self.removed: list[Path] = []
         self.spans: list[int] = []
+        self.bound_reads = 0
 
     def _run(self, argv: Sequence[str], env: Mapping[str, str]) -> Ran:
         self.calls.append(([*argv], {**env}))
@@ -101,11 +110,12 @@ class World:
             write=self.lines.append,
         )
 
-    def context(self, prepare: str = "") -> StepContext[JSONValue]:
+    def context(self, prepare: str = "", bound: int = CHECK_BOUND) -> StepContext[JSONValue]:
         """A run of the step bound to this world, with API's codec.
 
         Args:
             prepare: The package's prepare command, or empty.
+            bound: The bound the step holds itself to, read once it has mutants.
 
         Returns:
             The context, recording its spans into :attr:`spans`.
@@ -119,7 +129,12 @@ class World:
             environment=ENVIRONMENT,
             run_dir=RUN_DIR,
             record_span=self.spans.append,
+            read_bound=partial(self._read_bound, bound),
         )
+
+    def _read_bound(self, bound: int) -> int:
+        self.bound_reads += 1
+        return bound
 
     def argvs(self) -> list[list[str]]:
         """Every command run, in order.

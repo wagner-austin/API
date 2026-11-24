@@ -157,9 +157,9 @@ def test_a_change_whose_tests_miss_the_floor_fails_and_one_that_checks_it_passes
     ) in lines, output
     failed = [line for line in lines if line.startswith("mutation: FAILED: ")]
     assert failed == [
-        "mutation: FAILED: 1 of 7 mutant(s) made in 1 src file(s) changed against origin/main "
-        f"(merge base {_git(repo, 'rev-parse', 'HEAD~1').strip()}) survived. Kill each with a "
-        "test, or rewrite the code so the mutation cannot change what it does."
+        "mutation: FAILED: 1 of 7 mutant(s) made in 1 source file(s) changed against "
+        f"origin/main (merge base {_git(repo, 'rev-parse', 'HEAD~1').strip()}) survived. Kill "
+        "each with a test, or rewrite the code so the mutation cannot change what it does."
     ], output
     assert (repo / "src" / "compare.py").read_text(encoding="utf-8") == SOURCE
     assert _git(repo, "status", "--porcelain", "--untracked-files=no") == ""
@@ -169,7 +169,7 @@ def test_a_change_whose_tests_miss_the_floor_fails_and_one_that_checks_it_passes
     strong = _check(repo, spans)
     assert strong.returncode == 0, strong.stdout + strong.stderr
     assert any(
-        line.startswith("mutation: passed: 0 of 7 mutant(s) made in 1 src file(s)")
+        line.startswith("mutation: passed: 0 of 7 mutant(s) made in 1 source file(s)")
         for line in strong.stdout.splitlines()
     ), strong.stdout
     recorded = spans.read_text(encoding="utf-8").splitlines()

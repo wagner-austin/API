@@ -35,14 +35,18 @@ class MutationErrorCode(StrEnum):
     """Every way the step refuses to run or to finish."""
 
     BASE_UNAVAILABLE = "MUTATION_BASE_UNAVAILABLE"
+    SOURCES_UNDECLARED = "MUTATION_SOURCES_UNDECLARED"
     GIT_FAILED = "MUTATION_GIT_FAILED"
     TREE_DIRTY = "MUTATION_TREE_DIRTY"
     COSMIC_RAY_FAILED = "MUTATION_COSMIC_RAY_FAILED"
     COVERAGE_UNAVAILABLE = "MUTATION_COVERAGE_UNAVAILABLE"
     BASELINE_FAILED = "MUTATION_BASELINE_FAILED"
+    BASELINE_UNREPORTED = "MUTATION_BASELINE_UNREPORTED"
     PREPARE_FAILED = "MUTATION_PREPARE_FAILED"
     TREE_NOT_RESTORED = "MUTATION_TREE_NOT_RESTORED"
     SPAN_UNRECORDED = "MUTATION_SPAN_UNRECORDED"
+    BOUND_UNREAD = "MUTATION_BOUND_UNREAD"
+    OVER_BOUND = "MUTATION_OVER_BOUND"
 
 
 class MutationStepError(Exception):
@@ -138,6 +142,11 @@ class StepContext(NamedTuple, Generic[JsonT]):
         record_span: Record the step's wall time, in whole seconds, as the
             check's ``mutation testing`` span, which the package's check
             holds to its own bound; called once a run has made mutants.
+        read_bound: Read that bound, in whole seconds, which the step holds
+            itself to: it starts no trial once that many seconds have passed
+            since it began, and refuses ``MUTATION_OVER_BOUND`` naming each
+            mutant it did not run (board task 3b386c0d); called once a run
+            has made mutants, before its first trial.
     """
 
     hooks: MutationHooks
@@ -148,6 +157,7 @@ class StepContext(NamedTuple, Generic[JsonT]):
     environment: Mapping[str, str]
     run_dir: Path
     record_span: Callable[[int], None]
+    read_bound: Callable[[], int]
 
 
 def tail(ran: Ran) -> str:

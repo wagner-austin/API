@@ -16,7 +16,9 @@ from maketools.mutation.report import (
     Uncaught,
     UncaughtMutant,
     mutant_line,
+    render_over_bound,
     render_verdict,
+    tally_line,
 )
 
 TALLY = Tally(files=2, base="abc123", by_tests=5, by_suite=2, by_none=1, declarations=4)
@@ -60,7 +62,8 @@ def test_an_operator_outside_cosmic_rays_core_keeps_its_whole_name() -> None:
 def test_a_run_with_no_survivor_passes_naming_how_many_were_made() -> None:
     assert render_verdict(TALLY, [], dump_spaced) == [
         RAN,
-        "mutation: passed: 0 of 8 mutant(s) made in 2 src file(s) changed against origin/main "
+        "mutation: passed: 0 of 8 mutant(s) made in 2 source file(s) changed against "
+        "origin/main "
         "(merge base abc123) survived",
     ]
 
@@ -78,7 +81,35 @@ def test_survivors_fail_the_run_in_file_line_and_column_order() -> None:
         mutant_line(earlier_column, dump_spaced),
         mutant_line(later_column, dump_spaced),
         mutant_line(other_file, dump_spaced),
-        "mutation: FAILED: 4 of 8 mutant(s) made in 2 src file(s) changed against origin/main "
+        "mutation: FAILED: 4 of 8 mutant(s) made in 2 source file(s) changed against "
+        "origin/main "
         "(merge base abc123) survived. Kill each with a test, or rewrite the code so the "
         "mutation cannot change what it does.",
     ]
+
+
+def test_a_mutant_the_bound_left_unrun_says_so_showing_its_unmutated_line() -> None:
+    mutant = UncaughtMutant(
+        "src/p/a.py", 9, 7, "core/ReplaceBinaryOperator_Add_Sub", "return x + 1", Uncaught.NOT_RUN
+    )
+    assert mutant_line(mutant, dump_spaced) == (
+        "MUTANT NOT RUN, THE BOUND CAME src/p/a.py:9:8 ReplaceBinaryOperator_Add_Sub -> "
+        '"return x + 1"'
+    )
+
+
+def test_a_run_the_bound_stopped_names_the_uncaught_and_the_unrun_together_in_order() -> None:
+    unrun_late = _mutant("src/b.py", 4, 0, Uncaught.NOT_RUN)
+    survivor = _mutant("src/a.py", 7, 2, Uncaught.SURVIVED)
+    unrun_early = _mutant("src/a.py", 9, 1, Uncaught.NOT_RUN)
+    untested = _mutant("src/a.py", 3, 40, Uncaught.NO_TEST)
+    lines = render_over_bound(TALLY, [survivor, untested], [unrun_late, unrun_early], dump_spaced)
+    # No summary line: the refusal that follows is the run's last word.
+    assert lines == [
+        RAN,
+        'MUTANT SURVIVED, NO TEST RAN IT src/a.py:3:41 ReplaceComparisonOperator_Eq_Lt -> "x < y"',
+        'MUTANT SURVIVED src/a.py:7:3 ReplaceComparisonOperator_Eq_Lt -> "x < y"',
+        'MUTANT NOT RUN, THE BOUND CAME src/a.py:9:2 ReplaceComparisonOperator_Eq_Lt -> "x < y"',
+        'MUTANT NOT RUN, THE BOUND CAME src/b.py:4:1 ReplaceComparisonOperator_Eq_Lt -> "x < y"',
+    ]
+    assert tally_line(TALLY) == RAN

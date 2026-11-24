@@ -1,4 +1,4 @@
-"""Running a mutant's tests: unmutated first, then under the mutant (board task fec5851c).
+"""Running a mutant's tests, and the command every test run is (board task fec5851c).
 
 Every run is the package's own pytest with its own configuration, given
 three things a mutant needs: ``-x``, since one failure kills it; no cache
@@ -6,7 +6,9 @@ provider, so no run writes ``.pytest_cache``; and ``-W error::SyntaxWarning``,
 so a mutant the interpreter refuses (``x is ""``, which CPython warns of and
 which no test could tell from ``x == ""``) fails to import instead of
 surviving. A run of named tests adds ``-n 0``: a few tests in one process
-start faster than xdist's workers.
+start faster than xdist's workers, and run in the order given. The
+unmutated rounds before the first trial (:mod:`.baseline`, board task
+3b386c0d) also write the JUnit report each share's cost is read from.
 
 THE BASE TEMPORARY DIRECTORY IS THE PACKAGE'S (board task e6c9604f). The
 step once moved it into its scratch directory, outside the checkout; but a
@@ -26,6 +28,7 @@ from __future__ import annotations
 
 import math
 import shlex
+from pathlib import Path
 
 from .context import (
     JsonT,
@@ -33,7 +36,6 @@ from .context import (
     MutationStepError,
     StepContext,
     run_or_refuse,
-    tail,
 )
 from .cosmic import RunOutcome, Site, WorkerOutcome, command, decode_result, mutated_line
 
@@ -84,12 +86,14 @@ def run_environment(context: StepContext[JsonT]) -> dict[str, str]:
     return environment
 
 
-def pytest_script(context: StepContext[JsonT], tests: tuple[str, ...]) -> str:
+def pytest_script(context: StepContext[JsonT], tests: tuple[str, ...], report: Path | None) -> str:
     """The shell script that runs one set of tests.
 
     Args:
         context: The run.
-        tests: The tests' node ids, or empty for the whole suite.
+        tests: The test files or node ids, or empty for the whole suite.
+        report: Where a baseline round writes its xunit1 JUnit report, or
+            None for a run that writes none.
 
     Returns:
         ``exec`` of pytest, after the package's prepare command when it has
@@ -97,6 +101,9 @@ def pytest_script(context: StepContext[JsonT], tests: tuple[str, ...]) -> str:
     """
     pytest = [context.python, "-W", "error::SyntaxWarning", "-m", "pytest", "-x", "-q"]
     pytest += ["-p", "no:cacheprovider"]
+    if report is not None:
+        pytest += [f"--junitxml={report}", "-o", "junit_family=xunit1"]
+        pytest += ["-o", "junit_duration_report=total"]
     if tests:
         pytest += ["-n", "0", *tests]
     script = f"exec {shlex.join(pytest)}"
@@ -108,41 +115,17 @@ def pytest_script(context: StepContext[JsonT], tests: tuple[str, ...]) -> str:
 def mutant_timeout(baseline_seconds: float) -> int:
     """How long a mutant's run may take before it counts as killed.
 
-    Three times the unmutated run, rounded up, plus 30 seconds for a node
-    busier than it was then.
+    Three times what its tests took unmutated, rounded up, plus 30 seconds
+    for a node busier than it was then.
 
     Args:
-        baseline_seconds: The unmutated run's wall time.
+        baseline_seconds: What the baseline measured for its tests: the
+            whole suite's wall time, or its files' summed case times.
 
     Returns:
         Whole seconds.
     """
     return math.ceil(baseline_seconds * 3) + 30
-
-
-def run_baseline(context: StepContext[JsonT], tests: tuple[str, ...]) -> int:
-    """Run a set of tests unmutated, which must pass, and time it.
-
-    Args:
-        context: The run.
-        tests: The tests' node ids, or empty for the whole suite.
-
-    Returns:
-        The timeout of a mutant these tests run.
-
-    Raises:
-        MutationStepError: ``MUTATION_BASELINE_FAILED`` when they fail
-            unmutated, since every mutant would then read as killed.
-    """
-    started = context.hooks.now()
-    argv = ["sh", "-c", pytest_script(context, tests)]
-    ran = context.hooks.run(argv, run_environment(context))
-    if ran.exit_code:
-        named = " ".join(tests) or "the whole suite"
-        raise MutationStepError(
-            MutationErrorCode.BASELINE_FAILED, f"{named} failed unmutated, {tail(ran)}"
-        )
-    return mutant_timeout(context.hooks.now() - started)
 
 
 def run_mutant(
@@ -165,7 +148,14 @@ def run_mutant(
             be started.
     """
     tests_command = shlex.join(
-        ["timeout", "--kill-after=10", str(timeout), "sh", "-c", pytest_script(context, tests)]
+        [
+            "timeout",
+            "--kill-after=10",
+            str(timeout),
+            "sh",
+            "-c",
+            pytest_script(context, tests, None),
+        ]
     )
     argv = [command(context.python), "mutate-and-test", site.path, site.operator]
     argv += [str(site.occurrence), tests_command]
@@ -186,7 +176,6 @@ __all__ = [
     "SPANS_VARIABLE",
     "mutant_timeout",
     "pytest_script",
-    "run_baseline",
     "run_environment",
     "run_mutant",
     "survived",

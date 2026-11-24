@@ -1,11 +1,13 @@
-"""API's boundary of the lifted mutation step (MCPs board task e52e5148).
+"""API's boundary of the lifted mutation step (MCPs board tasks e52e5148 and 3b386c0d).
 
 What is API's own around MCPs' core: the JSON codec over
 ``platform_core.json_utils`` (its refusals naming the field), the hooks bound
-to maketools' own, the span sink ``check-budget`` reads, and the refusal
+to maketools' own, the span sink ``check-budget`` reads, the bound the step
+holds itself to (``check-budget``'s own for the span), and the refusal
 mapping onto ``platform_core``'s ``MutationErrorCode``. The core's commands
 go through the ``world`` fixture's ``run_answering``; the files, the scratch
-directory and the span file are real.
+directory and the span file are real. Each package's ``pyproject.toml``
+declares ``src`` and ``scripts`` for coverage, as every API package does.
 """
 
 from __future__ import annotations
@@ -15,9 +17,9 @@ from pathlib import Path
 import pytest
 from platform_core import error_codes_tooling
 from platform_core.errors import AppError
-from platform_core.json_utils import JSONTypeError
+from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
 
-from maketools.bounded_spans import SPANS_ENVIRONMENT_KEY, read_spans
+from maketools.bounded_spans import MUTATION_SPAN, SPANS_ENVIRONMENT_KEY, BoundedSpan, read_spans
 from maketools.commands import CommandResult
 from maketools.mutation.context import MutationErrorCode, Ran
 from maketools.mutation.launch import (
@@ -39,9 +41,18 @@ from maketools.mutation.launch import (
 )
 from tests.conftest import World, failed, ok
 
+#: An API package's declaration of what coverage measures (``libs/platform_core``'s).
+PYPROJECT = '[tool.coverage.run]\nsource = ["src", "scripts"]\nomit = []\nbranch = true\n'
+
 NOT_APPLICABLE = (
-    "mutation: not applicable: 0 lines added to src files against origin/main (merge base "
-    "abc123), so 0 mutants were made"
+    "mutation: not applicable: 0 lines added to the sources pyproject.toml [tool.coverage.run] "
+    "names (src, scripts) against origin/main (merge base abc123), so 0 mutants were made"
+)
+
+#: A commit adding one module constant, a line only import runs.
+CONSTANT_DIFF = (
+    "diff --git a/src/m.py b/src/m.py\nnew file mode 100644\n--- /dev/null\n"
+    "+++ b/src/m.py\n@@ -0,0 +1 @@\n+X = 1\n"
 )
 
 
@@ -150,6 +161,7 @@ def test_a_commit_adding_no_source_line_runs_in_scratch_and_records_no_span(
     world: World, tmp_path: Path
 ) -> None:
     world.answer = _no_change
+    (tmp_path / "pyproject.toml").write_text(PYPROJECT, encoding="utf-8")
     spans = tmp_path / "spans"
     scratch = tmp_path / ".mutation-deadbeef"
     environment = {"PATH": "/bin", SPANS_ENVIRONMENT_KEY: str(spans)}
@@ -159,6 +171,84 @@ def test_a_commit_adding_no_source_line_runs_in_scratch_and_records_no_span(
     assert world.lines == [NOT_APPLICABLE]
     assert read_spans(spans) == ()
     assert {call["env"][SPANS_ENVIRONMENT_KEY] for call in world.answering_calls} == {str(spans)}
+
+
+def _constant_dump() -> str:
+    """cosmic-ray's dump of the one mutant of ``X = 1``: its ``1``.
+
+    Returns:
+        The line ``cosmic-ray dump`` prints for it.
+    """
+    mutation: dict[str, JSONValue] = {
+        "module_path": "src/m.py",
+        "operator_name": "core/NumberReplacer",
+        "occurrence": 0,
+        "start_pos": [1, 4],
+        "end_pos": [1, 5],
+        "operator_args": {},
+        "definition_name": "x",
+    }
+    work_item: dict[str, JSONValue] = {"job_id": "j", "mutations": [mutation]}
+    dumped: list[JSONValue] = [work_item, None]
+    return dump_json_str(dumped, compact=False)
+
+
+def _import_only_coverage() -> str:
+    """The coverage report of a line only import ran: no test's context names it.
+
+    Returns:
+        The JSON ``coverage json --show-contexts`` writes.
+    """
+    contexts: dict[str, JSONValue] = {"1": [""]}
+    measured: dict[str, JSONValue] = {"executed_lines": [1], "contexts": contexts}
+    files: dict[str, JSONValue] = {"src/m.py": measured}
+    report: dict[str, JSONValue] = {"meta": {"show_contexts": True}, "files": files}
+    return dump_json_str(report, compact=False)
+
+
+def test_the_step_holds_itself_to_check_budgets_bound_and_refuses_when_it_comes(
+    world: World, tmp_path: Path
+) -> None:
+    # The clock reads 1,000,000.0 when the step starts and moves 900 s while
+    # cosmic-ray lists the mutants, so the step's own check before its first
+    # trial finds the bound, 900 s, come: no baseline and no trial runs, and
+    # the span is round(1,000,900.0 - 1,000,000.0) = 900 s.
+    (tmp_path / "pyproject.toml").write_text(PYPROJECT, encoding="utf-8")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "m.py").write_text("X = 1\n", encoding="utf-8")
+    spans = tmp_path / "spans"
+    scratch = tmp_path / ".mutation-deadbeef"
+    python = "/pkg/.venv/bin/python"
+
+    def answer_commands(argv: tuple[str, ...]) -> CommandResult:
+        if argv[:2] == ("git", "merge-base"):
+            return ok("abc123\n")
+        if argv[:2] == ("git", "diff"):
+            return ok(CONSTANT_DIFF)
+        if argv[1:2] == ("dump",):
+            world.now_value += 900.0
+            return ok(_constant_dump())
+        if argv[1:3] == ("-m", "coverage"):
+            Path(argv[-1]).write_text(_import_only_coverage(), encoding="utf-8")
+        return ok("")
+
+    world.answer = answer_commands
+    environment = {"PATH": "/bin", SPANS_ENVIRONMENT_KEY: str(spans)}
+    with pytest.raises(AppError) as refused:
+        mutate_after_suite(tmp_path, python, environment, scratch)
+    assert refused.value.code is error_codes_tooling.MutationErrorCode.OVER_BOUND
+    assert refused.value.message == (
+        "0 of the 1 mutant(s) the tests run in 1 source file(s) had been run when the step's "
+        "900 s bound came, so 1 were not run, beside 0 already uncaught, each named above; "
+        "HEAD's bytes are back in each file it mutates and its span is recorded. A change too "
+        "large to mutate inside the bound is one to split"
+    )
+    assert 'MUTANT NOT RUN, THE BOUND CAME src/m.py:1:5 NumberReplacer -> "X = 1"' in world.lines
+    ran = [call["argv"] for call in world.answering_calls]
+    assert [argv for argv in ran if argv[0] == "sh" or "mutate-and-test" in argv] == []
+    assert ran[2][-3:] == ("--", "src", "scripts")
+    assert read_spans(spans) == (BoundedSpan(MUTATION_SPAN, 900, 900, 1_000_900.0),)
+    assert world.removed_trees == [scratch]
 
 
 @pytest.mark.parametrize("code", list(MutationErrorCode))
@@ -172,6 +262,7 @@ def test_a_refusal_becomes_an_app_error_and_still_removes_the_scratch_directory(
     world: World, tmp_path: Path
 ) -> None:
     world.answer = lambda argv: failed(128, "")
+    (tmp_path / "pyproject.toml").write_text(PYPROJECT, encoding="utf-8")
     scratch = tmp_path / ".mutation-deadbeef"
     with pytest.raises(AppError) as refused:
         mutate_after_suite(tmp_path, "/py", {}, scratch)

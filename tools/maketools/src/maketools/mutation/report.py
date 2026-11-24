@@ -4,7 +4,9 @@ THE RULE IT ENFORCES is the coding prompt's: the source a commit changes is
 mutation tested and no mutant survives; a surviving mutant is killed by a
 test or, when it changes nothing observable, removed by rewriting the code;
 there is no ignore list. Two outcomes fail the step: a mutant the tests ran
-and passed, and one no test runs at all. The lines read as mcp-shared's
+and passed, and one no test runs at all. A run its bound stops names each
+mutant it did not run as well, and then refuses (:mod:`.step`, board task
+3b386c0d): a mutant left unrun is not one the tests killed. The lines read as mcp-shared's
 TypeScript step prints them (``mcp-shared/src/mutation/report.ts``), so a
 reader of either step reads one format: ``<words> <file>:<line>:<column>
 <mutator> -> <the mutated line as JSON>``, columns counted from one. The
@@ -27,6 +29,7 @@ class Uncaught(StrEnum):
 
     SURVIVED = "MUTANT SURVIVED"
     NO_TEST = "MUTANT SURVIVED, NO TEST RAN IT"
+    NOT_RUN = "MUTANT NOT RUN, THE BOUND CAME"
 
 
 class UncaughtMutant(NamedTuple):
@@ -38,7 +41,8 @@ class UncaughtMutant(NamedTuple):
         column: Its column, from zero as cosmic-ray counts it.
         operator: cosmic-ray's operator name.
         mutated: The line the mutation puts in place, or the original line
-            when no test ran it and so no mutation was made.
+            when no test ran it, or the bound came before it ran, and so no
+            mutation was made.
         why: Why it fails the step.
     """
 
@@ -99,6 +103,45 @@ def _position(mutant: UncaughtMutant) -> tuple[str, int, int]:
     return (mutant.path, mutant.line, mutant.column)
 
 
+def tally_line(tally: Tally) -> str:
+    """The line saying how the step's mutants were run.
+
+    Args:
+        tally: How they were run.
+
+    Returns:
+        How many were made, how many each way, and how many places were not code.
+    """
+    made = tally.by_tests + tally.by_suite + tally.by_none
+    return (
+        f"mutation: {made} mutant(s): {tally.by_tests} run by the tests covering their line, "
+        f"{tally.by_suite} by the whole suite (lines run only at import), {tally.by_none} by "
+        f"no test; {tally.declarations} more in annotations and parameter markers are not code"
+    )
+
+
+def render_over_bound(
+    tally: Tally,
+    uncaught: list[UncaughtMutant],
+    not_run: list[UncaughtMutant],
+    quote: Callable[[str], str],
+) -> list[str]:
+    """The lines a run the bound stopped prints before it refuses.
+
+    Args:
+        tally: How the mutants were to be run.
+        uncaught: The mutants already uncaught when the bound came.
+        not_run: The mutants the bound left unrun.
+        quote: Encode a string as JSON, for each line shown.
+
+    Returns:
+        The tally line, then one line per uncaught or unrun mutant in file,
+        line and column order.
+    """
+    ordered = sorted([*uncaught, *not_run], key=_position)
+    return [tally_line(tally), *(mutant_line(mutant, quote) for mutant in ordered)]
+
+
 def render_verdict(
     tally: Tally, uncaught: list[UncaughtMutant], quote: Callable[[str], str]
 ) -> list[str]:
@@ -116,13 +159,9 @@ def render_verdict(
         made.
     """
     made = tally.by_tests + tally.by_suite + tally.by_none
-    ran = (
-        f"mutation: {made} mutant(s): {tally.by_tests} run by the tests covering their line, "
-        f"{tally.by_suite} by the whole suite (lines run only at import), {tally.by_none} by "
-        f"no test; {tally.declarations} more in annotations and parameter markers are not code"
-    )
+    ran = tally_line(tally)
     scope = (
-        f"{made} mutant(s) made in {tally.files} src file(s) changed against origin/main "
+        f"{made} mutant(s) made in {tally.files} source file(s) changed against origin/main "
         f"(merge base {tally.base}) survived"
     )
     ordered = sorted(uncaught, key=_position)
@@ -136,4 +175,12 @@ def render_verdict(
     return [ran, f"mutation: passed: 0 of {scope}"]
 
 
-__all__ = ["Tally", "Uncaught", "UncaughtMutant", "mutant_line", "render_verdict"]
+__all__ = [
+    "Tally",
+    "Uncaught",
+    "UncaughtMutant",
+    "mutant_line",
+    "render_over_bound",
+    "render_verdict",
+    "tally_line",
+]

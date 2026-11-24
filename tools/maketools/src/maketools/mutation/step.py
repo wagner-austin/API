@@ -7,20 +7,23 @@ mcp_shared_py.mutation`` (:mod:`.cli`); API lifts this module and the rest
 of the core byte for byte and runs it from its test launcher (board task
 e52e5148), so it imports only the standard library and the core.
 
-WHAT IT MUTATES. The lines the checked commit adds to ``src`` against the
-merge base of ``HEAD`` and ``origin/main`` (:mod:`.changes`), less the places
+WHAT IT MUTATES. The lines the checked commit adds to the package's sources,
+the files its ``pyproject.toml`` declares for coverage (board task 9c456c33),
+against the merge base of ``HEAD`` and ``origin/main`` (:mod:`.changes`), less the places
 that are not code (:mod:`.sites`). cosmic-ray (:mod:`.cosmic`) enumerates the
 mutants of the changed files and applies each in place.
 
 WHICH TESTS RUN A MUTANT. Those the suite's coverage contexts name for its
 line: the suite runs with ``--cov-context=test``, so its coverage data
-records which test ran every line, and a mutant runs only those (0.63 s a
-mutant measured on sedona, where the whole suite takes 50 s). A line run
-only at import (a decorator, a module constant, a default) was run by no
-test in particular, so its mutant runs the whole suite, as StrykerJS runs
-every test for a static mutant. A line no test runs is a surviving mutant
-without a run. Each set of tests is first run unmutated, which must pass,
-and its time sets the mutant's timeout (:mod:`.trials`).
+records which test ran every line, and a mutant runs only those, the
+cheapest file's first (0.63 s a mutant measured on sedona, where the whole
+suite takes 50 s). A line run only at import (a decorator, a module
+constant, a default) was run by no test in particular, so its mutant runs
+the whole suite, as StrykerJS runs every test for a static mutant. A line no
+test runs is a surviving mutant without a run. Before the first trial each
+file's distinct share of the mutants' tests is run once unmutated, which
+must pass, and what each share cost orders a mutant's files and sets its
+timeout (:mod:`.baseline`, board task 3b386c0d).
 
 IN PLACE, NEVER OVER UNCOMMITTED WORK. The step refuses a changed file whose
 bytes differ from ``HEAD``, and after the run verifies each holds ``HEAD``'s
@@ -28,14 +31,36 @@ bytes, restoring them and failing when cosmic-ray did not. A package whose
 setup derives a file from its sources (mcp-shared-py's contract hash) names
 that command with ``--prepare``: it runs before each set of tests, as setup
 runs before the suite, and once more over the restored sources at the end.
+
+WHEN IT IS STOPPED (board task 3b386c0d). The check holds the step's time to
+its own bound, but read that only once the step ended, so a change too large
+to mutate inside it ran until the fleet's lease ended its check and printed
+nothing: fleet job 24f79dd5's 384 session-audit mutants ran 33 minutes past
+a 900 s bound. As the TypeScript step does since board task 10eef5d4, the
+step now starts no trial once the seconds
+:attr:`~.context.StepContext.read_bound` reads have passed since it began,
+once it has mutants to run, puts ``HEAD``'s bytes back, records its span,
+names each mutant it did not run beside those already uncaught, and refuses
+``MUTATION_OVER_BOUND``. A trial already started runs to its own timeout,
+so the step can pass its bound by one trial.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from pathlib import Path
+from typing import NamedTuple
 
-from .changes import BASE_REF, added_lines, diff_arguments
+from .baseline import Baselines, ordered, run_baselines
+from .changes import (
+    BASE_REF,
+    COVERAGE_TABLE,
+    PYPROJECT,
+    Sources,
+    added_lines,
+    declared_sources,
+    diff_arguments,
+)
 from .context import (
     JsonCodec,
     JsonT,
@@ -46,19 +71,39 @@ from .context import (
     run_or_refuse,
 )
 from .cosmic import Site, command, decode_sites, session_config
-from .report import Tally, Uncaught, UncaughtMutant, render_verdict
+from .report import Tally, Uncaught, UncaughtMutant, render_over_bound, render_verdict
 from .sites import SourceFacts, coverage_line, is_declaration, read_source_facts
-from .trials import run_baseline, run_mutant
+from .timing import Phase, Scope, TrialTimings
+from .trials import mutant_timeout, run_mutant
 
 
-def changed_sources(context: StepContext[JsonT]) -> tuple[str, dict[str, frozenset[int]]]:
-    """The lines the checked commit adds to source files against ``origin/main``.
+def package_sources(context: StepContext[JsonT]) -> Sources:
+    """The sources the package's ``pyproject.toml`` declares for coverage.
 
     Args:
         context: The run.
 
     Returns:
-        The merge base, and each changed ``.py`` file's added lines.
+        Its ``[tool.coverage.run]`` source and omit.
+
+    Raises:
+        MutationStepError: ``MUTATION_SOURCES_UNDECLARED`` as
+            :func:`~.changes.declared_sources` raises it.
+    """
+    return declared_sources(context.hooks.read_text(context.package_dir / PYPROJECT))
+
+
+def changed_sources(
+    context: StepContext[JsonT], sources: Sources
+) -> tuple[str, dict[str, frozenset[int]]]:
+    """The lines the checked commit adds to source files against ``origin/main``.
+
+    Args:
+        context: The run.
+        sources: The package's sources (:func:`package_sources`).
+
+    Returns:
+        The merge base, and each changed ``.py`` source's added lines.
 
     Raises:
         MutationStepError: ``MUTATION_BASE_UNAVAILABLE`` when
@@ -79,7 +124,8 @@ def changed_sources(context: StepContext[JsonT]) -> tuple[str, dict[str, frozens
         )
     git = MutationErrorCode.GIT_FAILED
     base = run_or_refuse(context, ["git", "merge-base", "HEAD", BASE_REF], env, git).strip()
-    return base, added_lines(run_or_refuse(context, ["git", *diff_arguments(base)], env, git))
+    diff = run_or_refuse(context, ["git", *diff_arguments(base, sources)], env, git)
+    return base, added_lines(diff, sources)
 
 
 def differing_from_head(context: StepContext[JsonT], files: list[str]) -> list[str]:
@@ -225,34 +271,71 @@ def selection(contexts: frozenset[str] | None) -> tuple[str, ...] | None:
     return tuple(sorted({node_id(name) for name in contexts if name}))
 
 
+class Judged(NamedTuple):
+    """What judging the chosen mutants found.
+
+    Attributes:
+        uncaught: The surviving mutants and those no test runs.
+        not_run: Those the bound left unrun.
+        ran: How many mutants' tests were run, counted as each ran.
+    """
+
+    uncaught: list[UncaughtMutant]
+    not_run: list[UncaughtMutant]
+    ran: int
+
+
 def _judge(
     context: StepContext[JsonT],
     chosen: list[tuple[Site, tuple[str, ...] | None]],
     sources: dict[str, list[str]],
-) -> list[UncaughtMutant]:
-    """Run every chosen mutant and keep those that fail the step.
+    deadline: float,
+) -> Judged:
+    """Run every chosen mutant the bound leaves time for and keep those that fail the step.
 
     Args:
         context: The run.
         chosen: Each mutant with its tests (:func:`selection`).
-        sources: Each changed file's lines, for a mutant no test ran.
+        sources: Each changed file's lines, for a mutant no test or no trial ran.
+        deadline: When, on the hooks' clock, the step's bound comes: no trial
+            starts at or after it, and the clock is read before each trial
+            until it has come.
 
     Returns:
-        The surviving mutants and those no test runs.
+        The uncaught mutants, those the bound left unrun, and how many ran.
     """
-    timeouts: dict[tuple[str, ...], int] = {}
+    selections = [tests for _, tests in chosen]
+    baselines: Baselines | None = None
     uncaught: list[UncaughtMutant] = []
-    for site, tests in chosen:
-        if tests is None:
+    not_run: list[UncaughtMutant] = []
+    ran = 0
+    timings = TrialTimings(context.hooks.now)
+    try:
+        for site, tests in chosen:
             original = sources[site.path][site.line - 1].strip()
-            uncaught.append(_uncaught(site, original, Uncaught.NO_TEST))
-            continue
-        if tests not in timeouts:
-            timeouts[tests] = run_baseline(context, tests)
-        mutated = run_mutant(context, site, tests, timeouts[tests])
-        if mutated is not None:
-            uncaught.append(_uncaught(site, mutated, Uncaught.SURVIVED))
-    return uncaught
+            if tests is None:
+                uncaught.append(_uncaught(site, original, Uncaught.NO_TEST))
+                continue
+            if not_run or context.hooks.now() >= deadline:
+                not_run.append(_uncaught(site, original, Uncaught.NOT_RUN))
+                continue
+            if baselines is None:
+                baselines = run_baselines(context, selections, timings)
+            nodes, cost = ordered(tests, baselines)
+            identity = (
+                f"{site.path}:{site.line}:{site.column + 1} {site.operator} "
+                f"occurrence={site.occurrence} tests={len(tests)}"
+            )
+            scope = Scope.SELECTED if tests else Scope.WHOLE_SUITE
+            with timings.measure(Phase.MUTANT, scope, identity):
+                mutated = run_mutant(context, site, nodes, mutant_timeout(cost))
+            ran += 1
+            if mutated is not None:
+                uncaught.append(_uncaught(site, mutated, Uncaught.SURVIVED))
+    finally:
+        for line in timings.lines():
+            context.hooks.write(line)
+    return Judged(uncaught=uncaught, not_run=not_run, ran=ran)
 
 
 def _uncaught(site: Site, shown: str, why: Uncaught) -> UncaughtMutant:
@@ -321,14 +404,18 @@ def run_mutation_step(context: StepContext[JsonT]) -> int:
         The exit code: 1 when any mutant survived, else 0.
 
     Raises:
-        MutationStepError: Every refusal :class:`~.context.MutationErrorCode` names.
+        MutationStepError: Every refusal :class:`~.context.MutationErrorCode` names,
+            ``MUTATION_OVER_BOUND`` among them once the bound came before
+            every mutant was run.
     """
     started = context.hooks.now()
-    base, added = changed_sources(context)
+    declared = package_sources(context)
+    base, added = changed_sources(context, declared)
     files = sorted(added)
     if not files:
         context.hooks.write(
-            f"mutation: not applicable: 0 lines added to src files against origin/main (merge "
+            f"mutation: not applicable: 0 lines added to the sources {PYPROJECT} "
+            f"{COVERAGE_TABLE} names ({', '.join(declared.roots)}) against origin/main (merge "
             f"base {base}), so 0 mutants were made"
         )
         return 0
@@ -340,7 +427,8 @@ def run_mutation_step(context: StepContext[JsonT]) -> int:
             "HEAD's bytes back, so it runs only over committed work",
         )
     chosen, declarations, sources = _choose(context, enumerate_sites(context, files), added, files)
-    uncaught = _judge(context, chosen, sources)
+    bound = context.read_bound()
+    uncaught, not_run, ran = _judge(context, chosen, sources, started + bound)
     _close(context, files, started)
     tally = Tally(
         files=len(files),
@@ -350,6 +438,18 @@ def run_mutation_step(context: StepContext[JsonT]) -> int:
         by_none=sum(1 for _, tests in chosen if tests is None),
         declarations=declarations,
     )
+    if not_run:
+        for line in render_over_bound(tally, uncaught, not_run, context.codec.dumps):
+            context.hooks.write(line)
+        trials = tally.by_tests + tally.by_suite
+        raise MutationStepError(
+            MutationErrorCode.OVER_BOUND,
+            f"{ran} of the {trials} mutant(s) the tests run in {len(files)} "
+            f"source file(s) had been run when the step's {bound} s bound came, so "
+            f"{len(not_run)} were not run, beside {len(uncaught)} already uncaught, each named "
+            "above; HEAD's bytes are back in each file it mutates and its span is recorded. A "
+            "change too large to mutate inside the bound is one to split",
+        )
     for line in render_verdict(tally, uncaught, context.codec.dumps):
         context.hooks.write(line)
     return 1 if uncaught else 0
@@ -384,11 +484,12 @@ def run_in_scratch(
     prepare: str,
     environment: Mapping[str, str],
     record_span: Callable[[int], None],
+    read_bound: Callable[[], int],
 ) -> int:
     """Run the step in a package, in a scratch directory made for it and removed after.
 
     The one entry both repositories' boundaries call: MCPs' :mod:`.cli` and
-    API's test launcher, each with its own hooks, codec and span sink.
+    API's test launcher, each with its own hooks, codec, span sink and bound.
 
     Args:
         hooks: The world the step reaches, bound to the package.
@@ -398,9 +499,14 @@ def run_in_scratch(
         prepare: The command that derives files from the sources, or empty.
         environment: The environment the step runs its commands with.
         record_span: Where the step's time goes once it has made mutants.
+        read_bound: Read the bound the step holds itself to
+            (:attr:`~.context.StepContext.read_bound`).
 
     Returns:
         The exit code :func:`run_mutation_step` decides.
+
+    Raises:
+        MutationStepError: The refusals of :func:`run_mutation_step`.
     """
     run_dir = hooks.make_run_directory()
     context = StepContext(
@@ -412,6 +518,7 @@ def run_in_scratch(
         environment=environment,
         run_dir=run_dir,
         record_span=record_span,
+        read_bound=read_bound,
     )
     try:
         return run_mutation_step(context)
@@ -420,10 +527,12 @@ def run_in_scratch(
 
 
 __all__ = [
+    "Judged",
     "changed_sources",
     "differing_from_head",
     "enumerate_sites",
     "node_id",
+    "package_sources",
     "read_contexts",
     "run_in_scratch",
     "run_mutation_step",
