@@ -55,4 +55,5 @@ def test_the_full_check_bootstraps_pinned_freecad_and_stages_shared_python() -> 
                 remote="https://github.com/wagner-austin/MCPs.git", ref="main", directory="MCPs"
             ),
         ),
+        base_branch="main",
     )
