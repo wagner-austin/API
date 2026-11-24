@@ -90,6 +90,27 @@ def failed(returncode: int, stderr: str) -> CommandResult:
     return CommandResult(returncode=returncode, stdout="", stderr=stderr)
 
 
+#: An API package's coverage declaration (``libs/platform_core``'s), which the
+#: mutation step reads its sources from (MCPs board task 9c456c33).
+PACKAGE_PYPROJECT = '[tool.coverage.run]\nsource = ["src", "scripts"]\nomit = []\nbranch = true\n'
+
+#: The step's one line over that package for a commit adding no source line
+#: against the merge base ``abc123``.
+NOT_APPLICABLE = (
+    "mutation: not applicable: 0 lines added to the sources pyproject.toml [tool.coverage.run] "
+    "names (src, scripts) against origin/main (merge base abc123), so 0 mutants were made"
+)
+
+
+def write_package_pyproject(package: Path) -> None:
+    """Give a test's package directory the coverage declaration every API package has.
+
+    Args:
+        package: The directory standing in for the package.
+    """
+    (package / "pyproject.toml").write_text(PACKAGE_PYPROJECT, encoding="utf-8")
+
+
 def row(
     pid: int,
     parent_pid: int,

@@ -15,7 +15,7 @@ from maketools.makefile_grammar import SHELL_INCLUDE
 from maketools.test_run import POETRY_EXECUTABLE_ARGV
 from maketools.venv_check import PROBE_ARGV
 from maketools.venvs import EMBED_PROBE
-from tests.conftest import World, ok, row
+from tests.conftest import World, ok, row, write_package_pyproject
 from tests.test_makefile_grammar import PORTABLE
 
 
@@ -105,6 +105,7 @@ def test_test_hub_offline_refuses_the_hub_to_the_suite(world: World, cwd: Path) 
 
 
 def test_test_mutation_records_contexts_and_runs_the_step(world: World, cwd: Path) -> None:
+    write_package_pyproject(cwd)
     world.capturing_answers[tuple(POETRY_EXECUTABLE_ARGV)] = ok("/v/bin/python\n")
     world.answer = lambda argv: ok("abc123\n" if argv[1] == "merge-base" else "")
     assert dispatch(["test", "--mutation", "--no-sweep", "-k", "x"]) == 0

@@ -21,7 +21,7 @@ from maketools.test_run import (
     remove_run_files,
     run_tests,
 )
-from tests.conftest import World, failed, ok, row
+from tests.conftest import NOT_APPLICABLE, World, failed, ok, row, write_package_pyproject
 
 
 def test_coverage_arguments_name_only_the_roots_that_exist(tmp_path: Path) -> None:
@@ -199,6 +199,7 @@ def test_a_mutation_run_records_test_contexts_and_runs_the_step_after_a_passing_
     world: World, tmp_path: Path
 ) -> None:
     (tmp_path / "src").mkdir()
+    write_package_pyproject(tmp_path)
     world.capturing_answers[tuple(POETRY_EXECUTABLE_ARGV)] = ok("/v/bin/python\n")
     world.answer = _no_change
     assert run_tests(tmp_path, ["-k", "x"], sweep=False, mutation=True) == 0
@@ -213,10 +214,7 @@ def test_a_mutation_run_records_test_contexts_and_runs_the_step_after_a_passing_
     assert world.removed_trees == [scratch, runs / ".caches-deadbeef"]
     step_env = world.answering_calls[0]["env"]
     assert step_env["COVERAGE_FILE"] == str(runs / ".coverage-deadbeef")
-    assert [line for line in world.lines if line.startswith("mutation: ")] == [
-        "mutation: not applicable: 0 lines added to src files against origin/main (merge base "
-        "abc123), so 0 mutants were made",
-    ]
+    assert [line for line in world.lines if line.startswith("mutation: ")] == [NOT_APPLICABLE]
     assert SPANS_ENVIRONMENT_KEY not in world.answering_calls[0]["env"]
 
 
@@ -235,6 +233,7 @@ def test_a_failing_suite_or_a_home_write_runs_no_mutant(world: World, tmp_path: 
 def test_an_own_home_mutation_run_asks_poetry_for_its_interpreter_once(
     world: World, tmp_path: Path
 ) -> None:
+    write_package_pyproject(tmp_path)
     world.capturing_answers[tuple(POETRY_EXECUTABLE_ARGV)] = ok("/v/bin/python\n")
     world.answer = _no_change
     assert run_tests(tmp_path, [], sweep=False, own_home=True, mutation=True) == 0
@@ -247,6 +246,7 @@ def test_a_refusal_of_the_step_propagates_after_the_runs_files_are_removed(
 ) -> None:
     (tmp_path / ".venv" / "bin").mkdir(parents=True)
     (tmp_path / ".venv" / "bin" / "python").write_bytes(b"")
+    write_package_pyproject(tmp_path)
     world.answer = lambda argv: failed(128, "")
     runs = (tmp_path / "runs").resolve()
     runs.mkdir()

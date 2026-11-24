@@ -40,15 +40,7 @@ from maketools.mutation.launch import (
     text,
     write_text,
 )
-from tests.conftest import World, failed, ok
-
-#: An API package's declaration of what coverage measures (``libs/platform_core``'s).
-PYPROJECT = '[tool.coverage.run]\nsource = ["src", "scripts"]\nomit = []\nbranch = true\n'
-
-NOT_APPLICABLE = (
-    "mutation: not applicable: 0 lines added to the sources pyproject.toml [tool.coverage.run] "
-    "names (src, scripts) against origin/main (merge base abc123), so 0 mutants were made"
-)
+from tests.conftest import NOT_APPLICABLE, World, failed, ok, write_package_pyproject
 
 #: A commit adding one module constant, a line only import runs.
 CONSTANT_DIFF = (
@@ -163,7 +155,7 @@ def test_a_commit_adding_no_source_line_runs_in_scratch_and_records_no_span(
     world: World, tmp_path: Path
 ) -> None:
     world.answer = _no_change
-    (tmp_path / "pyproject.toml").write_text(PYPROJECT, encoding="utf-8")
+    write_package_pyproject(tmp_path)
     spans = tmp_path / "spans"
     scratch = tmp_path / ".mutation-deadbeef"
     environment = {"PATH": "/bin", SPANS_ENVIRONMENT_KEY: str(spans)}
@@ -215,7 +207,7 @@ def test_the_step_holds_itself_to_check_budgets_bound_and_refuses_when_it_comes(
     # cosmic-ray lists the mutants, so the step's own check before its first
     # trial finds the bound, 900 s, come: no baseline and no trial runs, and
     # the span is round(1,000,900.0 - 1,000,000.0) = 900 s.
-    (tmp_path / "pyproject.toml").write_text(PYPROJECT, encoding="utf-8")
+    write_package_pyproject(tmp_path)
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "m.py").write_text("X = 1\n", encoding="utf-8")
     spans = tmp_path / "spans"
@@ -264,7 +256,7 @@ def test_a_refusal_becomes_an_app_error_and_still_removes_the_scratch_directory(
     world: World, tmp_path: Path
 ) -> None:
     world.answer = lambda argv: failed(128, "")
-    (tmp_path / "pyproject.toml").write_text(PYPROJECT, encoding="utf-8")
+    write_package_pyproject(tmp_path)
     scratch = tmp_path / ".mutation-deadbeef"
     with pytest.raises(AppError) as refused:
         mutate_after_suite(tmp_path, "/py", {}, scratch)
