@@ -481,6 +481,13 @@ class MutationErrorCode(ErrorCodeBase):
     # registry entry declares ``base_branch``; a checkout has it after a fetch.
     BASE_UNAVAILABLE = "MUTATION_BASE_UNAVAILABLE"
 
+    # The package's ``pyproject.toml`` declares no sources under
+    # ``[tool.coverage.run]`` (``source`` absent, empty or not an array of
+    # strings, or ``omit`` not one): the step mutates the files coverage
+    # measures, so it reads them from that one declaration (MCPs board task
+    # 9c456c33).
+    SOURCES_UNDECLARED = "MUTATION_SOURCES_UNDECLARED"
+
     # A git question the step needs answered failed after the base resolved.
     GIT_FAILED = "MUTATION_GIT_FAILED"
 
@@ -500,6 +507,12 @@ class MutationErrorCode(ErrorCodeBase):
     # mutant they run as killed.
     BASELINE_FAILED = "MUTATION_BASELINE_FAILED"
 
+    # A baseline round's JUnit report holds a case naming no file or no
+    # time, or names no case in a file the round ran, so nothing says what
+    # that file's share of the tests costs, which orders a mutant's files
+    # and sets its timeout (MCPs board task 3b386c0d).
+    BASELINE_UNREPORTED = "MUTATION_BASELINE_UNREPORTED"
+
     # The package's prepare command, which derives files from its sources,
     # failed over the restored sources. API's packages name none today; the
     # code is here because the lifted core can raise it.
@@ -517,6 +530,17 @@ class MutationErrorCode(ErrorCodeBase):
     # The span file check-budget reads holds a line that is not
     # ``<whole seconds> <epoch seconds it ended> <bounded span name>``.
     SPAN_UNREADABLE = "MUTATION_SPAN_UNREADABLE"
+
+    # The bound the step holds itself to could not be read. MCPs' boundary
+    # raises it when maketools' span-bound fails; API's reads its bound from
+    # ``maketools.bounded_spans`` in process, so it is here because the
+    # lifted core names it.
+    BOUND_UNREAD = "MUTATION_BOUND_UNREAD"
+
+    # The step's bound passed with mutants not yet run: it started no
+    # further trial, put ``HEAD``'s bytes back, and named each mutant it did
+    # not run (MCPs board task 3b386c0d).
+    OVER_BOUND = "MUTATION_OVER_BOUND"
 
 
 __all__ = [
