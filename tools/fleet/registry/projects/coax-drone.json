@@ -1,11 +1,12 @@
 {
   "worker_ram_gb": 2.0,
   "minimum_workers": 2,
-  "expected_minutes": 75,
+  "expected_minutes": 135,
   "required_tags": ["linux"],
   "source": {
     "remote": "https://github.com/wagner-austin/coax-drone.git",
     "path": "",
+    "base_branch": "main",
     "install": [
       {"phase": "install", "argv": ["make", "freecad-environment"]}
     ],
