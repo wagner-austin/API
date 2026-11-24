@@ -14,9 +14,8 @@ omitted, copied from MCPs ``packages/claude-hooks/pyproject.toml``.
 
 from __future__ import annotations
 
-import tomllib
-
 import pytest
+from platform_core.json_utils import JSONTypeError
 
 from maketools.mutation.changes import (
     BASE_REF,
@@ -26,6 +25,7 @@ from maketools.mutation.changes import (
     diff_arguments,
 )
 from maketools.mutation.context import MutationErrorCode, MutationStepError
+from maketools.mutation.launch import API_CODEC
 
 SRC = Sources(roots=("src",), omit=())
 
@@ -116,7 +116,7 @@ def test_no_diff_adds_no_lines() -> None:
 
 
 def test_the_files_coverage_omits_are_not_sources_at_any_depth() -> None:
-    sources = declared_sources(HOOKS_PYPROJECT)
+    sources = declared_sources(HOOKS_PYPROJECT, API_CODEC)
     assert added_lines(HOOKS_DIFF, sources) == {
         "board-watch.py": frozenset({2}),
         "board_watch/feed.py": frozenset({2}),
@@ -156,40 +156,69 @@ def test_the_base_is_main_as_the_fleet_stages_it() -> None:
 
 
 def test_a_package_declares_its_roots_and_its_omit_patterns() -> None:
-    assert declared_sources(HOOKS_PYPROJECT) == Sources(roots=(".",), omit=("*.test.py", "tests/*"))
+    hooks = declared_sources(HOOKS_PYPROJECT, API_CODEC)
+    assert hooks == Sources(roots=(".",), omit=("*.test.py", "tests/*"))
     two_roots = '[tool.coverage.run]\nsource = ["src", "scripts"]\nomit = []\n'
-    assert declared_sources(two_roots) == Sources(roots=("src", "scripts"), omit=())
+    assert declared_sources(two_roots, API_CODEC) == Sources(roots=("src", "scripts"), omit=())
 
 
 def test_a_declaration_with_no_omit_omits_nothing() -> None:
-    assert declared_sources('[tool.coverage.run]\nsource = ["src"]\n').omit == ()
+    assert declared_sources('[tool.coverage.run]\nsource = ["src"]\n', API_CODEC).omit == ()
 
 
 @pytest.mark.parametrize(
-    ("text", "detail"),
+    "text",
     [
-        ("", "names no source"),
-        ("[tool.coverage.run]\nbranch = true\n", "names no source"),
-        ("[tool.coverage.run]\nsource = []\n", "names no source"),
-        ('[tool.coverage.run]\nsource = "src"\n', "source is not an array of strings"),
-        ("[tool.coverage.run]\nsource = [1]\n", "source is not an array of strings"),
-        ('[tool.coverage.run]\nsource = ["src"]\nomit = "x"\n', "omit is not an array of strings"),
-        ("tool = 1\n", "is unreadable: [tool] is not a table"),
-        ("[tool]\ncoverage = 1\n", "is unreadable: [tool.coverage] is not a table"),
-        ("[tool.coverage]\nrun = 1\n", "is unreadable: [tool.coverage.run] is not a table"),
+        "",
+        "[tool]\nname = 1\n",
+        "[tool.coverage]\nx = 1\n",
+        "[tool.coverage.run]\nbranch = true\n",
+        "[tool.coverage.run]\nsource = []\n",
     ],
 )
-def test_a_package_that_declares_no_readable_source_is_refused(text: str, detail: str) -> None:
+def test_a_package_that_declares_no_source_is_refused(text: str) -> None:
     with pytest.raises(MutationStepError) as raised:
-        declared_sources(text)
+        declared_sources(text, API_CODEC)
     assert raised.value.code == MutationErrorCode.SOURCES_UNDECLARED
     assert str(raised.value) == (
-        f"MUTATION_SOURCES_UNDECLARED: pyproject.toml [tool.coverage.run] {detail}; the step "
-        "mutates the files coverage measures, so the package declares them there as its 100 "
-        "percent gate reads them"
+        "MUTATION_SOURCES_UNDECLARED: pyproject.toml [tool.coverage.run] names no source; the "
+        "step mutates the files coverage measures, so the package declares them there as its "
+        "100 percent gate reads them"
     )
 
 
-def test_a_pyproject_that_is_not_toml_is_refused_by_the_toml_reader() -> None:
-    with pytest.raises(tomllib.TOMLDecodeError):
-        declared_sources("[tool.coverage.run\n")
+@pytest.mark.parametrize(
+    ("text", "refusal"),
+    [
+        ('[tool.coverage.run]\nsource = "src"\n', "source: Expected JSON array, got str"),
+        ("[tool.coverage.run]\nsource = [1]\n", "source: Expected JSON string, got int"),
+        (
+            '[tool.coverage.run]\nsource = ["src"]\nomit = "x"\n',
+            "omit: Expected JSON array, got str",
+        ),
+        (
+            '[tool.coverage.run]\nsource = ["src"]\nomit = [2]\n',
+            "omit: Expected JSON string, got int",
+        ),
+        ("tool = 1\n", "[tool]: Expected JSON object, got int"),
+        ("[tool]\ncoverage = 1\n", "[tool.coverage]: Expected JSON object, got int"),
+        ("[tool.coverage]\nrun = 1\n", "[tool.coverage.run]: Expected JSON object, got int"),
+    ],
+)
+def test_a_declaration_of_the_wrong_shape_is_refused_by_the_codec_naming_it(
+    text: str, refusal: str
+) -> None:
+    with pytest.raises(JSONTypeError) as raised:
+        declared_sources(text, API_CODEC)
+    assert str(raised.value) == refusal
+
+
+def test_a_pyproject_that_is_not_toml_is_refused_by_platform_cores_toml_reader() -> None:
+    # platform_core.toml_utils propagates tomllib's own error, a ValueError,
+    # whose message is the line and column (tomllib's text for this input).
+    with pytest.raises(ValueError) as raised:
+        declared_sources("[tool.coverage.run\n", API_CODEC)
+    assert type(raised.value).__name__ == "TOMLDecodeError"
+    assert str(raised.value) == (
+        "Expected ']' at the end of a table declaration (at line 1, column 19)"
+    )

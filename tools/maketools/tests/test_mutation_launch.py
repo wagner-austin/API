@@ -18,6 +18,7 @@ import pytest
 from platform_core import error_codes_tooling
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
+from platform_core.toml_utils import loads_toml
 
 from maketools.bounded_spans import MUTATION_SPAN, SPANS_ENVIRONMENT_KEY, BoundedSpan, read_spans
 from maketools.commands import CommandResult
@@ -93,6 +94,7 @@ def test_the_codec_writes_json_with_the_standard_separator_as_mcps_does() -> Non
     assert dump_spaced(["src/a.py", 'q"']) == '["src/a.py", "q\\""]'
     assert dump_spaced("é\t") == '"\\u00e9\\t"'
     assert API_CODEC.dumps is dump_spaced
+    assert API_CODEC.loads_toml is loads_toml
     assert (API_CODEC.mapping, API_CODEC.sequence) == (mapping, sequence)
     assert (API_CODEC.text, API_CODEC.optional_text, API_CODEC.integer) == (
         text,

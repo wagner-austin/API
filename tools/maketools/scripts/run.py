@@ -11,10 +11,11 @@ not installed.
 
 ``libs/platform_core/src`` goes on the path beside it, for the same reason
 and by the same route ``scripts/guard.py`` takes to ``monorepo_guards``:
-the monorepo permits one error module and one JSON reader, both in
-``platform_core``, and the three modules this package imports from it
-(``errors``, ``json_utils``, ``error_codes_tooling``) are standard library
-all the way down, so they load under the system interpreter.
+the monorepo permits one error module, one JSON reader and one TOML reader,
+all in ``platform_core``, and the four modules this package imports from it
+(``errors``, ``json_utils``, ``toml_utils``, ``error_codes_tooling``) are
+standard library all the way down, so they load under the system
+interpreter.
 
 Everything else is :func:`maketools.cli.main`; this file has no logic of its
 own to test apart from the paths it inserts and the exit code it forwards,

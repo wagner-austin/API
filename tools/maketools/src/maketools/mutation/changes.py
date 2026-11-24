@@ -16,18 +16,21 @@ suites beside them as ``*.test.py``) is mutated where its code is. An omit
 pattern is matched as coverage matches one against a file under the package
 it runs in: ``fnmatch`` over the path relative to the package, whose ``*``
 crosses a ``/``, so ``*.test.py`` drops a suite at any depth and
-``tests/*`` drops everything under ``tests``.
+``tests/*`` drops everything under ``tests``. The declaration is read
+through the package's codec (board task 9976dca1), as every document the
+step reads is: its TOML reader and its narrowers, each refusing a value of
+the wrong shape by its own error naming the field. API lifts this module
+and allows one TOML reader, ``platform_core.toml_utils``, so the module
+imports none.
 """
 
 from __future__ import annotations
 
 import re
-import tomllib
-from collections.abc import Mapping
 from fnmatch import fnmatchcase
 from typing import NamedTuple
 
-from .context import MutationErrorCode, MutationStepError
+from .context import JsonCodec, JsonT, MutationErrorCode, MutationStepError
 
 #: The ref a change is measured against: a fleet node stages it for a
 #: package whose API registry entry declares ``base_branch``.
@@ -81,68 +84,55 @@ def _undeclared(detail: str) -> MutationStepError:
     )
 
 
-def _table(value: object, name: str) -> Mapping[str, object]:
-    """Require a TOML table.
+#: The tables on the way to the declaration, each with the name a refusal gives it.
+_TABLES = (("tool", "[tool]"), ("coverage", "[tool.coverage]"), ("run", COVERAGE_TABLE))
+
+
+def _strings(value: JsonT | None, name: str, codec: JsonCodec[JsonT]) -> tuple[str, ...]:
+    """Require a TOML array of strings, or nothing where the table holds none.
 
     Args:
-        value: What the document holds there.
-        name: Where, for the refusal.
-
-    Returns:
-        The table.
-
-    Raises:
-        MutationStepError: ``MUTATION_SOURCES_UNDECLARED`` when it is not one.
-    """
-    if not isinstance(value, dict):
-        raise _undeclared(f"is unreadable: {name} is not a table")
-    table: dict[str, object] = {}
-    for key, member in value.items():
-        table[str(key)] = member
-    return table
-
-
-def _strings(value: object, name: str) -> tuple[str, ...]:
-    """Require a TOML array of strings.
-
-    Args:
-        value: What the table holds there.
+        value: What the table holds there, or None for nothing.
         name: Its key, for the refusal.
+        codec: The package's codec.
 
     Returns:
-        The strings, in order.
-
-    Raises:
-        MutationStepError: ``MUTATION_SOURCES_UNDECLARED`` when it is not one.
+        The strings, in order; none for nothing. The codec's own error,
+        naming ``name``, is raised when it is not an array or a member is
+        not a string.
     """
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-        raise _undeclared(f"{name} is not an array of strings")
-    return tuple(str(item) for item in value)
+    if value is None:
+        return ()
+    return tuple(codec.text(item, name) for item in codec.sequence(value, name))
 
 
-def declared_sources(text: str) -> Sources:
+def declared_sources(text: str, codec: JsonCodec[JsonT]) -> Sources:
     """The sources a package's ``pyproject.toml`` declares for coverage.
 
     Args:
         text: The file's text.
+        codec: The package's codec, whose TOML reader parses it.
 
     Returns:
         Its ``source`` and ``omit``.
 
     Raises:
-        MutationStepError: ``MUTATION_SOURCES_UNDECLARED`` when the table on
-            the way is not a table, ``source`` is absent, empty or not an
-            array of strings, or ``omit`` is not one.
-        tomllib.TOMLDecodeError: When the text is not TOML.
+        MutationStepError: ``MUTATION_SOURCES_UNDECLARED`` when a table on
+            the way or ``source`` is absent, or ``source`` is empty; the
+            codec's own error, naming the table or key, when a table on the
+            way is not a table or ``source`` or ``omit`` is not an array of
+            strings, and its TOML reader's own when the text is not TOML.
     """
-    tables: Mapping[str, object] = tomllib.loads(text)
-    tool = _table(tables.get("tool", {}), "[tool]")
-    coverage = _table(tool.get("coverage", {}), "[tool.coverage]")
-    run = _table(coverage.get("run", {}), COVERAGE_TABLE)
-    roots = _strings(run.get("source", []), "source")
+    table = codec.mapping(codec.loads_toml(text), PYPROJECT)
+    for key, name in _TABLES:
+        member = table.get(key)
+        if member is None:
+            raise _undeclared("names no source")
+        table = codec.mapping(member, name)
+    roots = _strings(table.get("source"), "source", codec)
     if not roots:
         raise _undeclared("names no source")
-    return Sources(roots=roots, omit=_strings(run.get("omit", []), "omit"))
+    return Sources(roots=roots, omit=_strings(table.get("omit"), "omit", codec))
 
 
 def diff_arguments(base: str, sources: Sources) -> list[str]:

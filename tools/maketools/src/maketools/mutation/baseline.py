@@ -31,7 +31,7 @@ timeout is three times its shares' cost plus 30 s (:func:`~.trials.mutant_timeou
 from __future__ import annotations
 
 import xml.etree.ElementTree as ElementTree
-from collections.abc import Iterable
+from collections.abc import Sequence
 from itertools import zip_longest
 from typing import NamedTuple
 
@@ -92,7 +92,7 @@ def shares(tests: tuple[str, ...]) -> list[Share]:
     return [Share(file=file, tests=tuple(by_file[file])) for file in sorted(by_file)]
 
 
-def rounds(selections: Iterable[tuple[str, ...] | None]) -> list[tuple[str, ...]]:
+def rounds(selections: Sequence[tuple[str, ...] | None]) -> list[tuple[str, ...]]:
     """The rounds that run every distinct share once, each file once a round.
 
     Args:

@@ -102,13 +102,17 @@ class MutationHooks(NamedTuple):
 
 
 class JsonCodec(NamedTuple, Generic[JsonT]):
-    """How the step reads cosmic-ray's and coverage's JSON and writes its own.
+    """How the step reads cosmic-ray's and coverage's JSON and a package's TOML, and writes JSON.
 
     Each reader raises the package's own decoding error, naming the field,
-    when a value is not the shape asked for.
+    when a value is not the shape asked for. A TOML document decodes into
+    the same values a JSON one does (tables, arrays, strings), so one set of
+    narrowers reads both, and the boundary names the TOML reader its
+    repository allows (board task 9976dca1).
 
     Attributes:
         loads: Decode a JSON document.
+        loads_toml: Decode a TOML document.
         dumps: Encode a string, or a list of them, as JSON with the
             standard ``", "`` separator.
         mapping: Require an object.
@@ -119,6 +123,7 @@ class JsonCodec(NamedTuple, Generic[JsonT]):
     """
 
     loads: Callable[[str], JsonT]
+    loads_toml: Callable[[str], JsonT]
     dumps: Callable[[str | list[str]], str]
     mapping: Callable[[JsonT, str], Mapping[str, JsonT]]
     sequence: Callable[[JsonT, str], Sequence[JsonT]]

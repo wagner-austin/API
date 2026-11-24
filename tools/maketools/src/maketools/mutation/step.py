@@ -87,10 +87,11 @@ def package_sources(context: StepContext[JsonT]) -> Sources:
         Its ``[tool.coverage.run]`` source and omit.
 
     Raises:
-        MutationStepError: ``MUTATION_SOURCES_UNDECLARED`` as
-            :func:`~.changes.declared_sources` raises it.
+        MutationStepError: ``MUTATION_SOURCES_UNDECLARED``, and the codec's
+            own errors, as :func:`~.changes.declared_sources` raises them.
     """
-    return declared_sources(context.hooks.read_text(context.package_dir / PYPROJECT))
+    text = context.hooks.read_text(context.package_dir / PYPROJECT)
+    return declared_sources(text, context.codec)
 
 
 def changed_sources(

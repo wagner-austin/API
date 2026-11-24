@@ -10,7 +10,9 @@ is bound here and nowhere else:
   :data:`maketools._test_hooks.run_answering` under the step's wall, the
   clock, files, and output through ``write_line``.
 - JSON (:data:`API_CODEC`): ``platform_core.json_utils``, this repository's
-  one JSON reader, its decoding errors naming the field.
+  one JSON reader, its decoding errors naming the field; and a package's
+  ``pyproject.toml`` through ``platform_core.toml_utils``, its one TOML
+  reader, into the same values (MCPs board task 9976dca1).
 - REFUSALS: the core's :class:`~maketools.mutation.context.MutationStepError`
   becomes an ``AppError`` carrying ``platform_core``'s
   :class:`~platform_core.error_codes_tooling.MutationErrorCode` of the same
@@ -50,6 +52,7 @@ from platform_core.json_utils import (
     narrow_json_to_list,
     narrow_json_to_str,
 )
+from platform_core.toml_utils import loads_toml
 
 from maketools import _test_hooks
 from maketools.bounded_spans import (
@@ -169,6 +172,7 @@ def dump_spaced(value: str | list[str]) -> str:
 #: How API reads and writes the step's JSON.
 API_CODEC: Final[JsonCodec[JSONValue]] = JsonCodec(
     loads=load_json_str,
+    loads_toml=loads_toml,
     dumps=dump_spaced,
     mapping=mapping,
     sequence=sequence,

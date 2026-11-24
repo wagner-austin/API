@@ -7,9 +7,9 @@ time. They never select tests, change deadlines, or decide a mutant's result.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from collections.abc import Callable
 from enum import StrEnum
+from types import TracebackType
 from typing import NamedTuple
 
 
@@ -48,6 +48,59 @@ def _descending_seconds(trial: Trial) -> float:
     return -trial.seconds
 
 
+class Measurement:
+    """One invocation being measured: its start read when made, its cost recorded on exit.
+
+    A class rather than a ``@contextmanager`` generator because API, which
+    lifts this module byte for byte, forbids importing ``Iterator`` (its
+    ``import-collections-iterator`` guard, board task 9976dca1), and a
+    generator context manager cannot be annotated without it. Its exit
+    returns nothing, so an invocation's error propagates unchanged.
+    """
+
+    def __init__(
+        self,
+        now: Callable[[], float],
+        record: Callable[[Trial], None],
+        phase: Phase,
+        scope: Scope,
+        identity: str,
+    ) -> None:
+        """Read the clock at the invocation's start.
+
+        Args:
+            now: Current monotonic seconds.
+            record: Where the finished invocation's cost goes.
+            phase: Baseline or mutant.
+            scope: Named tests or whole suite.
+            identity: Test count and, for mutants, their exact source site.
+        """
+        self._now = now
+        self._record = record
+        self._phase = phase
+        self._scope = scope
+        self._identity = identity
+        self._started = now()
+
+    def __enter__(self) -> None:
+        """Enter the invocation; the clock was read when this was made."""
+
+    def __exit__(
+        self,
+        kind: type[BaseException] | None,
+        error: BaseException | None,
+        trace: TracebackType | None,
+    ) -> None:
+        """Record the invocation's cost, whether it returned or raised.
+
+        Args:
+            kind: The error's type, or None when it returned.
+            error: The error, or None.
+            trace: Its traceback, or None.
+        """
+        self._record(Trial(self._phase, self._scope, self._now() - self._started, self._identity))
+
+
 class TrialTimings:
     """Accumulate costs without intercepting an invocation's result or error."""
 
@@ -60,8 +113,7 @@ class TrialTimings:
         self._now = now
         self._trials: list[Trial] = []
 
-    @contextmanager
-    def measure(self, phase: Phase, scope: Scope, identity: str) -> Iterator[None]:
+    def measure(self, phase: Phase, scope: Scope, identity: str) -> Measurement:
         """Measure the enclosed invocation, including one that raises.
 
         Args:
@@ -69,14 +121,11 @@ class TrialTimings:
             scope: Named tests or whole suite.
             identity: Test count and, for mutants, their exact source site.
 
-        Yields:
-            Control to the original invocation, whose failures propagate.
+        Returns:
+            The context the invocation runs in, its clock read now; its
+            failures propagate.
         """
-        started = self._now()
-        try:
-            yield
-        finally:
-            self._trials.append(Trial(phase, scope, self._now() - started, identity))
+        return Measurement(self._now, self._trials.append, phase, scope, identity)
 
     def lines(self) -> list[str]:
         """Render four totals and at most five slow invocations.
@@ -107,4 +156,4 @@ class TrialTimings:
         return lines
 
 
-__all__ = ["Phase", "Scope", "Trial", "TrialTimings"]
+__all__ = ["Measurement", "Phase", "Scope", "Trial", "TrialTimings"]
