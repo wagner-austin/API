@@ -50,8 +50,8 @@ def _answer_one(listener: socket.socket) -> None:
         connection.sendall(NOT_FOUND)
 
 
-@pytest.fixture
-def answering() -> Generator[str, None, None]:
+@pytest.fixture(name="answering")
+def _answering() -> Generator[str, None, None]:
     """A server on this host's loopback that answers the one HEAD a case sends.
 
     Yields:
@@ -67,8 +67,8 @@ def answering() -> Generator[str, None, None]:
     assert worker.is_alive() is False
 
 
-@pytest.fixture
-def silent() -> Generator[str, None, None]:
+@pytest.fixture(name="silent")
+def _silent() -> Generator[str, None, None]:
     """A socket the kernel completes connections to and nothing ever answers on.
 
     Yields:

@@ -1124,6 +1124,22 @@ once it is back on mains. On 2026-11-03 loki, off its charger, drew 23 to
 32 W through back-to-back NixOS VM checks and fell from 35 to 30 percent in
 seven minutes.
 
+**A node that cannot reach the internet takes no check** (MCPs board task
+e70cdf05). The Linux capacity probe asks, from the node, both package indexes
+a check's setup downloads from, `curl --head` to `https://pypi.org/simple/pip/`
+and `https://registry.npmjs.org/` with 3 s to connect and 5 s in all each, and
+prints `egress_<n>=<curl exit> <target>` per target, then `egress_count=`
+(`fleet.core.linux_egress_probe`). Any HTTP answer is reach, and a node reaches
+the internet when one index answers. A count that is missing or zero, a counted
+target with no line and curl's absence (exit 127) make the probe unreadable,
+never reach. `capacity.assess` refuses a node that reached neither with
+`NODE_EGRESS_LOST`, naming each target and curl's failure, after the battery
+refusal and before every load refusal, so the node runner's gate claims nothing
+and its tick tells the queue why. On 2026-11-25 lavender lost its IPv4 lease to
+the LAN's DHCP and still answered ssh over the tailnet, so it went on claiming
+checks, and fleet job 376c6670 failed `make setup` in packages/maketools as
+that package's own red.
+
 **How many runs a node holds is live, not declared** (MCPs board task
 939ec5c7). Every node used to declare `max_concurrent_runs`, and every node
 declared 1: on 2026-10-02 thirteen jobs queued behind four running while the
