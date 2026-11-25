@@ -27,7 +27,7 @@ from __future__ import annotations
 import re
 from typing import Final
 
-from fleet.contracts.egress_reading import CURL_MISSING_EXIT, EgressAttempt
+from fleet.contracts.egress_reading import CURL_NOT_RUN, EgressAttempt
 
 #: The package indexes a check's setup downloads from: poetry's and npm's.
 #: pip's own project page rather than the whole index, which is tens of
@@ -68,8 +68,9 @@ EGRESS_PROBE_PART: Final = (
     + f"printf '{COUNT_FIELD}=%s\\n' \"$asked\"\n"
 )
 
-#: A whole number as the probe prints it.
-_WHOLE: Final = re.compile(r"0|[1-9][0-9]*")
+#: A positive whole number as the probe prints it: a count of no targets
+#: would read as a node that reached nothing it was never asked to.
+_POSITIVE: Final = re.compile(r"[1-9][0-9]*")
 
 #: One target's line: curl's exit, a space, the target.
 _ATTEMPT: Final = re.compile(r"(0|[1-9][0-9]{0,2}) (\S+)")
@@ -87,12 +88,12 @@ def read_egress(host: str, fields: dict[str, str]) -> tuple[tuple[EgressAttempt,
 
     Returns:
         The attempts in the order the probe asked and an empty string; or
-        None and the reason, naming the node, when the count is missing, not
-        a whole number or zero, a target it counts printed no line, a line
-        cannot be read, or curl was not found.
+        None and the reason, naming the node, when the count is missing or
+        not a positive whole number, a target it counts printed no line, a
+        line cannot be read, or the shell could not run curl.
     """
     count = fields.get(COUNT_FIELD)
-    if count is None or _WHOLE.fullmatch(count) is None or count == "0":
+    if count is None or _POSITIVE.fullmatch(count) is None:
         return None, (
             f"{host} reported {COUNT_FIELD}={count!r}, which is not a positive whole number "
             "of targets, so whether it reaches the internet is unknown"
@@ -108,10 +109,11 @@ def read_egress(host: str, fields: dict[str, str]) -> tuple[tuple[EgressAttempt,
         if matched is None:
             return None, f"{host} printed an egress line that cannot be read: {line!r}"
         curl_exit = int(matched.group(1))
-        if curl_exit == CURL_MISSING_EXIT:
+        not_run = CURL_NOT_RUN.get(curl_exit)
+        if not_run is not None:
             return None, (
-                f"{host} has no curl on its PATH (exit {CURL_MISSING_EXIT}), so its probe cannot "
-                "say whether it reaches the internet"
+                f"{host} {not_run} (exit {curl_exit}), so its probe cannot say whether it "
+                "reaches the internet"
             )
         attempts.append(EgressAttempt(target=matched.group(2), curl_exit=curl_exit))
     return tuple(attempts), ""

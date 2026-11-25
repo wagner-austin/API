@@ -16,8 +16,9 @@ one target answers. Requiring both would refuse every check on the fleet
 whenever one index alone was down, including the checks that download only
 from the other.
 
-WHAT IS NOT A READING. Exit 127 is the shell's 'command not found': the node
-has no curl, which says nothing about its network, so
+WHAT IS NOT A READING. Exits 126 and 127 are the shell's, not curl's: 127
+is 'command not found', the node has no curl, and 126 is 'found but not
+executable'. Neither says anything about the node's network, so
 :func:`fleet.core.linux_egress_probe.read_egress` refuses the probe rather
 than calling the node offline.
 """
@@ -31,8 +32,13 @@ from typing_extensions import TypedDict
 #: The exit code of a target that answered over HTTP.
 REACHED_EXIT: Final = 0
 
-#: The shell's exit code for a command it cannot find.
-CURL_MISSING_EXIT: Final = 127
+#: The shell's exits for a curl it could not run, POSIX's 'Exit Status for
+#: Commands' (XCU 2.8.2), each with what it says about the node: an ask that
+#: never ran, and so no reading of its network.
+CURL_NOT_RUN: Final[dict[int, str]] = {
+    126: "cannot execute the curl on its PATH",
+    127: "has no curl on its PATH",
+}
 
 #: The curl exits a refusal names in words, from curl's own exit code table
 #: (``man curl``, EXIT CODES). Any other exit is named by its number alone.
@@ -66,7 +72,7 @@ def reaches(attempts: tuple[EgressAttempt, ...]) -> bool:
     Returns:
         True when at least one target answered.
     """
-    return any(attempt["curl_exit"] == REACHED_EXIT for attempt in attempts)
+    return REACHED_EXIT in {attempt["curl_exit"] for attempt in attempts}
 
 
 def describe_attempt(attempt: EgressAttempt) -> str:
@@ -87,7 +93,7 @@ def describe_attempt(attempt: EgressAttempt) -> str:
 
 __all__ = [
     "CURL_FAILURES",
-    "CURL_MISSING_EXIT",
+    "CURL_NOT_RUN",
     "REACHED_EXIT",
     "EgressAttempt",
     "describe_attempt",
