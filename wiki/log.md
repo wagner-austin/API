@@ -600,3 +600,8 @@ Notes: Records why loki drained running NixOS VM checks off its charger and the 
 ## [2026-11-05] create | Weight-space programming on our own models
 Pages created: model-trainer-weight-space-programming (hub services; index now 80 pages, services 22).
 Notes: Records Model-Trainer's weight-program harness and its two HPC3 runs. Job 58906732: an LLM-written edit took a MountainCar policy from 0 to 1,024 of 1,024 episodes. Job 58906742: an LLM-written ablation of GPT-2's induction heads raised greedy loops from 44 to 125 of 256 against the untouched control. The records, programs and reader briefs are committed under services/Model-Trainer/results/weight-space. Board task 7964f9f6-68d6-43c2-8565-bb8e387ca694.
+
+## [2026-11-25] create | The egress refusal
+Pages created: fleet-runner-egress-refusal (hub infrastructure; index now 81 pages, infrastructure 9).
+Pages updated: fleet-runner-battery-refusal-and-nixos-test-tag, repinned to the probe, refusal and probe-test blobs the egress change moved; its refusal quote moved from node_refusal.py:96-104 to :99-107 and its lenovold test quote from :489 to :506, each re-read at the new blob and unchanged in wording.
+Notes: Records why lavender went on claiming checks on 2026-11-25 after losing its IPv4 lease while still answering ssh, and the reading that stops it: the capacity probe asks pypi.org and registry.npmjs.org from the node with curl --head, any HTTP answer from either is reach, and machine_refusal refuses a node that reached neither with NODE_EGRESS_LOST. MCPs board task e70cdf05-1c2e-4db1-b52b-93e8cd9fd4b5.

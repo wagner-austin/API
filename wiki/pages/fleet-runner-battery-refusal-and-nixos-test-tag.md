@@ -13,13 +13,13 @@ source_paths:
   - tools/fleet/tests/test_linux_capacity_probe.py
   - tools/fleet/tests/test_capacity_battery.py
 source_git_blobs:
-  "tools/fleet/src/fleet/core/linux_capacity_probe.py": 8f25450b7bd3536ef3f1b1179bf40d1763ed7a87
-  "tools/fleet/src/fleet/core/node_refusal.py": dbb0f0022d762d541623f72848f494420bcac4ef
+  "tools/fleet/src/fleet/core/linux_capacity_probe.py": 57dd0993db52bb0f7d42e944b6fc1d895d17d583
+  "tools/fleet/src/fleet/core/node_refusal.py": 79065403e6d4e0d65161bfe8dd11bdb63694e039
   "tools/fleet/src/fleet/contracts/tagged_tools.py": 404b961a3ff567cb1bdc06aa33de128a812db152
   "tools/fleet/src/fleet/contracts/runner_tick.py": e0f87e25be83cbf421fcc8a274a99352c05fb1b3
   "tools/fleet/src/fleet/cli/rolled.py": 2cfadec4898974adf278be94666c911df4f231e3
   "tools/fleet/registry/projects/MCPs/fleet-nixos.json": b238202a7cea3ef2ac7eb35cac69fd16913bd6db
-  "tools/fleet/tests/test_linux_capacity_probe.py": 99fe2bd463e46c0d6ae9085db814c77ca7edd210
+  "tools/fleet/tests/test_linux_capacity_probe.py": 6e09698a430b6b6e6c5fe90c1382a85eecc7d6e4
   "tools/fleet/tests/test_capacity_battery.py": c818a01fdcb98d2aa64d85397adc89ff91cf69b1
 fact_checked: "2026-11-04"
 confidence: high
@@ -56,9 +56,9 @@ Two limits showed up in the same window. A runner tick that ended before its pro
 [^pin]: `tools/fleet/src/fleet/contracts/tagged_tools.py:184-186` -- "fleet registry pinned the project to loki by name on 2026-10-28 (MCPs"
 [^predicate]: `tools/fleet/src/fleet/core/linux_capacity_probe.py:70-71` -- "entry whose ``type`` is ``Battery`` reads ``status`` ``Discharging`` and no"
 [^external]: `tools/fleet/src/fleet/core/linux_capacity_probe.py:72` -- "external supply (any other ``type``: ``Mains``, or a ``USB`` port the"
-[^lenovold]: `tools/fleet/src/fleet/core/linux_capacity_probe.py:78-80` -- "and at 2026-11-04T03:06Z its BAT0 read ``Discharging`` at 93 percent while"; `tools/fleet/tests/test_linux_capacity_probe.py:489` -- "lenovold at 2026-11-04T03:06Z: its firmware's conservation mode held BAT0"
+[^lenovold]: `tools/fleet/src/fleet/core/linux_capacity_probe.py:78-80` -- "and at 2026-11-04T03:06Z its BAT0 read ``Discharging`` at 93 percent while"; `tools/fleet/tests/test_linux_capacity_probe.py:506` -- "lenovold at 2026-11-04T03:06Z: its firmware's conservation mode held BAT0"
 [^device]: `tools/fleet/src/fleet/core/linux_capacity_probe.py:82-83` -- "``Device`` is a peripheral's (a wireless mouse or keyboard), not the"
-[^refusal]: `tools/fleet/src/fleet/core/node_refusal.py:96-104` -- "is running on its battery: its probe read a power supply"
+[^refusal]: `tools/fleet/src/fleet/core/node_refusal.py:99-107` -- "is running on its battery: its probe read a power supply"
 [^order]: `tools/fleet/tests/test_capacity_battery.py:52` -- `def test_the_battery_refusal_comes_before_every_load_refusal(self) -> None:`; `:69` -- `def test_a_node_short_of_disk_is_refused_for_its_disk_first(self) -> None:`
 [^tick]: `tools/fleet/src/fleet/contracts/runner_tick.py:65` -- "The queue keeps it in each tick's history, so an audit can read"
 [^history]: [synthesis] -- MCPs migration 903, `packages/db/migrations/903_fleet_runner_tick_history.sql` at MCPs 20a2ae4e7, and its writer `packages/db/src/fleet-dispatch/runner-tick-history.ts`, landed for MCPs board task 3268afdf; this repository carries only the runner that sends the reading.
