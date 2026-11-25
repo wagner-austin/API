@@ -133,6 +133,7 @@ def _probe(
     io_pressure: str | None,
     quota: str = QUOTA,
     supplies: pathlib.Path | None = None,
+    wrapper: tuple[str, ...] = (),
 ) -> subprocess.CompletedProcess[str]:
     """Run the probe with its roots pointed at fakes.
 
@@ -150,6 +151,8 @@ def _probe(
         supplies: The fake ``/sys/class/power_supply``, or None for one that
             does not exist, so the reading never depends on whether the node
             running the test is itself on its battery.
+        wrapper: The command the shell runs under, e.g. ``unshare`` and its
+            flags for a namespace with no network; empty to run it as is.
 
     Returns:
         The finished probe.
@@ -179,7 +182,7 @@ def _probe(
         encoding="utf-8",
     )
     return subprocess.run(
-        [*SH_INVOCATION, str(script)],
+        [*wrapper, *SH_INVOCATION, str(script)],
         capture_output=True,
         text=True,
         check=False,
