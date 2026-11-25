@@ -50,6 +50,15 @@ class FleetErrorCode(ErrorCodeBase):
     # VM checks, 35 percent falling to 30 in seven minutes. It clears when
     # the node is back on mains, with no edit.
     NODE_ON_BATTERY = "NODE_ON_BATTERY"
+    # The node answers ssh over the tailnet but reaches neither package index
+    # a check's setup downloads from (MCPs board task e70cdf05). Distinct from
+    # NODE_UNREACHABLE, which is the hub failing to reach the node: here the
+    # node answers and cannot reach out. Measured 2026-11-25 on lavender, which
+    # had lost its IPv4 lease to the LAN's DHCP: ssh answered, `curl
+    # https://pypi.org/simple/pip/` failed 'Could not resolve host', and the
+    # queue kept sending it checks whose setup then failed as the package's
+    # own red. It clears when either index answers again, with no edit.
+    NODE_EGRESS_LOST = "NODE_EGRESS_LOST"
     NODE_UNREACHABLE = "NODE_UNREACHABLE"
     # Distinct from NODE_UNREACHABLE, and the distinction is the whole point:
     # "was never asked" is not "did not answer". A node the workspace declares
