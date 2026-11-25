@@ -100,8 +100,10 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # since MCPs/packages/public-portal, search-query-parser and
     # document-categories-codegen, lifted out of civic-sources (the same task).
     # 82 since MCPs/packages/claude-hooks-linux, whose live watcher cases run
-    # a built taskboard and mcp-proxy (MCPs board task c35a9ac3).
-    assert len(prepared) == 82
+    # a built taskboard and mcp-proxy (MCPs board task c35a9ac3). 83 since
+    # MCPs/packages/council-inventory, the independent inventory of every
+    # council's published records (MCPs board task ed80074e).
+    assert len(prepared) == 83
     assert prepared["MCPs/scripts/ci-contracts"] == (
         InstallStep(phase="install", argv=(*PREPARE, "install")),
         InstallStep(
@@ -178,8 +180,10 @@ def test_a_test_database_step_names_its_container_and_its_phase() -> None:
     # usage-limit case (MCPs board task ea46a7a4); 33 since
     # MCPs/instagram-mcp, for its scheduled publications (MCPs board task 4fd6d24a);
     # 34 since MCPs/packages/claude-hooks-linux, for its live watcher cases'
-    # disposable board (MCPs board task c35a9ac3).
-    assert len(databases) == 34
+    # disposable board (MCPs board task c35a9ac3); 35 since
+    # MCPs/packages/council-inventory, whose runs are stored in corvis_test
+    # (MCPs board task ed80074e).
+    assert len(databases) == 35
     assert {step["phase"] for step in databases} == {"test-database"}
     assert {step["argv"][5:] for step in databases} == {("CONTAINER=corvis-fleet-testdb",)}
 
