@@ -30,6 +30,7 @@ from typing_extensions import TypedDict
 from fleet.contracts.action_cache import ActionCacheCounts
 from fleet.contracts.budget import NodeBudget, decode_node_budget, encode_node_budget
 from fleet.contracts.capability import Capability, decode_capability
+from fleet.contracts.egress_reading import EgressAttempt
 from fleet.contracts.gpu_reading import GpuReading
 from fleet.contracts.model_host import NodeModels, decode_node_models, encode_node_models
 
@@ -245,6 +246,11 @@ class NodeState(TypedDict):
             no external supply reads ``online`` 1
             (:mod:`fleet.core.linux_capacity_probe`, MCPs board task
             3268afdf). False on mains and on a node with no battery.
+        egress: Every package index the node asked and how curl ended
+            (:mod:`fleet.core.linux_egress_probe`, MCPs board task
+            e70cdf05), in the order asked; never empty. The node reaches the
+            internet when one answered
+            (:func:`fleet.contracts.egress_reading.reaches`).
         gpus: Every display device on the node with its memory, when a
             driver counter reads it (:mod:`fleet.core.linux_gpu_probe`, MCPs
             board task b4d5ca0f); empty for a node with none. Carried to the
@@ -262,6 +268,7 @@ class NodeState(TypedDict):
     io_pressure_pct: float
     check_cpu_quota: float | None
     on_battery: bool
+    egress: tuple[EgressAttempt, ...]
     gpus: tuple[GpuReading, ...]
 
 

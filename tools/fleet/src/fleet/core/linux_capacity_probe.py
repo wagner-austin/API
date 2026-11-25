@@ -82,6 +82,11 @@ charger until the adapter was read beside it. A battery whose ``scope`` is
 ``Device`` is a peripheral's (a wireless mouse or keyboard), not the
 machine's, and is skipped, as is any supply of that scope.
 
+WHETHER THE NODE REACHES THE INTERNET IS ASKED FROM THE NODE (MCPs board
+task e70cdf05, :mod:`fleet.core.linux_egress_probe`): curl asks each package
+index a check's setup downloads from, after the battery and before the
+reservations, so a reservation file that ends the probe has already printed it.
+
 THE NODE'S RESERVATIONS ARE CHARGED LAST (MCPs board task 84a2b690,
 :mod:`fleet.core.reservations` for the file and why). Each live
 ``.reservation`` file's ``cores`` are summed into ``reserved_cores``, which
@@ -94,6 +99,7 @@ than read as holding nothing.
 from __future__ import annotations
 
 from fleet.core import reservations
+from fleet.core.linux_egress_probe import EGRESS_PROBE_PART
 from fleet.core.linux_gpu_probe import GPU_PROBE_PART
 
 #: Where the probe reads memory from; the test replaces it.
@@ -228,6 +234,7 @@ CAPACITY_PROBE_BODY = (
     + PRESSURE_PART
     + CHECK_QUOTA_PART
     + BATTERY_PART
+    + EGRESS_PROBE_PART
     + RESERVATIONS_PART
     + GPU_PROBE_PART
 )

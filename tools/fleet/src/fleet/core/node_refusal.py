@@ -4,9 +4,10 @@ Split out of :mod:`fleet.core.capacity` when the battery refusal (MCPs board
 task 3268afdf) took that module past the 600-line ceiling. These are the
 refusals :func:`fleet.core.capacity.assess` gives before it weighs any load:
 a node that is not the one a project names, one that checks only its pinned
-projects, one whose disk cannot hold a staged tree, and one running on its
-battery. No load falling changes any of them, which is why they are one
-concern and come first.
+projects, one whose disk cannot hold a staged tree, one running on its
+battery, and one that cannot reach the package indexes a check's setup
+downloads from (MCPs board task e70cdf05). No load falling changes any of
+them, which is why they are one concern and come first.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from __future__ import annotations
 from platform_core.errors import FleetErrorCode
 from typing_extensions import TypedDict
 
+from fleet.contracts.egress_reading import describe_attempt, reaches
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
 
@@ -80,8 +82,9 @@ def machine_refusal(node: NodeConfig, state: NodeState) -> DispatchVerdict | Non
     Returns:
         The refusal :func:`fleet.core.capacity.assess` gives after the tags
         for a disk short of the staged trees' reservation, then for a node
-        running on its battery (MCPs board task 3268afdf); None when neither
-        holds.
+        running on its battery (MCPs board task 3268afdf), then for a node
+        that reached none of the package indexes it asked (MCPs board task
+        e70cdf05); None when none holds.
     """
     if state["free_disk_gb"] < node["budget"]["max_disk_gb"]:
         return DispatchVerdict(
@@ -101,6 +104,17 @@ def machine_refusal(node: NodeConfig, state: NodeState) -> DispatchVerdict | Non
                 f"{node['host']} is running on its battery: its probe read a power supply "
                 "discharging, and a check placed here drains it. It takes the next job once it "
                 "is back on mains."
+            ),
+        )
+    if not reaches(state["egress"]):
+        asked = "; ".join(describe_attempt(attempt) for attempt in state["egress"])
+        return DispatchVerdict(
+            workers=0,
+            code=FleetErrorCode.NODE_EGRESS_LOST,
+            reason=(
+                f"{node['host']} cannot reach the internet: {asked}. Every check's setup "
+                "downloads what its lockfile pins from these indexes, so a check placed here "
+                "would fail as its package's own red. It takes the next job once one answers."
             ),
         )
     return None

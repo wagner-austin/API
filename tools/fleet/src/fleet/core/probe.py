@@ -36,8 +36,10 @@ from typing import TypedDict
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.action_cache import PROBE_FIELDS, ActionCacheCounts, inconsistency
+from fleet.contracts.egress_reading import EgressAttempt
 from fleet.contracts.node import LiveLoad, NodeConfig, NodeState, SliceMemory
 from fleet.core import dialect, names, remote, reservations
+from fleet.core.linux_egress_probe import read_egress
 from fleet.core.linux_gpu_probe import read_gpus
 
 #: The share of the last minute a runnable task waited for a CPU (MCPs board
@@ -151,15 +153,10 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
     check_cpu_quota, quota_problem = _read_quota(host, fields, output)
     if quota_problem:
         return ProbeOutcome(state=None, reason=quota_problem)
-    battery = fields.get(BATTERY_FIELD)
-    if battery not in BATTERY_READINGS:
-        return ProbeOutcome(
-            state=None,
-            reason=(
-                f"{host} reported {BATTERY_FIELD}={battery!r} where yes or no belongs, so whether "
-                f"it is running on its battery is unknown; it reported: {output.strip()!r}"
-            ),
-        )
+    machine, machine_problem = _read_machine(host, fields, output)
+    if machine is None:
+        return ProbeOutcome(state=None, reason=machine_problem)
+    on_battery, egress = machine
     action_cache, cache_problem = _read_action_cache(host, fields, output)
     if cache_problem:
         return ProbeOutcome(state=None, reason=cache_problem)
@@ -178,11 +175,44 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
             cpu_pressure_pct=readings[PRESSURE_FIELD],
             io_pressure_pct=readings[IO_PRESSURE_FIELD],
             check_cpu_quota=check_cpu_quota,
-            on_battery=BATTERY_READINGS[battery],
+            on_battery=on_battery,
+            egress=egress,
             gpus=gpus,
         ),
         reason="",
     )
+
+
+def _read_machine(
+    host: str, fields: dict[str, str], output: str
+) -> tuple[tuple[bool, tuple[EgressAttempt, ...]] | None, str]:
+    """Read whether the node runs on its battery and whether it reaches the internet.
+
+    The two readings that make a node the wrong machine for a check whatever
+    its load (:func:`fleet.core.node_refusal.machine_refusal`), read together
+    so :func:`read_state` stays one refusal per reading.
+
+    Args:
+        host: The node, for the message.
+        fields: The parsed key=value pairs.
+        output: The whole output, for the message.
+
+    Returns:
+        Whether it is on its battery and every package index it asked
+        (:func:`fleet.core.linux_egress_probe.read_egress`), and an empty
+        string; or None and the reason, naming the node, when either cannot
+        be read.
+    """
+    battery = fields.get(BATTERY_FIELD)
+    if battery not in BATTERY_READINGS:
+        return None, (
+            f"{host} reported {BATTERY_FIELD}={battery!r} where yes or no belongs, so whether "
+            f"it is running on its battery is unknown; it reported: {output.strip()!r}"
+        )
+    egress, egress_problem = read_egress(host, fields)
+    if egress is None:
+        return None, egress_problem
+    return (BATTERY_READINGS[battery], egress), ""
 
 
 def _read_quota(host: str, fields: dict[str, str], output: str) -> tuple[float | None, str]:
