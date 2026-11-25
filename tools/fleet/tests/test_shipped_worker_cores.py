@@ -49,6 +49,17 @@ they wanted about 8.4 cores, the share was throttled 670 s, and a 19 s watcher
 case timed out at 60 s. Charged 2, lavender grants it 3 workers, 6 of its 8,
 so watcher is placed beside it only at its minimum of 2 workers, about 6.5
 cores of real use, and repo-contracts is not placed beside watcher's 4.
+
+MCPs/packages/council-inventory is charged 2 cores a worker with a minimum
+of 3 workers (MCPs board task 0a0d442b). Its check ends in StrykerJS's
+mutation step, whose TypeScript checkers run beside its test runners, so a
+run draws 4.5 to 6 cores at 2 to 4 workers. Charged one core with a minimum
+of 2, lenovold, whose slice is held to 2 CPUs, took it at 2 workers three
+times and each run stopped at the step's 900 s bound (fleet jobs 1b821fb5,
+fa069997 and 589e9282) on mutants colossus finished in about 330 s. The
+largest mutation measured, 806 mutants, spent about 3600 CPU-seconds, more
+than 4 cores do inside the bound, hence 3 workers of 2: lenovold refuses it,
+and lavender, colossus and serendipity each grant it 3.
 """
 
 from __future__ import annotations
@@ -118,6 +129,25 @@ TWIN_CORES_MEASUREMENT = (
     "(MCPs board task d198701c); 6b46dfff at 4 workers there read throttled:531s. Charged 8, "
     "a node grants it 1 worker, lavender places nothing beside it, and a node whose spare "
     "cores are fewer than 8 (serendipity's 6) refuses it."
+)
+
+#: The runs MCPs/packages/council-inventory's registry row names beside its
+#: worker_cores 2 and minimum_workers 3.
+INVENTORY_CORES_MEASUREMENT = (
+    "Fleet jobs f28d5812, 2567648a and 02c96602 on colossus at 4 workers (2026-11-25) read "
+    "dispatch=1775s/344s, 2008s/344s and 2259s/364s, and 8d4476df there at 2 read "
+    "3525s/776s/throttled:239s: 1.3 to 1.6 cores a worker at 4 and 2.3 at 2, a run drawing "
+    "4.5 to 6 cores whatever its workers, because its make check ends in mcp-shared's "
+    "StrykerJS mutation step, whose TypeScript checkers run beside its test runners; those "
+    "four ran before MCPs f8336e98c, which starts a checker and a runner for each worker "
+    "granted. Charged one core with a minimum of 2, lenovold (4 threads, 2 reserved, its "
+    "slice held to 2 CPUs) was granted 2 workers, and fleet jobs 1b821fb5, fa069997 and "
+    "589e9282 there read throttled 725 s, 816 s and 1554 s and stopped MUTATION_OVER_BOUND at "
+    "870 s of 900 on 299, 183 and 183 mutants whose mutation step colossus at 4 workers "
+    "finished in 340 s (480ce217) and 313 s (2567648a), MCPs board task 0a0d442b. The minimum "
+    "of 3 is set by that bound: the largest measured mutation, 806 mutants in fleet job "
+    "b5e4cca4 on colossus, spent about 3600 CPU-seconds, more than 4 cores can do in 870 s, "
+    "so 3 workers of 2 cores and lenovold refuses it."
 )
 
 
@@ -327,3 +357,45 @@ def test_lavender_books_repo_contracts_so_watcher_runs_beside_it_at_its_minimum(
         "lavender's checks are held to 8.00 CPU(s) by the quota systemd keeps on their slice, "
         "so 4 core(s) are left where the suite's minimum of 3 worker(s) occupies 6"
     )
+
+
+def test_lenovold_refuses_the_council_inventory_and_three_other_nodes_grant_it_three() -> None:
+    """MCPs board task 0a0d442b: charged one core a worker with a minimum of 2,
+    MCPs/packages/council-inventory was granted 2 workers on lenovold, whose
+    slice systemd holds to 2 CPUs (CPUQuotaPerSecUSec=2s, measured
+    2026-11-25T11:18:33Z), and three of its runs there stopped at the mutation
+    step's 900 s bound. Charged 2 cores with a minimum of 3, lenovold's 2
+    spare cores afford 1 worker idle and its quota leaves 2 cores where the
+    minimum occupies 6, so it is refused either way; lavender and colossus,
+    whose slices are held to 8 CPUs, and serendipity, held to 6, each grant 3
+    workers."""
+    workspace = shipped_workspace()
+    inventory = workspace["projects"]["MCPs/packages/council-inventory"]
+
+    assert (inventory["worker_cores"], inventory["minimum_workers"]) == (2, 3)
+    assert inventory["worker_cores_measurement"] == INVENTORY_CORES_MEASUREMENT
+
+    lenovold = workspace["nodes"]["lenovold"]
+    lenovold_tags = node_tags(lenovold) | frozenset(inventory["required_tags"])
+    state = idle_state(lenovold)
+    idle = assess(lenovold, state, inventory, lenovold_tags)
+    assert (idle["workers"], idle["code"]) == (0, FleetErrorCode.NODE_MEMORY_EXHAUSTED)
+    assert idle["reason"].startswith(
+        "lenovold affords 1 worker(s) for a suite that declares a minimum of 3: 4 cores "
+        "against 2 reserved, 24.0 GB free, 0.5 GB per worker, 1.5 GB reserved for the node's "
+        "owner"
+    )
+    state["check_cpu_quota"] = 2.0
+    held = assess(lenovold, state, inventory, lenovold_tags)
+    assert (held["workers"], held["code"]) == (0, FleetErrorCode.NODE_OWNER_RESERVED)
+    assert held["reason"].startswith(
+        "lenovold's checks are held to 2.00 CPU(s) by the quota systemd keeps on their slice, "
+        "so 2 core(s) are left where the suite's minimum of 3 worker(s) occupies 6"
+    )
+
+    for host, quota in (("lavender", 8.0), ("colossus", 8.0), ("serendipity", 6.0)):
+        node = workspace["nodes"][host]
+        tags = node_tags(node) | frozenset(inventory["required_tags"])
+        state = idle_state(node)
+        state["check_cpu_quota"] = quota
+        assert assess(node, state, inventory, tags) == {"workers": 3, "code": None, "reason": ""}

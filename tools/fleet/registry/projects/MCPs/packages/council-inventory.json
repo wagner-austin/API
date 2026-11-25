@@ -1,6 +1,8 @@
 {
   "worker_ram_gb": 0.5,
-  "minimum_workers": 2,
+  "minimum_workers": 3,
+  "worker_cores": 2,
+  "worker_cores_measurement": "Fleet jobs f28d5812, 2567648a and 02c96602 on colossus at 4 workers (2026-11-25) read dispatch=1775s/344s, 2008s/344s and 2259s/364s, and 8d4476df there at 2 read 3525s/776s/throttled:239s: 1.3 to 1.6 cores a worker at 4 and 2.3 at 2, a run drawing 4.5 to 6 cores whatever its workers, because its make check ends in mcp-shared's StrykerJS mutation step, whose TypeScript checkers run beside its test runners; those four ran before MCPs f8336e98c, which starts a checker and a runner for each worker granted. Charged one core with a minimum of 2, lenovold (4 threads, 2 reserved, its slice held to 2 CPUs) was granted 2 workers, and fleet jobs 1b821fb5, fa069997 and 589e9282 there read throttled 725 s, 816 s and 1554 s and stopped MUTATION_OVER_BOUND at 870 s of 900 on 299, 183 and 183 mutants whose mutation step colossus at 4 workers finished in 340 s (480ce217) and 313 s (2567648a), MCPs board task 0a0d442b. The minimum of 3 is set by that bound: the largest measured mutation, 806 mutants in fleet job b5e4cca4 on colossus, spent about 3600 CPU-seconds, more than 4 cores can do in 870 s, so 3 workers of 2 cores and lenovold refuses it.",
   "expected_minutes": 10,
   "exclusive_resources": [
     "corvis-fleet-testdb"
