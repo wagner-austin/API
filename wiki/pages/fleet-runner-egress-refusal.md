@@ -13,11 +13,11 @@ source_paths:
   - tools/fleet/tests/test_node_refusal.py
   - libs/platform_core/src/platform_core/error_codes_fleet.py
 source_git_blobs:
-  "tools/fleet/src/fleet/contracts/egress_reading.py": 55f78af8c04dd5759729e84edf0a2ea25b0f5d20
-  "tools/fleet/src/fleet/core/linux_egress_probe.py": 35cde8f9cada8cbd32e809c950de3eaa40e5d3f7
+  "tools/fleet/src/fleet/contracts/egress_reading.py": b914e2da4e2c75005bb801ec1b8ecc2c3c1dfd9a
+  "tools/fleet/src/fleet/core/linux_egress_probe.py": 35ceb2a2bd66a8ec35e2f381fa194e388cc12c7b
   "tools/fleet/src/fleet/core/node_refusal.py": 79065403e6d4e0d65161bfe8dd11bdb63694e039
   "tools/fleet/tests/test_egress_gate.py": ce97629f62aea0ae3d0fa3dd40bda3ff0a73f3c1
-  "tools/fleet/tests/test_linux_egress_probe.py": daec01b4c211fa9d0a9c8abd68c9307291037363
+  "tools/fleet/tests/test_linux_egress_probe.py": 4b202564990bdd9644cb88cf6761e6d78076620c
   "tools/fleet/tests/test_node_agent_ticks.py": 6d6937d0bdb8433c05e4950bd6eccd9bb8c26cbd
   "tools/fleet/tests/test_node_refusal.py": db5be586646c028f83863a205622821a550eafcb
   "libs/platform_core/src/platform_core/error_codes_fleet.py": e897b564f1bb4ff7cefb6ce8ebf0803f5bb9e7b2
@@ -36,7 +36,7 @@ Every tick, the Linux capacity probe asks both indexes a check's setup downloads
 
 Any HTTP answer, whatever its status, is reach: the name resolved, a route existed and the server spoke. A node reaches the internet when at least one index answers. Requiring both would refuse every check on the fleet whenever one index alone was down, including checks that download only from the other.[^reach]
 
-The reader refuses a reading it cannot interpret rather than calling it reach or its absence. That covers a count that is missing, not a whole number or zero, a counted target with no line, and a line that is not an exit and a target. Exit 127, the shell's "command not found", means the node has no curl, which says nothing about its network, so that probe reading is refused too.[^reader] Every Linux node carries curl in its system profile, `/run/current-system/sw/bin/curl`, measured over ssh on all eleven on 2026-11-25.[^curl]
+The reader refuses a reading it cannot interpret rather than calling it reach or its absence. That covers a count that is missing, not a whole number or zero, a counted target with no line, and a line that is not an exit and a target. Exits 126 and 127 are the shell's, not curl's: curl was found but not executable, or not found at all. Neither says anything about the node's network, so that probe reading is refused too.[^reader] Every Linux node carries curl in its system profile, `/run/current-system/sw/bin/curl`, measured over ssh on all eleven on 2026-11-25.[^curl]
 
 ## The refusal
 
@@ -48,7 +48,7 @@ A refused node's runner tick reaches the queue claiming nothing, with no fits, a
 
 ## How it was proved
 
-The gate case runs the probe the fleet sends inside a user and network namespace of its own (`unshare --user --map-root-user --net`), which has no route out, and asks the runner's own gate.[^gate] At API 6eee92fa9, before the reading existed, fleet job 852779e2 on serendipity failed exactly that case: the gate admitted a node with no network, while the same probe on the host's network passed. After the change the case passes. The probe's lines are also run under `sh` against loopback servers the tests start: a 404 is reach, a port nothing listens on is exit 7, a socket that never answers is exit 28 within the bound, an `.invalid` name is exit 6, and an empty `PATH` prints 127.[^sh]
+The gate case runs the probe the fleet sends inside a user and network namespace of its own (`unshare --user --map-root-user --net`), which has no route out, and asks the runner's own gate.[^gate] At API 6eee92fa9, before the reading existed, fleet job 852779e2 on serendipity failed exactly that case: the gate admitted a node with no network, while the same probe on the host's network passed. After the change the case passes. The probe's lines are also run under `sh` against loopback servers the tests start: a 404 is reach, a port nothing listens on is exit 7, a socket that never answers is exit 28 within the bound, an `.invalid` name is exit 6, and an empty `PATH` prints 127.[^sh] The package's mutation check found four mutants of the first version's reader that no exit it admits could tell apart, and the reader was rewritten so they cannot occur.
 
 ## What this does not cover
 
@@ -57,10 +57,10 @@ The probe asks two package indexes. A check whose setup downloads from somewhere
 [^lavender]: `tools/fleet/src/fleet/contracts/egress_reading.py:5` -- "lost its IPv4 lease to the LAN's DHCP. It still answered ssh over the"
 [^targets]: `tools/fleet/src/fleet/core/linux_egress_probe.py:35` -- `TARGETS: Final = ("https://pypi.org/simple/pip/", "https://registry.npmjs.org/")`; `:38` -- `CONNECT_SECONDS: Final = 3`; `:41` -- `MAX_SECONDS: Final = 5`
 [^lines]: `tools/fleet/src/fleet/core/linux_egress_probe.py:7` -- "``egress_<n>=`` then curl's exit code, a space and the target,"
-[^reach]: `tools/fleet/src/fleet/contracts/egress_reading.py:13` -- "answer, whatever its status, proves the name resolved, a route existed and"; `:69` -- `return any(attempt["curl_exit"] == REACHED_EXIT for attempt in attempts)`
-[^reader]: `tools/fleet/src/fleet/core/linux_egress_probe.py:97` -- "which is not a positive whole number"; `tools/fleet/src/fleet/contracts/egress_reading.py:20` -- "has no curl, which says nothing about its network, so"
+[^reach]: `tools/fleet/src/fleet/contracts/egress_reading.py:13` -- "answer, whatever its status, proves the name resolved, a route existed and"; `:75` -- `return REACHED_EXIT in {attempt["curl_exit"] for attempt in attempts}`
+[^reader]: `tools/fleet/src/fleet/core/linux_egress_probe.py:98` -- "which is not a positive whole number"; `tools/fleet/src/fleet/contracts/egress_reading.py:21` -- "executable'. Neither says anything about the node's network, so"
 [^curl]: `tools/fleet/src/fleet/core/linux_egress_probe.py:21` -- "in its system profile (``/run/current-system/sw/bin/curl``, measured over ssh"
-[^refusal]: `tools/fleet/src/fleet/core/node_refusal.py:115` -- "cannot reach the internet: {asked}. Every check's setup"; `tools/fleet/src/fleet/contracts/egress_reading.py:40` -- `6: "could not resolve its host",`
+[^refusal]: `tools/fleet/src/fleet/core/node_refusal.py:115` -- "cannot reach the internet: {asked}. Every check's setup"; `tools/fleet/src/fleet/contracts/egress_reading.py:46` -- `6: "could not resolve its host",`
 [^order]: `tools/fleet/tests/test_node_refusal.py:115` -- `def test_the_battery_is_named_before_the_lost_egress(self) -> None:`; `:128` -- `def test_the_lost_egress_is_named_before_every_load_refusal(self) -> None:`
 [^code]: `libs/platform_core/src/platform_core/error_codes_fleet.py:61` -- `NODE_EGRESS_LOST = "NODE_EGRESS_LOST"`
 [^tick]: `tools/fleet/tests/test_node_agent_ticks.py:182` -- `def test_a_node_that_reaches_no_package_index_asks_the_queue_for_nothing(`

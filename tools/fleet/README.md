@@ -1131,8 +1131,8 @@ and `https://registry.npmjs.org/` with 3 s to connect and 5 s in all each, and
 prints `egress_<n>=<curl exit> <target>` per target, then `egress_count=`
 (`fleet.core.linux_egress_probe`). Any HTTP answer is reach, and a node reaches
 the internet when one index answers. A count that is missing or zero, a counted
-target with no line and curl's absence (exit 127) make the probe unreadable,
-never reach. `capacity.assess` refuses a node that reached neither with
+target with no line and a curl the shell could not run (exit 126, not
+executable, or 127, not found) make the probe unreadable, never reach. `capacity.assess` refuses a node that reached neither with
 `NODE_EGRESS_LOST`, naming each target and curl's failure, after the battery
 refusal and before every load refusal, so the node runner's gate claims nothing
 and its tick tells the queue why. On 2026-11-25 lavender lost its IPv4 lease to
