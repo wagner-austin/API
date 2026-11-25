@@ -11,6 +11,7 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.budget import NodeBudget
+from fleet.contracts.egress_reading import EgressAttempt
 from fleet.contracts.node import (
     LiveLoad,
     NodeConfig,
@@ -21,6 +22,7 @@ from fleet.contracts.node import (
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.tags import NodeTag
 from fleet.core.capacity import assess, job_ceiling, plan_dispatch, room_for_any
+from tests._egress_fixtures import REACHED
 from tests.conftest import IDLE
 
 #: What a node with no other declaration carries.
@@ -98,6 +100,7 @@ def _state(
     io_pressure_pct: float = 0.0,
     check_cpu_quota: float | None = None,
     on_battery: bool = False,
+    egress: tuple[EgressAttempt, ...] = REACHED,
 ) -> NodeState:
     """Build a probed state.
 
@@ -112,6 +115,7 @@ def _state(
         io_pressure_pct: Its I/O pressure.
         check_cpu_quota: The CPUs its check slices' quota allows, or None.
         on_battery: Whether it is running on its battery.
+        egress: Every package index it asked and how curl ended.
 
     Returns:
         The state.
@@ -128,6 +132,7 @@ def _state(
         io_pressure_pct=io_pressure_pct,
         check_cpu_quota=check_cpu_quota,
         on_battery=on_battery,
+        egress=egress,
         gpus=(),
     )
 

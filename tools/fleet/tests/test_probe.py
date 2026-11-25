@@ -21,6 +21,7 @@ from fleet.contracts.node import (
     describe_node,
 )
 from fleet.core import _test_hooks, dialect, probe
+from tests._egress_fixtures import LOST, REACHED, REACHED_LINES
 from tests.conftest import CALM, IDLE, FakeRun, ok
 
 
@@ -77,6 +78,7 @@ class TestProbe:
             "io_pressure_pct": 0.0,
             "check_cpu_quota": None,
             "on_battery": False,
+            "egress": REACHED,
             "gpus": (),
         }
 
@@ -85,7 +87,7 @@ class TestProbe:
         output = (
             "free_ram_gb=4.073\nfree_disk_gb=206.206\nlogical_cores=8\n"
             "cpu_pressure_pct=14.06\nio_pressure_pct=68.81\ncheck_cpu_quota=max\non_battery=no\n"
-            "reserved_cores=0\ngpu_count=0\n"
+            "reserved_cores=0\ngpu_count=0\n" + REACHED_LINES
         )
 
         state = probe.parse_probe("diphtheria", output, live=IDLE)
@@ -97,7 +99,7 @@ class TestProbe:
         output = (
             "free_ram_gb=25.0\nfree_disk_gb=663.0\nlogical_cores=16\n"
             "cpu_pressure_pct=1.20\nio_pressure_pct=0.10\ncheck_cpu_quota=1.000\non_battery=no\n"
-            "reserved_cores=0\ngpu_count=0\n"
+            "reserved_cores=0\ngpu_count=0\n" + REACHED_LINES
         )
 
         state = probe.parse_probe("loki", output, live=IDLE)
@@ -109,12 +111,40 @@ class TestProbe:
         output = (
             "free_ram_gb=17.0\nfree_disk_gb=700.0\nlogical_cores=16\n"
             "cpu_pressure_pct=1.20\nio_pressure_pct=0.10\ncheck_cpu_quota=max\non_battery=yes\n"
-            "reserved_cores=0\ngpu_count=0\n"
+            "reserved_cores=0\ngpu_count=0\n" + REACHED_LINES
         )
 
         state = probe.parse_probe("loki", output, live=IDLE)
 
         assert state["on_battery"] is True
+
+    def test_a_node_that_reached_neither_index_carries_both_failures(self) -> None:
+        """lavender at 04:00Z on 2026-11-25, its IPv4 lease lost (MCPs board task e70cdf05)."""
+        lost = "".join(
+            f"egress_{index}=6 {attempt['target']}\n" for index, attempt in enumerate(LOST)
+        )
+        output = "free_ram_gb=27.0\nfree_disk_gb=860.0\nreserved_cores=0\n" + CALM.replace(
+            REACHED_LINES, lost + "egress_count=2\n"
+        )
+
+        state = probe.parse_probe("lavender", output, live=IDLE)
+
+        assert state["egress"] == LOST
+
+    def test_an_egress_reading_that_cannot_be_read_refuses_the_node_s_answer(self) -> None:
+        """Read as reach, a node with no route out would take checks again."""
+        output = "free_ram_gb=27.0\nfree_disk_gb=860.0\nreserved_cores=0\n" + CALM.replace(
+            "egress_count=2\n", ""
+        )
+
+        with pytest.raises(AppError) as excinfo:
+            probe.parse_probe("lavender", output, live=IDLE)
+
+        assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
+        assert excinfo.value.message == (
+            "lavender reported egress_count=None, which is not a positive whole number of "
+            "targets, so whether it reaches the internet is unknown"
+        )
 
     @pytest.mark.parametrize(
         ("battery", "shown"),
@@ -382,6 +412,7 @@ class TestDescribeNode:
         io_pressure_pct=0.0,
         check_cpu_quota=None,
         on_battery=False,
+        egress=REACHED,
         gpus=(),
     )
 

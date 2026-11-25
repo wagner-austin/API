@@ -25,6 +25,7 @@ from fleet.core.workspace_files import (
     SETTINGS_FILE,
     read_workspace_document,
 )
+from tests._egress_fixtures import REACHED
 
 #: The registry this commit ships, beside the tests.
 SHIPPED_REGISTRY: Final[pathlib.Path] = pathlib.Path(__file__).resolve().parents[1] / "registry"
@@ -77,6 +78,7 @@ def idle_state(node: NodeConfig, *, free_ram_gb: float = 24.0) -> NodeState:
         io_pressure_pct=0.0,
         check_cpu_quota=None,
         on_battery=False,
+        egress=REACHED,
         gpus=(),
     )
 

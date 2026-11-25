@@ -30,6 +30,7 @@ from fleet.core.linux_capacity_probe import (
     RESERVATIONS_LINE,
     RESERVATIONS_PART,
 )
+from fleet.core.linux_egress_probe import EGRESS_PROBE_PART, TARGETS, read_egress
 from fleet.core.linux_gpu_probe import GPU_PROBE_PART, read_gpus
 from tests.test_dialect_linux import fields_of
 
@@ -59,7 +60,12 @@ def test_the_dialect_runs_the_body_after_its_prologue() -> None:
     assert CAPACITY_PROBE_BODY.startswith(MEMINFO_LINE)
     assert MEMINFO_LINE == "meminfo=/proc/meminfo\n"
     assert CAPACITY_PROBE_BODY.endswith(
-        PRESSURE_PART + CHECK_QUOTA_PART + BATTERY_PART + RESERVATIONS_PART + GPU_PROBE_PART
+        PRESSURE_PART
+        + CHECK_QUOTA_PART
+        + BATTERY_PART
+        + EGRESS_PROBE_PART
+        + RESERVATIONS_PART
+        + GPU_PROBE_PART
     )
     assert BATTERY_PART.startswith(POWER_SUPPLY_LINE)
     assert POWER_SUPPLY_LINE == "power_supply=/sys/class/power_supply\n"
@@ -104,14 +110,21 @@ def test_the_unaltered_probe_reports_this_host_s_numbers(tmp_path: pathlib.Path)
     # b4d5ca0f); each line reads as a GPU, so none is a zero.
     assert read_gpus("this host", fields)[1] == ""
     devices = {f"gpu_{index}" for index in range(int(fields["gpu_count"]))}
+    # Both package indexes, asked in order, then their count (MCPs board
+    # task e70cdf05); whether this host reaches them is its network's answer.
+    egress, problem = read_egress("this host", fields)
+    assert problem == ""
+    assert tuple(attempt["target"] for attempt in egress or ()) == TARGETS
+    asked = {f"egress_{index}" for index in range(len(TARGETS))}
     reported = {
         *probe.REQUIRED_FIELDS,
         "logical_cores",
         probe.CHECK_QUOTA_FIELD,
         probe.BATTERY_FIELD,
+        "egress_count",
         "gpu_count",
     }
-    assert set(fields) == reported | counted | devices | (
+    assert set(fields) == reported | counted | devices | asked | (
         {"ci_slice_current_gb", "ci_slice_high_gb"} if sliced else set()
     )
     # MemAvailable, which the kernel never reports below zero.
@@ -367,10 +380,11 @@ class TestTheReservationsUnderSh:
         fields = _run(tmp_path, held)
 
         assert fields["reserved_cores"] == "7"
-        # Read after the body's other fields; the dialect's CI-slice lines,
+        # Read after the body's other fields, the egress count last among
+        # them (MCPs board task e70cdf05); the dialect's CI-slice lines,
         # printed only on a node with a runners.slice, follow it.
         keys = list(fields)
-        assert keys.index("reserved_cores") == keys.index("on_battery") + 1
+        assert keys.index("reserved_cores") == keys.index("egress_count") + 1
 
     def test_an_empty_directory_holds_nothing(self, tmp_path: pathlib.Path) -> None:
         held = tmp_path / "reservations"

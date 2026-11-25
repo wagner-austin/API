@@ -34,6 +34,7 @@ from fleet.contracts.node import LiveLoad, NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.core import _test_hooks, probe, staging
 from fleet.core.node_choice import Unassessed, first_fit
+from tests._egress_fixtures import REACHED
 from tests._registry import write_registry
 from tests._roster_fixtures import machine_document, machines_of
 from tests.conftest import (
@@ -108,6 +109,7 @@ def _state(host: str, *, free_ram_gb: float = 27.0) -> NodeState:
         io_pressure_pct=0.0,
         check_cpu_quota=None,
         on_battery=False,
+        egress=REACHED,
         gpus=(),
     )
 

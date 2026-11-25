@@ -33,6 +33,7 @@ from fleet.cli import _config
 from fleet.contracts.node import LiveLoad
 from fleet.core import _test_hooks, manifest, staging
 from fleet.core import _test_hooks_attempts as attempt_hooks
+from tests._egress_fixtures import REACHED_LINES
 from tests._registry import write_registry
 from tests._retire_answers import RETIRED_OUTPUT
 from tests._roll_reads import extracted_registry
@@ -283,14 +284,13 @@ DEMO_DEPENDENCY = "libs/base"
 #: lavender, the node every demo dispatch lands on.
 DEMO_RUN_ID = f"libs-demo-lavender-{DEMO_NOW}"
 
-#: The pressure lines of a node nothing stalls on, which every capacity
-#: probe answers since the last node without ``/proc/pressure`` left the
-#: fleet (board task e705f08c), the check quota of one whose check slices
-#: have none (MCPs board task d77b8c73), the power reading of one on mains
-#: (MCPs board task 3268afdf), and the GPU count of one with no display
-#: device (MCPs board task b4d5ca0f), which every probe prints.
+#: Every reading a probe prints: pressures nothing stalls on (board task
+#: e705f08c), no check-slice quota, mains power, both package indexes reached
+#: and no display device (MCPs board tasks d77b8c73, 3268afdf, e70cdf05 and
+#: b4d5ca0f).
 CALM = (
     "cpu_pressure_pct=0.00\nio_pressure_pct=0.00\ncheck_cpu_quota=max\non_battery=no\ngpu_count=0\n"
+    + REACHED_LINES
 )
 
 #: What a healthy capacity probe answers.

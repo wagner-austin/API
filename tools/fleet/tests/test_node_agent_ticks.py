@@ -179,6 +179,30 @@ class TestATickThatClaimsNothing:
             "battery"
         )
 
+    def test_a_node_that_reaches_no_package_index_asks_the_queue_for_nothing(
+        self, sourced_config: pathlib.Path
+    ) -> None:
+        """MCPs board task e70cdf05: lavender at 04:00Z on 2026-11-25, its IPv4
+        lease lost, answering ssh while neither index's name resolved. The
+        tick records the refusal as its verdict, and no claim is asked for, so
+        the queue hands the node no check."""
+        lost = PROBE_OK.replace("egress_0=0 ", "egress_0=6 ").replace("egress_1=0 ", "egress_1=6 ")
+        endpoint, tick = _ticked(
+            sourced_config,
+            [ok(""), ok(lost), ok(""), ok(DIPHTHERIA_2026_09_23)],
+            [dump_json_str({"jobs": []})],
+        )
+
+        assert endpoint.tools == ["dispatch_list"]
+        assert (tick["load"], tick["fits"], tick["claiming"]) == (ROOMY, [], False)
+        assert tick["verdict"] == (
+            "has room for nothing; claiming nothing: NODE_EGRESS_LOST: lavender cannot reach the "
+            "internet: https://pypi.org/simple/pip/ could not resolve its host (curl exit 6); "
+            "https://registry.npmjs.org/ could not resolve its host (curl exit 6). Every check's "
+            "setup downloads what its lockfile pins from these indexes, so a check placed here "
+            "would fail as its package's own red. It takes the next job once one answers."
+        )
+
 
 class TestATickThatAsksTheQueue:
     def test_an_empty_lane_records_the_fitting_projects_it_asked_for(
