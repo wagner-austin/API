@@ -17,6 +17,7 @@ the node for another reason first.
 from __future__ import annotations
 
 import pathlib
+import re
 
 import pytest
 
@@ -36,6 +37,24 @@ CALM_IO = (
 #: account make the network namespace beside it, with no network.
 NO_NETWORK = ("unshare", "--user", "--map-root-user", "--net")
 
+#: How curl fails in that namespace, from curl's exit code table: where the
+#: host resolves names through nscd's socket, which no network namespace
+#: cuts, the name resolves and the connection fails (exit 7, measured on
+#: lavender, colossus and serendipity at 2026-11-25T22:3xZ); where it
+#: resolves them over the network, the name fails (exit 6, lavender's own
+#: failure at 04:00Z).
+NO_ROUTE_FAILURES = re.compile(
+    r"could not connect to it \(curl exit 7\)|could not resolve its host \(curl exit 6\)"
+)
+
+#: The refusal the task asks for, with each target's failure written as FAILED.
+LOST_EGRESS = (
+    "NODE_EGRESS_LOST: lavender cannot reach the internet: "
+    "https://pypi.org/simple/pip/ FAILED; https://registry.npmjs.org/ FAILED. "
+    "Every check's setup downloads what its lockfile pins from these indexes, so a check "
+    "placed here would fail as its package's own red. It takes the next job once one answers."
+)
+
 
 def _gate(tmp_path: pathlib.Path, wrapper: tuple[str, ...]) -> str | None:
     """Run the probe, read its answer and ask the node runner's gate.
@@ -52,9 +71,7 @@ def _gate(tmp_path: pathlib.Path, wrapper: tuple[str, ...]) -> str | None:
     outcome = probe.read_state("lavender", completed.stdout, live=IDLE)
     state = outcome["state"]
     assert state is not None, outcome["reason"]
-    return room_for_any(
-        _node(max_disk_gb=0.0), state, (_project(minimum_workers=1),), LINUX_TAGS
-    )
+    return room_for_any(_node(max_disk_gb=0.0), state, (_project(minimum_workers=1),), LINUX_TAGS)
 
 
 @pytest.mark.host_linux
@@ -64,14 +81,10 @@ class TestEgressGate:
     ) -> None:
         verdict = _gate(tmp_path, NO_NETWORK)
 
-        assert verdict is not None
-        # The code the task names, then the node, then the first index a
-        # Python check's setup downloads from (poetry's).
-        assert verdict.startswith(
-            "NODE_EGRESS_LOST: lavender cannot reach the internet: https://pypi.org/simple/pip/ "
-        )
-        # npm's index, which a TypeScript check's setup downloads from.
-        assert "; https://registry.npmjs.org/ " in verdict
+        # The code the task names, the node, and both indexes a check's
+        # setup downloads from: poetry's, then npm's. ``str`` reads a gate
+        # that admitted the node as 'None', which matches nothing here.
+        assert NO_ROUTE_FAILURES.sub("FAILED", str(verdict)) == LOST_EGRESS
 
     def test_the_same_node_on_this_host_s_network_may_claim(self, tmp_path: pathlib.Path) -> None:
         """A fleet node running this check downloaded its dependencies in setup."""
