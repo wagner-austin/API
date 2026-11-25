@@ -201,8 +201,8 @@ class TestReadEgress:
             "",
         )
 
-    @pytest.mark.parametrize("curl_exit", [0, 1, 6, 7, 28, 35, 52, 60, 126, 128, 255])
-    def test_any_exit_but_not_found_reads_back_as_printed(self, curl_exit: int) -> None:
+    @pytest.mark.parametrize("curl_exit", [0, 1, 6, 7, 28, 35, 52, 60, 125, 128, 255])
+    def test_any_exit_but_the_shell_s_not_run_reads_back_as_printed(self, curl_exit: int) -> None:
         fields = {"egress_0": f"{curl_exit} https://registry.npmjs.org/", "egress_count": "1"}
 
         assert read_egress("loki", fields) == (
@@ -211,7 +211,26 @@ class TestReadEgress:
         )
 
     @pytest.mark.parametrize(
-        ("count", "shown"), [(None, "None"), ("two", "'two'"), ("0", "'0'"), ("-1", "'-1'")]
+        ("curl_exit", "words"),
+        [(126, "cannot execute the curl on its PATH"), (127, "has no curl on its PATH")],
+    )
+    def test_a_curl_the_shell_could_not_run_is_no_reading(self, curl_exit: int, words: str) -> None:
+        """POSIX XCU 2.8.2: 126 found but not executable, 127 not found."""
+        fields = {
+            "egress_0": "0 https://pypi.org/simple/pip/",
+            "egress_1": f"{curl_exit} https://registry.npmjs.org/",
+            "egress_count": "2",
+        }
+
+        assert read_egress("loki", fields) == (
+            None,
+            f"loki {words} (exit {curl_exit}), so its probe cannot say whether it reaches the "
+            "internet",
+        )
+
+    @pytest.mark.parametrize(
+        ("count", "shown"),
+        [(None, "None"), ("two", "'two'"), ("0", "'0'"), ("00", "'00'"), ("-1", "'-1'")],
     )
     def test_a_count_that_is_not_a_positive_whole_number_is_unreadable(
         self, count: str | None, shown: str
