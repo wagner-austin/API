@@ -20,49 +20,46 @@ node's platform and lowercased hostname (which together spell the ledger's
 machine key, ``linux:diphtheria``), the
 ``pidDomain`` the node's harness writes, and every record in the directory,
 verbatim. An absent directory is a node that has never run Claude Code,
-reported as zero records rather than as a fault.
+reported as zero records rather than as a fault. Reading that document,
+the machine key, and what each record is checked for, is
+:mod:`fleet.core.observe_records`.
 
-THE MACHINE KEY AND THE pidDomain ARE TWO SPELLINGS (board task 5cee2f65).
-Until Claude Code 2.1.294 the harness wrote ``pidDomain`` as
-``<platform>:<hostname>`` on both platforms, so one string served as both.
-2.1.294 writes ``linux:<machine-id>:pid:[<pid namespace inode>]`` on Linux
-(measured on ziggurat 2026-10-16:
-``linux:f191c99155c14a719632bdc88e77f914:pid:[4026531836]``, its
-``/etc/machine-id`` and ``readlink /proc/self/ns/pid``) and still
-``win32:<hostname>`` on Windows (all 8 records on austinpc), and every hub
-tick from 06:30Z failed on the comparison. So the script computes the
-node's own ``pidDomain`` the way its harness does, and a record is
-compared against THAT, while the ledger keeps its ``<platform>:<hostname>``
-key.
-
-WHAT IS COPIED AND WHAT IS CHECKED. Every field the ledger stores is copied
-from the record; nothing is inferred. Two things are refused by name: a record
-that is not the shape the harness writes (``SESSION_RECORD_UNREADABLE``), and
-a record whose own ``pidDomain`` is not the one its node reports
-(``SESSION_MACHINE_MISMATCH``) -- the refusal ``pcsession-mcp`` makes for the
-hub's own directory, made here for the same reason.
-
-WHICH FAILURES ARE VALUES. A node that is off, or refuses ssh, is an OUTCOME
-of the pass -- reported per node and the pass continues, exactly as
+EVERY FAILURE OF ONE NODE IS THAT NODE'S OUTCOME (MCPs board task
+56fee128). A node that is off, or refuses ssh, is an OUTCOME of the pass --
+reported per node and the pass continues, exactly as
 :func:`fleet.core.probe.attempt_probe` treats an unreachable node -- because
-one laptop asleep must not blind the ledger to the rest of the fleet. A record
-that cannot be read is a CONTRACT fault and raises: the harness changed shape,
-and recording around it would fill the ledger with rows nobody can trace.
+one laptop asleep must not blind the ledger to the rest of the fleet. A
+record that cannot be read, or that names another machine's pidDomain, is
+the same: decoding returns a :class:`RecordRefusal` VALUE carrying its code
+and message, and the node's outcome is not observed, naming every refused
+record. Until 2026-11-25 such a record raised, and one demure record
+lacking ``messagingSocketPath`` ended every hub tick from 01:09Z: no later
+node was observed and the reap pass never ran. Nothing is recorded around a
+refused record -- its node gets no pass at all, because the readable records
+alone would be derived as the node's whole set and depart the refused
+session -- and the refusal itself goes to the board
+(:func:`fleet.core.queue.observe_refusal`), which reads the node as not
+observed with this reason and moves none of its sessions.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import UTC, datetime
 from typing import Final, TypedDict
 
 from platform_core.error_codes_fleet import FleetErrorCode
-from platform_core.errors import AppError
-from platform_core.json_utils import JSONObject, JSONValue, load_json_str
+from platform_core.json_utils import JSONObject, JSONValue
 from platform_core.mcp_client import McpCredentials
 
-from fleet.contracts.machine import LedgerObserver, Machine
+from fleet.contracts.machine import PLATFORM, LedgerObserver, Machine
 from fleet.core import dialect, native_observe, native_wake, queue, remote
+from fleet.core.observe_records import (
+    RecordRefusal,
+    decode_node_sessions,
+    machine_of,
+    observation_json,
+    to_observation,
+)
 
 #: What the script is called on the node, before the dialect's extension,
 #: under the provisioned account's ``.fleet`` directory -- the same
@@ -71,52 +68,18 @@ from fleet.core import dialect, native_observe, native_wake, queue, remote
 OBSERVE_STEM: Final = "observe-sessions"
 
 
-class NodeSessions(TypedDict):
-    """What the script reported from one node.
-
-    Attributes:
-        platform: The harness platform tag the node's own interpreter
-            reports, ``linux`` on every node since board task e705f08c.
-        hostname: The node's hostname, lowercased.
-        pid_domain: The ``pidDomain`` the node's harness writes, computed on
-            the node the way the harness computes it.
-        records: Every registration document in the directory, untouched.
-    """
-
-    platform: str
-    hostname: str
-    pid_domain: str
-    records: tuple[JSONObject, ...]
-
-
-class SessionObservation(TypedDict):
-    """One record in ``task_session_observe``'s wire shape.
-
-    Every field is copied from the harness record. The two instants are
-    ISO-8601 with an explicit offset, converted from the record's epoch
-    milliseconds; the tool refuses anything else.
-    """
-
-    sessionId: str
-    pid: int
-    processStartedAt: str
-    name: str
-    nameSource: str
-    cwd: str
-    socketPath: str
-    harnessVersion: str
-    status: str
-    heartbeatAt: str
-
-
 class NodeOutcome(TypedDict):
     """What one node's pass came to.
 
     Attributes:
         node: The registry name.
-        recorded: Whether the board accepted a pass for it. False means the
-            node did not answer, and ``detail`` says why in ssh's own words.
-        detail: The board's rendered line, or the transport failure.
+        recorded: Whether the board accepted a pass for it. False means it
+            did not: the node was not asked (no provisioned user), or it
+            was asked and could not be observed -- ssh did not reach it, or
+            it reported a record this pass cannot read -- and the board
+            recorded that refusal in place of a pass.
+        detail: The board's rendered line, for a pass or for a refusal, or
+            why the node was not asked.
     """
 
     node: str
@@ -138,187 +101,62 @@ def script_path(user: str) -> str:
     return dialect.script_path(dialect.fleet_directory(user), OBSERVE_STEM)
 
 
-def _unreadable(host: str, detail: str) -> AppError[FleetErrorCode]:
-    """Build the contract-fault error for a record this pass cannot read.
+def roster_machine(node: Machine) -> str:
+    """The machine key the roster spells for a node it could not read.
 
     Args:
-        host: The node it came from.
-        detail: What was wrong with it.
+        node: The machine, from the roster.
 
     Returns:
-        The error, ready to raise.
+        ``linux:<name>``: the key the fleet audit holds the node's
+        watermark to, used when the node's own document did not decode.
     """
-    return AppError(
-        code=FleetErrorCode.SESSION_RECORD_UNREADABLE,
-        message=f"{host} reported a session record this runner cannot read: {detail}",
+    return f"{PLATFORM}:{node['name']}"
+
+
+def refused_records_detail(refusals: list[RecordRefusal], total: int) -> str:
+    """Name every record of one node this pass refused.
+
+    Args:
+        refusals: The refused records' refusals, in the node's order.
+        total: How many records the node reported.
+
+    Returns:
+        ``refused <k> of <n> session record(s): <message>; <message>``.
+    """
+    messages = "; ".join(refusal["message"] for refusal in refusals)
+    return f"refused {len(refusals)} of {total} session record(s): {messages}"
+
+
+def _not_observed(
+    board: McpCredentials,
+    node: Machine,
+    machine: str,
+    code: FleetErrorCode,
+    detail: str,
+    identity: JSONObject,
+) -> NodeOutcome:
+    """Record on the board that a node could not be observed, and why.
+
+    Args:
+        board: The taskboard's endpoint and headers.
+        node: The machine, from the roster.
+        machine: Its ledger machine key.
+        code: The refusal's code.
+        detail: The refusal's sentence.
+        identity: This runner's identity arguments.
+
+    Returns:
+        The node's outcome: not recorded, with the board's line for the
+        refusal, which names the code, the reason and the pass that stands.
+
+    Raises:
+        AppError: Any transport or contract failure from the board call.
+    """
+    reply = queue.observe_refusal(
+        board, machine=machine, code=code, detail=detail, identity=identity
     )
-
-
-def _field_str(host: str, record: JSONObject, key: str) -> str:
-    """Read one required string field of a record.
-
-    Args:
-        host: The node, for the error.
-        record: The record.
-        key: The field.
-
-    Returns:
-        The value.
-
-    Raises:
-        AppError: ``SESSION_RECORD_UNREADABLE`` when absent or not a string.
-    """
-    value = record.get(key)
-    if not isinstance(value, str) or value == "":
-        raise _unreadable(host, f"{key!r} is {type(value).__name__}, not a non-empty string")
-    return value
-
-
-def _field_int(host: str, record: JSONObject, key: str) -> int:
-    """Read one required integer field of a record.
-
-    Args:
-        host: The node, for the error.
-        record: The record.
-        key: The field.
-
-    Returns:
-        The value.
-
-    Raises:
-        AppError: ``SESSION_RECORD_UNREADABLE`` when absent or not an
-            integer. ``bool`` is refused too: it is an ``int`` to Python and
-            a pid to nobody.
-    """
-    value = record.get(key)
-    if not isinstance(value, int) or isinstance(value, bool):
-        raise _unreadable(host, f"{key!r} is {type(value).__name__}, not an integer")
-    return value
-
-
-def iso_from_millis(millis: int) -> str:
-    """Render epoch milliseconds as ISO-8601 with an explicit UTC offset.
-
-    Args:
-        millis: Milliseconds since the epoch, as the harness writes
-            ``startedAt`` and ``updatedAt``.
-
-    Returns:
-        ``2026-09-13T00:10:00.000+00:00``.
-    """
-    return datetime.fromtimestamp(millis / 1000, tz=UTC).isoformat(timespec="milliseconds")
-
-
-def decode_node_sessions(host: str, output: str) -> NodeSessions:
-    """Read the script's document.
-
-    Args:
-        host: The node it came from.
-        output: The script's standard output.
-
-    Returns:
-        The decoded document.
-
-    Raises:
-        AppError: ``SESSION_RECORD_UNREADABLE`` when the output is not the
-            document the script emits -- not JSON, not an object, or with
-            ``records`` that is not a list of objects.
-    """
-    document: JSONValue = load_json_str(output)
-    if not isinstance(document, dict):
-        raise _unreadable(host, f"the document is {type(document).__name__}, not an object")
-    records_raw = document.get("records")
-    if not isinstance(records_raw, list):
-        raise _unreadable(host, f"'records' is {type(records_raw).__name__}, not an array")
-    records: list[JSONObject] = []
-    for entry in records_raw:
-        if not isinstance(entry, dict):
-            raise _unreadable(host, f"a record is {type(entry).__name__}, not an object")
-        records.append(entry)
-    return NodeSessions(
-        platform=_field_str(host, document, "platform"),
-        hostname=_field_str(host, document, "hostname"),
-        pid_domain=_field_str(host, document, "pidDomain"),
-        records=tuple(records),
-    )
-
-
-def to_observation(host: str, pid_domain: str, record: JSONObject) -> SessionObservation:
-    """Copy one harness record into the tool's wire shape.
-
-    Args:
-        host: The node it came from, for errors.
-        pid_domain: The ``pidDomain`` that node reports for its own harness.
-        record: The registration document, as the harness wrote it.
-
-    Returns:
-        The observation.
-
-    Raises:
-        AppError: ``SESSION_RECORD_UNREADABLE`` for a missing or mistyped
-            field; ``SESSION_MACHINE_MISMATCH`` when the record's own
-            ``pidDomain`` is not ``pid_domain``.
-    """
-    recorded = record.get("pidDomain")
-    if recorded is not None:
-        if not isinstance(recorded, str):
-            raise _unreadable(host, f"'pidDomain' is {type(recorded).__name__}, not a string")
-        if recorded != pid_domain:
-            raise AppError(
-                code=FleetErrorCode.SESSION_MACHINE_MISMATCH,
-                message=(
-                    f"{host}: record for session {_field_str(host, record, 'sessionId')} "
-                    f"names pidDomain {recorded!r} but its node reports {pid_domain!r}"
-                ),
-            )
-    return SessionObservation(
-        sessionId=_field_str(host, record, "sessionId"),
-        pid=_field_int(host, record, "pid"),
-        processStartedAt=iso_from_millis(_field_int(host, record, "startedAt")),
-        name=_field_str(host, record, "name"),
-        nameSource=_field_str(host, record, "nameSource"),
-        cwd=_field_str(host, record, "cwd"),
-        socketPath=_field_str(host, record, "messagingSocketPath"),
-        harnessVersion=_field_str(host, record, "version"),
-        status=_field_str(host, record, "status"),
-        heartbeatAt=iso_from_millis(_field_int(host, record, "updatedAt")),
-    )
-
-
-def observation_json(observation: SessionObservation) -> JSONObject:
-    """Render one observation as the JSON object the tool takes.
-
-    Args:
-        observation: The observation.
-
-    Returns:
-        A plain JSON object with the same keys.
-    """
-    return {
-        "sessionId": observation["sessionId"],
-        "pid": observation["pid"],
-        "processStartedAt": observation["processStartedAt"],
-        "name": observation["name"],
-        "nameSource": observation["nameSource"],
-        "cwd": observation["cwd"],
-        "socketPath": observation["socketPath"],
-        "harnessVersion": observation["harnessVersion"],
-        "status": observation["status"],
-        "heartbeatAt": observation["heartbeatAt"],
-    }
-
-
-def machine_of(sessions: NodeSessions) -> str:
-    """The machine key a node's document spells.
-
-    Args:
-        sessions: The decoded document.
-
-    Returns:
-        ``<platform>:<hostname>``, the ledger's machine key, which since
-        Claude Code 2.1.294 is no longer the harness's ``pidDomain``.
-    """
-    return f"{sessions['platform']}:{sessions['hostname']}"
+    return NodeOutcome(node=node["name"], recorded=False, detail=reply)
 
 
 def observe_node(
@@ -335,13 +173,16 @@ def observe_node(
             (:func:`fleet.core.native_observe.observe_codex`).
 
     Returns:
-        The outcome -- recorded, or not reached and why.
+        The outcome. Recorded; or not asked, for a node with no provisioned
+        user; or not observed, with the refusal the board recorded in place
+        of a pass: ssh's failure for a node it did not reach, or every
+        record the node reported that this pass cannot read. A node with
+        any refused record records no pass, so none of its sessions is
+        departed by the refused one's absence.
 
     Raises:
-        AppError: A contract fault in what the node reported
-            (``SESSION_RECORD_UNREADABLE``, ``SESSION_MACHINE_MISMATCH``),
-            or any transport or contract failure from the board call.
-            Never for the node being unreachable: that is the outcome.
+        AppError: Any transport or contract failure from a board call.
+            Never for the node: whatever it reported is its outcome.
     """
     user = node["user"]
     if user is None:
@@ -353,13 +194,26 @@ def observe_node(
     )
     failure = outcome["failure"]
     if failure is not None:
-        return NodeOutcome(node=node["name"], recorded=False, detail=failure["message"])
+        return _not_observed(
+            board, node, roster_machine(node), failure["code"], failure["message"], identity
+        )
     sessions = decode_node_sessions(node["name"], outcome["output"])
+    if "code" in sessions:
+        return _not_observed(
+            board, node, roster_machine(node), sessions["code"], sessions["message"], identity
+        )
     machine = machine_of(sessions)
-    observations: list[JSONValue] = [
-        observation_json(to_observation(node["name"], sessions["pid_domain"], record))
-        for record in sessions["records"]
-    ]
+    observations: list[JSONValue] = []
+    refusals: list[RecordRefusal] = []
+    for record in sessions["records"]:
+        read = to_observation(node["name"], sessions["pid_domain"], record)
+        if "code" in read:
+            refusals.append(read)
+        else:
+            observations.append(observation_json(read))
+    if refusals:
+        detail = refused_records_detail(refusals, len(sessions["records"]))
+        return _not_observed(board, node, machine, refusals[0]["code"], detail, identity)
     native = native_observe.observe_codex(
         board, node["name"], user, machine, identity, evidence_seconds
     )
@@ -423,7 +277,8 @@ def observe_pass(
         evidence_seconds: See :func:`observe_node`.
 
     Returns:
-        One outcome per machine, in order.
+        One outcome per machine, in order: one node that cannot be observed
+        is that node's outcome, and every machine after it is still visited.
 
     Raises:
         AppError: See :func:`observe_node`.
@@ -438,8 +293,9 @@ def render_outcome(outcome: NodeOutcome) -> str:
         outcome: The node's outcome.
 
     Returns:
-        ``<node>: <detail>``, prefixed ``not observed`` when the node did not
-        answer, so a quiet node and a recorded one never read alike.
+        ``<node>: <detail>``, prefixed ``not observed`` when no pass was
+        recorded for it, so a refused or unasked node and a recorded one
+        never read alike.
     """
     if outcome["recorded"]:
         return f"{outcome['node']}: {outcome['detail']}"
@@ -449,16 +305,11 @@ def render_outcome(outcome: NodeOutcome) -> str:
 __all__ = [
     "OBSERVE_STEM",
     "NodeOutcome",
-    "NodeSessions",
-    "SessionObservation",
-    "decode_node_sessions",
-    "iso_from_millis",
-    "machine_of",
     "observable",
-    "observation_json",
     "observe_node",
     "observe_pass",
+    "refused_records_detail",
     "render_outcome",
+    "roster_machine",
     "script_path",
-    "to_observation",
 ]

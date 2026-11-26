@@ -143,9 +143,12 @@ def observe_pass(
 
     Raises:
         AppError: The board-watch credential codes when the taskboard's
-            variables are unset, and the contract faults
-            :func:`fleet.core.observe.observe_node` names. A node that does
-            not answer is logged, not raised.
+            variables are unset, and any transport or contract failure of a
+            board call (:func:`fleet.core.observe.observe_node`). A node
+            that cannot be observed -- ssh does not reach it, or it reports
+            a record this runner cannot read -- is its own outcome, logged
+            here and recorded on the board as that node's refusal, and
+            never ends the tick (MCPs board task 56fee128).
     """
     observed = observe.observable(machines)
     if not observed:

@@ -458,6 +458,50 @@ def observe_sessions(
     return call_mcp_tool(_test_hooks.http_post, credentials, "task_session_observe", arguments)
 
 
+def observe_refusal(
+    credentials: McpCredentials,
+    *,
+    machine: str,
+    code: FleetErrorCode,
+    detail: str,
+    identity: JSONObject,
+) -> str:
+    """Record on the board that one node could not be observed, and why.
+
+    The same ``task_session_observe`` call as :func:`observe_sessions`,
+    carrying a ``refusal`` and no records (MCPs board task 56fee128). The
+    board records the machine's refusal watermark and nothing else: no
+    sighting, no state derivation and no pass watermark, so none of the
+    machine's sessions reads as departed, and the ledger's coverage shows
+    the machine as not observed with this code and reason until a newer
+    pass.
+
+    Args:
+        credentials: The board's endpoint and headers.
+        machine: The node's ledger machine key, ``linux:demure``.
+        code: Why it was not observed, ``SESSION_RECORD_UNREADABLE``,
+            ``SESSION_MACHINE_MISMATCH``, ``NODE_UNREACHABLE`` or
+            ``DISPATCH_FAILED``.
+        detail: The runner's own sentence for it.
+        identity: From :func:`identity_arguments`.
+
+    Returns:
+        The tool's rendered line, which names the refusal and the pass that
+        still stands.
+
+    Raises:
+        AppError: Any transport or contract failure from the underlying call.
+    """
+    refusal: JSONObject = {"code": code.value, "detail": detail}
+    arguments: JSONObject = {
+        "machine": machine,
+        "observations": [],
+        "refusal": refusal,
+        **identity,
+    }
+    return call_mcp_tool(_test_hooks.http_post, credentials, "task_session_observe", arguments)
+
+
 #: The fleet's own room, where each runner registers with its check-in. A
 #: job's outcome is the queue's close to post (MCPs board task 52017b1e).
 RUNNER_ROOM: Final = "fleet"
@@ -519,6 +563,7 @@ __all__ = [
     "get_job",
     "identity_arguments",
     "load_credentials",
+    "observe_refusal",
     "observe_sessions",
     "report_close",
     "report_inspected",
