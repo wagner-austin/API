@@ -147,6 +147,7 @@ def test_the_build_copies_after_the_recipe_and_before_its_last_two_lines() -> No
         target="/s/run-1/run-1",
         path="packages/db",
         workers=2,
+        ram_gb=1.0,
         install=(),
         cache_root="/s/cache",
         isolated_docker=False,

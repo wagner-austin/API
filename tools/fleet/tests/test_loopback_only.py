@@ -83,6 +83,7 @@ def _build(loopback_unit: str | None) -> str:
         target=TARGET,
         path="",
         workers=4,
+        ram_gb=2.0,
         install=INSTALL,
         cache_root="/home/corvis/fleet/stage/cache",
         isolated_docker=False,

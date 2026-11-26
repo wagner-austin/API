@@ -1,6 +1,11 @@
 {
   "worker_ram_gb": 0.5,
   "minimum_workers": 3,
+  "mutation_checker": {
+    "heap_mb": 1750,
+    "ram_gb": 2.0,
+    "measurement": "ziggurat 2026-11-26, StrykerJS 10.1.1: one TypeScript checker finished src/migrate/verify-data-integrity.ts (35 mutants) at a 1400 MB heap cap, the least in 100 MB steps, peaking at 1.53 GB RSS; heap_mb is 1.25 times that cap and ram_gb heap_mb plus 0.25 GB (MCPs wiki typescript-mutation-step)"
+  },
   "expected_minutes": 25,
   "exclusive_resources": [
     "corvis-fleet-testdb"

@@ -277,6 +277,7 @@ def _staging(directories: tuple[str, ...], *, exclusive: tuple[str, ...] = ()) -
         worker_cores=1,
         worker_cores_measurement=None,
         release_artifact=None,
+        mutation_checker=None,
     )
 
 

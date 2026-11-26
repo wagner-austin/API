@@ -53,6 +53,7 @@ from fleet.contracts.dispatch import DispatchJob
 from fleet.contracts.host_claim import HostClaim
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import LiveLoad, NodeConfig
+from fleet.contracts.project import run_ram_gb
 from fleet.core import (
     _test_hooks,
     commit_stage,
@@ -201,6 +202,7 @@ def launch_claimed(
             lease=lease,
             node=node,
             workers=prepared["workers"],
+            ram_gb=run_ram_gb(prepared["plan"], prepared["workers"]),
             stage_tree=stage_tree,
             companions=prepared["companions"],
             recipe=recipe.recipe_for(
@@ -309,7 +311,7 @@ class Launcher:
             project=job["project"],
             workers=admitted["workers"],
             cores=admitted["workers"] * admitted["plan"]["worker_cores"],
-            ram_gb=admitted["workers"] * admitted["plan"]["worker_ram_gb"],
+            ram_gb=run_ram_gb(admitted["plan"], admitted["workers"]),
         )
         host_claims.record(
             self._loaded.host_claims,

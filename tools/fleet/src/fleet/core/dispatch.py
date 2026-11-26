@@ -50,7 +50,7 @@ from fleet.contracts.feed import FeedKind
 from fleet.contracts.lease import Lease
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
-from fleet.contracts.project import MAKE_TARGET, ProjectConfig
+from fleet.contracts.project import MAKE_TARGET, ProjectConfig, run_ram_gb
 from fleet.core import (
     _test_hooks,
     commit_stage,
@@ -335,6 +335,7 @@ def start(
         lease=lease,
         node=node,
         workers=workers,
+        ram_gb=run_ram_gb(plan, workers),
         stage_tree=stage_tree,
         companions=companions,
         recipe=recipe,
@@ -351,6 +352,7 @@ def launch(
     lease: Lease,
     node: NodeConfig,
     workers: int,
+    ram_gb: float,
     stage_tree: TreeStager,
     companions: tuple[export.CompanionExport, ...],
     recipe: Recipe,
@@ -367,6 +369,7 @@ def launch(
             names the run, its node and its project.
         node: The node's declaration.
         workers: Test workers the capacity check granted.
+        ram_gb: The memory the check was booked, which the build exports.
         stage_tree: Stages the tree once the lease is held:
             :func:`working_tree_stager` for ``fleet-run``, :func:`commit_stager`
             for the queue's node lane.
@@ -466,6 +469,7 @@ def launch(
             target=target,
             path=recipe["path"],
             workers=workers,
+            ram_gb=ram_gb,
             install=recipe["install"],
             cache_root=names.cache_root(node["stage_root"]),
             isolated_docker=recipe["isolated_docker"],

@@ -47,7 +47,7 @@ from fleet.contracts.feed import FeedEvent, decode_feed_event, encode_feed_event
 from fleet.contracts.freed_record import FreedRecord, decode_freed_record, encode_freed_record
 from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry, encode_ledger_entry, is_live
 from fleet.contracts.node import LiveLoad
-from fleet.contracts.project import ProjectConfig
+from fleet.contracts.project import ProjectConfig, run_ram_gb
 from fleet.contracts.retire_record import RetireRecord, decode_retire_record, encode_retire_record
 from fleet.core import _test_hooks, file_turn, record_tail
 
@@ -251,7 +251,8 @@ def live_load(path: pathlib.Path, *, node: str, projects: Mapping[str, ProjectCo
         path: The ledger file.
         node: The node's workspace name.
         projects: Every registered project, for each run's ``worker_cores``
-            and ``worker_ram_gb``.
+            and the memory it was booked
+            (:func:`~fleet.contracts.project.run_ram_gb`).
 
     Returns:
         How many dispatches on that node are CURRENTLY running -- see
@@ -277,7 +278,7 @@ def live_load(path: pathlib.Path, *, node: str, projects: Mapping[str, ProjectCo
                 "again or let the run end before this node takes more work",
             )
         cores += row["workers"] * project["worker_cores"]
-        ram_gb += row["workers"] * project["worker_ram_gb"]
+        ram_gb += run_ram_gb(project, row["workers"])
     return LiveLoad(
         runs=len(live), workers=sum(row["workers"] for row in live), cores=cores, ram_gb=ram_gb
     )

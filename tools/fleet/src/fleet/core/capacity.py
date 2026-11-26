@@ -36,9 +36,10 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.budget import NodeBudget, admissible_workers
 from fleet.contracts.node import NodeConfig, NodeState
-from fleet.contracts.project import ProjectConfig
+from fleet.contracts.project import ProjectConfig, run_ram_gb
 from fleet.contracts.tags import NodeTag, missing_tags
 from fleet.contracts.width_offer import WidthOffer
+from fleet.core.live_clause import live_clause
 from fleet.core.node_refusal import DispatchVerdict, machine_refusal, wrong_node
 
 #: How close to its ``memory.high`` a ``runners.slice`` must be to count as
@@ -204,6 +205,10 @@ def assess(
     it: loki, off its charger, drew 23 to 32 W through back-to-back NixOS VM
     checks on 2026-11-03. It takes the next job once it is back on mains.
 
+    A RUN IS BOOKED AT LEAST ITS MUTATION STEP'S SMALLEST RUN (MCPs board task
+    330b0465), last: memory left under :func:`~fleet.contracts.project.run_ram_gb`
+    is refused though the workers fit (:func:`_booked_verdict`).
+
     Args:
         node: The node's declaration.
         state: What it reported when last probed.
@@ -254,7 +259,7 @@ def assess(
             reason=(
                 f"{node['host']}'s CPUs carry {carried_at_once} budgeted check(s) at once "
                 f"across its runners, and {live['runs']} are live or launching on it now"
-                f"{_live_clause(state)}. A check runs wider than its test workers, so a "
+                f"{live_clause(state)}. A check runs wider than its test workers, so a "
                 "second would push both past their budget; it takes the next job when one "
                 "of them ends."
             ),
@@ -267,7 +272,7 @@ def assess(
             reason=(
                 f"{node['host']}'s CPUs are saturated: a runnable task waited for one through "
                 f"{pressure:.1f}% of the last minute, at or over the {CPU_PRESSURE_BOUND_PCT:.0f}% "
-                f"a check is placed under{_live_clause(state)}. Free cores counted from its "
+                f"a check is placed under{live_clause(state)}. Free cores counted from its "
                 "declaration do not show work the fleet does not run, and a check placed here "
                 "would run past its budget; it takes the next job when the pressure falls."
             ),
@@ -280,7 +285,7 @@ def assess(
             reason=(
                 f"{node['host']}'s disk is saturated: a task stalled on I/O through "
                 f"{io_pressure:.1f}% of the last minute, at or over the "
-                f"{IO_PRESSURE_BOUND_PCT:.0f}% a check is placed under{_live_clause(state)}. "
+                f"{IO_PRESSURE_BOUND_PCT:.0f}% a check is placed under{live_clause(state)}. "
                 "Its CPUs do not show it, and a "
                 "check placed here would run past its budget; it takes the next job when the "
                 "pressure falls."
@@ -298,7 +303,7 @@ def assess(
                 f"{node['host']}'s checks are held to {quota:.2f} CPU(s) by the quota systemd "
                 f"keeps on their slice, so {quota_room} core(s) are left where the suite's "
                 f"minimum of {project['minimum_workers']} worker(s) occupies {needed}"
-                f"{_live_clause(state)}. Whoever capped it is using the machine, and a check "
+                f"{live_clause(state)}. Whoever capped it is using the machine, and a check "
                 "placed here would run past its budget; it takes the next job when the quota is "
                 "lifted."
             ),
@@ -325,7 +330,7 @@ def assess(
                 f"{node['host']} has {state['free_ram_gb']:.1f} GB free against a reservation "
                 f"of {node['budget']['reserved_ram_gb']:.1f} GB for whoever is using it, and "
                 f"{node['logical_cores']} cores against {node['budget']['reserved_cores']} "
-                f"reserved{_live_clause(state)}. Nothing is left for a dispatch; "
+                f"reserved{live_clause(state)}. Nothing is left for a dispatch; "
                 f"{_who_holds_it(node, state, budget, worker_cores)}."
             ),
         )
@@ -339,8 +344,45 @@ def assess(
                 f"{node['budget']['reserved_cores']} reserved, {state['free_ram_gb']:.1f} GB "
                 f"free, {project['worker_ram_gb']:.1f} GB per worker, "
                 f"{node['budget']['reserved_ram_gb']:.1f} GB reserved for the node's owner"
-                f"{_live_clause(state)}. Dispatching anyway would run a suite at a fraction of "
+                f"{live_clause(state)}. Dispatching anyway would run a suite at a fraction of "
                 "its workers until its own lease expired underneath it."
+            ),
+        )
+    return _booked_verdict(node, state, project, workers)
+
+
+def _booked_verdict(
+    node: NodeConfig, state: NodeState, project: ProjectConfig, workers: int
+) -> DispatchVerdict:
+    """Grant the workers, or refuse a node whose memory left is under the run's booking.
+
+    Fleet job 752810f4 started StrykerJS's checkers on pendragon beside 3.5 GB
+    booked for 7 workers and was killed for memory. A checker's charge is
+    memory, not a worker, so it is weighed as memory and books no core.
+
+    Args:
+        node: The node's declaration.
+        state: What it reported when last probed.
+        project: The work being dispatched.
+        workers: The workers its cores and memory afford, at least its minimum.
+
+    Returns:
+        The grant, or ``NODE_MEMORY_EXHAUSTED`` when the memory left after the
+        owner and the live runs is under the booking.
+    """
+    booked = run_ram_gb(project, workers)
+    spare_ram = state["free_ram_gb"] - state["live"]["ram_gb"] - node["budget"]["reserved_ram_gb"]
+    if booked > spare_ram:
+        return DispatchVerdict(
+            workers=0,
+            code=FleetErrorCode.NODE_MEMORY_EXHAUSTED,
+            reason=(
+                f"{node['host']} has {spare_ram:.2f} GB left after the owner's "
+                f"{node['budget']['reserved_ram_gb']:.1f} GB{live_clause(state)}, under the "
+                f"{booked:.2f} GB a run of this project is booked whatever its workers: its "
+                "mutation step's smallest run, one TypeScript checker beside StrykerJS and one "
+                "test runner (project.mutation_checker). It takes the next job when that much "
+                "is free."
             ),
         )
     return DispatchVerdict(workers=workers, code=None, reason="")
@@ -374,35 +416,6 @@ def job_ceiling(node: NodeConfig, project: ProjectConfig) -> int:
     spare = node["logical_cores"] - node["budget"]["reserved_cores"]
     share = 1 if node["budget"]["checks_at_once"] == 1 else 2
     return max(project["minimum_workers"], -(-spare // share) // project["worker_cores"])
-
-
-def _live_clause(state: NodeState) -> str:
-    """Name what a node's live runs and reservations hold, for a capacity refusal.
-
-    Args:
-        state: What the node reported.
-
-    Returns:
-        An empty string when no fleet run is live on the node and no
-        reservation holds a core; otherwise ``, and its N live fleet run(s)
-        hold W worker(s) on K core(s) and X GB`` and ``, and its reservations
-        hold C core(s)``, each only when it holds something.
-    """
-    live = state["live"]
-    runs = (
-        ""
-        if live["runs"] == 0
-        else (
-            f", and its {live['runs']} live fleet run(s) hold {live['workers']} worker(s) on "
-            f"{live['cores']} core(s) and {live['ram_gb']:.1f} GB"
-        )
-    )
-    held = (
-        ""
-        if state["reserved_cores"] == 0
-        else f", and its reservations hold {state['reserved_cores']} core(s)"
-    )
-    return runs + held
 
 
 def room_for_any(
@@ -482,6 +495,7 @@ def room_for_any(
         worker_cores=1,
         worker_cores_measurement=None,
         release_artifact=None,
+        mutation_checker=None,
     )
     verdict = assess(node, state, default_tenant, tags)
     if verdict["code"] is None:

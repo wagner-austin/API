@@ -151,6 +151,7 @@ def isolated_build_lines(
     target: str,
     path: str,
     workers: int,
+    ram_gb: float,
     install: tuple[InstallStep, ...],
     agent: str,
     artifact: ReleaseArtifact | None,
@@ -166,6 +167,8 @@ def isolated_build_lines(
             owned by the runner.
         path: The project's directory inside the export, ``""`` for the root.
         workers: Test workers the capacity check granted.
+        ram_gb: The memory the check was booked, carried into the cleared
+            environment as :data:`~fleet.core.names.RAM_VARIABLE`.
         install: The project's declared install steps, each with its phase.
         agent: The job's submitting agent label, already held to the board's
             grammar, carried into the cleared environment as
@@ -216,6 +219,7 @@ def isolated_build_lines(
         f"{PLAYWRIGHT_KEEP_BROWSERS[0]}='{PLAYWRIGHT_KEEP_BROWSERS[1]}' "
         f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}' "
         f"CORVIS_TEST_MAX_WORKERS='{workers}' "
+        f"{names.RAM_VARIABLE}='{ram_gb!r}' "
         f"{AGENT_LABEL_VARIABLE}='{agent}' "
         f'{CACHE_VARIABLE}="$exec_cache" '
         f"{WORKSPACE_VARIABLE}={shlex.quote(path or '.')} "

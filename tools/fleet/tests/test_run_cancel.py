@@ -70,6 +70,7 @@ def _plan() -> ProjectConfig:
         worker_cores=1,
         worker_cores_measurement=None,
         release_artifact=None,
+        mutation_checker=None,
     )
 
 

@@ -279,6 +279,7 @@ def build_script(
     target: str,
     path: str,
     workers: int,
+    ram_gb: float,
     install: tuple[InstallStep, ...],
     cache_root: str,
     isolated_docker: bool,
@@ -306,6 +307,10 @@ def build_script(
         target: Absolute remote directory holding the export, its root.
         path: The project's directory inside the export, ``""`` for the root.
         workers: Test workers the capacity check granted.
+        ram_gb: The memory the check was booked
+            (:func:`~fleet.contracts.project.run_ram_gb`), exported as
+            :data:`~fleet.core.names.RAM_VARIABLE` in Python's exact float
+            spelling.
         install: The project's declared install steps, each an argv in the
             source grammar timed as the phase it names, run at the root
             before the recipe.
@@ -348,6 +353,7 @@ def build_script(
             target=target,
             path=path,
             workers=workers,
+            ram_gb=ram_gb,
             install=install,
             agent=label,
             artifact=artifact,
@@ -371,6 +377,7 @@ def build_script(
         f"{PLAYWRIGHT_KEEP_BROWSERS[0]}='{PLAYWRIGHT_KEEP_BROWSERS[1]}'",
         f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}'",
         f"CORVIS_TEST_MAX_WORKERS='{workers}'",
+        f"{names.RAM_VARIABLE}='{ram_gb!r}'",
         f"{AGENT_LABEL_VARIABLE}='{label}'",
         f"{CACHE_VARIABLE}='{cache_root}'",
         f"{WORKSPACE_VARIABLE}={shlex.quote(path or '.')}",

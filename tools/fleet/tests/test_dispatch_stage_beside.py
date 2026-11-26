@@ -144,6 +144,7 @@ def _launch(tmp_path: pathlib.Path, stage_tree: dispatch.TreeStager) -> None:
         ),
         node=node(),
         workers=4,
+        ram_gb=2.0,
         stage_tree=stage_tree,
         companions=(),
         recipe=Recipe(

@@ -22,6 +22,7 @@ from platform_core.json_utils import JSONObject, dump_json_str, narrow_json_to_s
 
 from fleet.cli import _config, node_agent, node_prepare
 from fleet.contracts.dispatch import decode_job
+from fleet.contracts.project import run_ram_gb
 from fleet.core import _test_hooks, commit_stage, dialect, mirror_fetch, names, records, staging
 from tests._node_agent_fixtures import (
     NOTHING_LAUNCHED,
@@ -187,6 +188,7 @@ class TestClaiming:
             target=target,
             path=DEMO_PROJECT,
             workers=rows[0]["workers"],
+            ram_gb=run_ram_gb(loaded.workspace["projects"][DEMO_PROJECT], rows[0]["workers"]),
             install=(NPM_CI,),
             cache_root="/home/corvis/fleet/stage/cache",
             isolated_docker=False,

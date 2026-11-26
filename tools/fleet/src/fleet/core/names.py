@@ -147,6 +147,11 @@ CACHE_VARIABLE = "CORVIS_FLEET_CACHE"
 #: Project directory used by preparation to select its dependency closure.
 WORKSPACE_VARIABLE = "CORVIS_FLEET_WORKSPACE"
 
+#: The variable every build exports carrying the GB the check was booked
+#: (:func:`fleet.contracts.project.run_ram_gb`), which MCPs' mutation step
+#: sizes StrykerJS to (MCPs board task 330b0465).
+RAM_VARIABLE = "CORVIS_TEST_RAM_GB"
+
 #: The variable every build exports naming :func:`registry_directory`, the
 #: fleet's registry as the runner that launched the build read it, so a
 #: suite reads the one roster (``machines``, MCPs board task e447de72) with

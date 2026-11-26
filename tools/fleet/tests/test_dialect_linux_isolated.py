@@ -67,6 +67,7 @@ def _isolated(
         target=target,
         path=path,
         workers=3,
+        ram_gb=2.35,
         install=install,
         cache_root="/s/cache",
         isolated_docker=True,
@@ -98,6 +99,7 @@ def _plan(required_tags: tuple[NodeTag, ...]) -> ProjectConfig:
         worker_cores=1,
         worker_cores_measurement=None,
         release_artifact=None,
+        mutation_checker=None,
     )
 
 
@@ -161,6 +163,9 @@ class TestIsolatedText:
         assert "POETRY_VIRTUALENVS_IN_PROJECT='true' " in body
         assert "PYTEST_XDIST_AUTO_NUM_WORKERS='3' " in body
         assert "CORVIS_TEST_MAX_WORKERS='3' " in body
+        # The booked memory crosses the cleared environment for the
+        # mutation step (MCPs board task 330b0465).
+        assert "CORVIS_TEST_RAM_GB='2.35' " in body
         assert f"CORVIS_FLEET_WORKSPACE={DEMO_PROJECT} " in body
         assert "CORVIS_FLEET_WORKSPACE=. " in _isolated(path="")
         assert 'CORVIS_FLEET_REGISTRY="$exec_registry" ' in body
@@ -253,6 +258,7 @@ def test_a_docker_project_that_declares_loopback_only_is_refused_by_name() -> No
             target=TARGET,
             path="slime",
             workers=2,
+            ram_gb=1.0,
             install=(),
             cache_root="/s/cache",
             isolated_docker=True,

@@ -21,6 +21,7 @@ def test_every_act_renders_its_script() -> None:
         target="/s/run",
         path="libs/x",
         workers=2,
+        ram_gb=1.0,
         install=(),
         cache_root="/s/cache",
         isolated_docker=False,

@@ -100,6 +100,7 @@ def _build(
         target=TARGET,
         path=path,
         workers=workers,
+        ram_gb=7 * 0.35,
         install=install,
         cache_root="/s/cache",
         isolated_docker=False,
@@ -116,13 +117,16 @@ class TestBuildScript:
         assert f"cd '{TARGET}/{DEMO_PROJECT}'\n" in body
         assert "PYTEST_XDIST_AUTO_NUM_WORKERS='6'\n" in body
         assert "CORVIS_TEST_MAX_WORKERS='6'\n" in body
+        # The booked memory in Python's exact spelling, so the step reads back
+        # the double admission weighed: 7 x 0.35 is 2.4499999999999997.
+        assert "CORVIS_TEST_RAM_GB='2.4499999999999997'\n" in body
         assert f"CORVIS_FLEET_WORKSPACE={DEMO_PROJECT}\n" in body
         assert "CORVIS_FLEET_WORKSPACE=.\n" in _build(path="")
         assert f"CORVIS_FLEET_REGISTRY='{names.registry_directory(TARGET)}'\n" in body
         assert (
             "export npm_config_cache POETRY_CACHE_DIR POETRY_VIRTUALENVS_IN_PROJECT "
             "POETRY_KEYRING_ENABLED PLAYWRIGHT_BROWSERS_PATH PLAYWRIGHT_SKIP_BROWSER_GC "
-            "PYTEST_XDIST_AUTO_NUM_WORKERS CORVIS_TEST_MAX_WORKERS "
+            "PYTEST_XDIST_AUTO_NUM_WORKERS CORVIS_TEST_MAX_WORKERS CORVIS_TEST_RAM_GB "
             "BOARD_AGENT_LABEL "
             "CORVIS_FLEET_CACHE CORVIS_FLEET_WORKSPACE CORVIS_FLEET_REGISTRY\n"
         ) in body
@@ -141,6 +145,7 @@ class TestBuildScript:
                 target=TARGET,
                 path=DEMO_PROJECT,
                 workers=1,
+                ram_gb=0.5,
                 install=(),
                 cache_root="/s/cache",
                 isolated_docker=False,

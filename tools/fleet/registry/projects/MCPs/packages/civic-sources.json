@@ -1,6 +1,11 @@
 {
   "worker_ram_gb": 0.5,
   "minimum_workers": 3,
+  "mutation_checker": {
+    "heap_mb": 1300,
+    "ram_gb": 1.55,
+    "measurement": "ziggurat 2026-11-26, StrykerJS 10.1.1: one TypeScript checker finished src/city-scorecard-listing.ts (107 mutants) at a 1000 MB heap cap, the least in 100 MB steps, peaking at 1.13 GB RSS; heap_mb is 1.25 times that cap and ram_gb heap_mb plus 0.25 GB (MCPs wiki typescript-mutation-step)"
+  },
   "expected_minutes": 8,
   "required_tags": [
     "cxx"

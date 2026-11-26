@@ -13,9 +13,10 @@ The two numbers live in two files (``runners.json`` and ``registry/machines``) a
 were each reasonable alone. This is the check that reads both: for every
 node, the CI slice its runners may take on the same machine (none unless a
 runners.json host carries the node's name), plus the node's
-``reserved_ram_gb``, plus the smallest job the node can serve (a project's
-``minimum_workers`` times its ``worker_ram_gb``, over the projects whose
-tags the node carries), must be at most the node's declared ``ram_gb``.
+``reserved_ram_gb``, plus the smallest job the node can serve (what a run of
+a project at its ``minimum_workers`` is booked,
+:func:`~fleet.contracts.project.run_ram_gb`, over the projects whose tags
+the node carries), must be at most the node's declared ``ram_gb``.
 Since 2026-10-19 a runner host is the machine itself, never a VM a node
 shares (MCPs board task 1e9ab738), so the join is by name.
 """
@@ -23,7 +24,7 @@ shares (MCPs board task 1e9ab738), so the join is by name.
 from __future__ import annotations
 
 from fleet.contracts.node import NodeConfig
-from fleet.contracts.project import ProjectConfig
+from fleet.contracts.project import ProjectConfig, run_ram_gb
 from fleet.contracts.runners import RunnerSpec
 from fleet.contracts.tags import missing_tags, node_tags
 from fleet.contracts.workspace import FleetWorkspace
@@ -54,12 +55,12 @@ def smallest_job_gb(node: NodeConfig, projects: tuple[ProjectConfig, ...]) -> fl
         projects: Every registered project.
 
     Returns:
-        The least ``minimum_workers * worker_ram_gb`` over the projects whose
+        The least booking of a run at ``minimum_workers`` over the projects whose
         required tags the node carries; 0.0 when it can serve none, since
         such a node claims nothing and so needs no room.
     """
     sizes = [
-        project["minimum_workers"] * project["worker_ram_gb"]
+        run_ram_gb(project, project["minimum_workers"])
         for project in projects
         if not missing_tags(node_tags(node), project["required_tags"])
     ]
