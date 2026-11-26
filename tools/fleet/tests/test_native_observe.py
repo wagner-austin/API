@@ -9,9 +9,9 @@ from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
 
 from fleet.core import _test_hooks, _test_hooks_native, native_observe, observe
 from fleet.core.ssh_options import SSH_OPTIONS
+from tests._observe_fixtures import BOARD, EVIDENCE, IDENTITY, document, node
 from tests._queue_fakes import FakeQueue
 from tests.conftest import FakeRun, ok
-from tests.test_observe import BOARD, EVIDENCE, IDENTITY, document, node
 
 SESSION = "11111111-1111-4111-8111-111111111111"
 MACHINE = "linux:ziggurat"

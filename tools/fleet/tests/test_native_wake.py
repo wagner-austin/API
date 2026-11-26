@@ -21,10 +21,10 @@ from fleet.core import _test_hooks, _test_hooks_native, native_wake, observe
 from fleet.core.native_turns import WakeDelivery, WakeRequest
 from fleet.core.native_wake_contract import PreparedWake, decode_prepare
 from fleet.core.ssh_options import SSH_OPTIONS
+from tests._observe_fixtures import BOARD, EVIDENCE, IDENTITY, document, node
 from tests._queue_fakes import FakeQueue
 from tests.conftest import FakeRun, failed, ok
 from tests.test_native_observe import Runtime, identity_row, inventory
-from tests.test_observe import BOARD, EVIDENCE, IDENTITY, document, node
 
 SESSION = "11111111-1111-4111-8111-111111111111"
 KEY = "22222222-2222-4222-8222-222222222222"
