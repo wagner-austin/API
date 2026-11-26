@@ -365,6 +365,41 @@ def test_a_generation_a_running_job_reads_is_kept_by_its_marker_alone(
 
 
 @pytest.mark.host_linux
+def test_a_sibling_run_s_live_worker_never_marks_this_run_s_install_busy(
+    tmp_path: pathlib.Path,
+) -> None:
+    # Another run of this suite on the same host lays its case out under its
+    # own temporary root with the same final name, as tools/fleet's check did
+    # beside fleet job f3c7068e on lacrymal (MCPs board task 475158f3). Its
+    # Worker stays live through this run's pass, which must still remove the
+    # generation only this run's idle install's marker names.
+    home = tmp_path / "home"
+    (home / ".cache" / "pypoetry" / "virtualenvs").mkdir(parents=True)
+    tools = home / ".cache" / "fleet-tools"
+    read = _generation(tools, days_ago=16)
+    current = _generation(tools, days_ago=1)
+    (tools / names.CURRENT_GENERATION_NAME).write_text(f"{current}\n", encoding="utf-8")
+    (install,) = _install_names(tmp_path, "busy")
+    _marker(home, install, read)
+    sibling = tmp_path / "sibling-run" / tmp_path.name
+    (sibling_install,) = _install_names(sibling, "busy")
+    worker = _worker(sibling / sibling_install)
+    try:
+        ran = _run_caches(tmp_path, home)
+    finally:
+        worker.kill()
+        worker.wait(timeout=10)
+
+    assert ran.returncode == 0, ran.stderr
+    assert ran.stdout.splitlines()[1:4] == [
+        f"cache-generations: {tools}: generation {current} current, removed 1 of 2 (1 MB)",
+        f"cache-held: generation {current}",
+        f"cache-reader: {install} read generation {read}",
+    ]
+    assert not (tools / read).exists()
+
+
+@pytest.mark.host_linux
 def test_a_host_no_job_has_run_on_says_it_has_no_generation(tmp_path: pathlib.Path) -> None:
     home = tmp_path / "home"
     (home / ".cache" / "pypoetry" / "virtualenvs").mkdir(parents=True)
