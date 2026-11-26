@@ -13,7 +13,10 @@ WHICH LINE A MUTANT'S TESTS ARE READ FROM. coverage records a statement
 spread over several lines under the lines its bytecode names, which for a
 continued expression is often only the first: 23 mutants of mcp-shared-py
 sat on lines coverage holds no context for. A line coverage did not record
-is read under the first line of the innermost statement holding it.
+is read under the first recorded line owned by the innermost statement
+holding it. For ``if (`` on its own line, the first executing line is in
+the predicate. Nested body statements own their lines independently and
+cannot stand for an unexecuted condition (board task ee29c9e5).
 """
 
 from __future__ import annotations
@@ -163,12 +166,21 @@ def coverage_line(facts: SourceFacts, line: int, recorded: frozenset[int]) -> in
         recorded: The lines coverage holds contexts for in that file.
 
     Returns:
-        The line itself when coverage recorded it, else the first line of
-        the innermost statement holding it.
+        The line itself when recorded, otherwise the earliest recorded
+        line owned by the same innermost statement. With no such coverage,
+        the statement's unrecorded first line preserves the no-test verdict.
     """
     if line in recorded:
         return line
-    return facts.statement_lines.get(line, line)
+    statement = facts.statement_lines.get(line, line)
+    return min(
+        (
+            candidate
+            for candidate, owner in facts.statement_lines.items()
+            if owner == statement and candidate in recorded
+        ),
+        default=statement,
+    )
 
 
 __all__ = ["SourceFacts", "coverage_line", "is_declaration", "read_source_facts"]
