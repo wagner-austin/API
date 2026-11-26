@@ -173,14 +173,10 @@ def coverage_line(facts: SourceFacts, line: int, recorded: frozenset[int]) -> in
     if line in recorded:
         return line
     statement = facts.statement_lines.get(line, line)
-    return min(
-        (
-            candidate
-            for candidate, owner in facts.statement_lines.items()
-            if owner == statement and candidate in recorded
-        ),
-        default=statement,
-    )
+    statements: dict[int, set[int]] = {}
+    for candidate, owner in facts.statement_lines.items():
+        statements.setdefault(owner, set()).add(candidate)
+    return min(recorded.intersection(statements.get(statement, ())), default=statement)
 
 
 __all__ = ["SourceFacts", "coverage_line", "is_declaration", "read_source_facts"]
