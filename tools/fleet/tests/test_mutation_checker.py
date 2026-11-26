@@ -107,6 +107,8 @@ class TestTheDeclaration:
             ({**DECLARED, "heap_mb": -1}, "positive whole number of MB, got -1"),
             ({**DECLARED, "ram_gb": "1.0"}, "ram_gb"),
             ({**DECLARED, "ram_gb": 0.68}, "ram_gb 0.68 is under its heap_mb 700 MB"),
+            # 1.0 GB is 1024 MB, one under a 1025 MB cap.
+            ({**DECLARED, "heap_mb": 1025}, "ram_gb 1.0 is under its heap_mb 1025 MB"),
             ({**DECLARED, "measurement": 7}, "measurement"),
             ({**DECLARED, "measurement": "  "}, "must name the run that measured heap_mb"),
         ],

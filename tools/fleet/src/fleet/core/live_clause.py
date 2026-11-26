@@ -24,18 +24,21 @@ def live_clause(state: NodeState) -> str:
         hold C core(s)``, each only when it holds something.
     """
     live = state["live"]
+    # Each count is never negative, so a count that is not zero holds
+    # something; tested as a truth value, no comparison can be mutated to one
+    # that reads the same.
     runs = (
-        ""
-        if live["runs"] == 0
-        else (
+        (
             f", and its {live['runs']} live fleet run(s) hold {live['workers']} worker(s) on "
             f"{live['cores']} core(s) and {live['ram_gb']:.1f} GB"
         )
+        if live["runs"]
+        else ""
     )
     held = (
-        ""
-        if state["reserved_cores"] == 0
-        else f", and its reservations hold {state['reserved_cores']} core(s)"
+        f", and its reservations hold {state['reserved_cores']} core(s)"
+        if state["reserved_cores"]
+        else ""
     )
     return runs + held
 
