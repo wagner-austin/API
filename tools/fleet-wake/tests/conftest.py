@@ -166,6 +166,7 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
             # NO RELEASE ARCHIVE, SPELLED OUT: the bridge packages nothing a
             # host runs (MCPs board task 0c8ace8d).
             release_artifact=None,
+            mutation_checker=None,
         )
     )
     # Laid out as fleet's registry is (fleet.core.workspace_files, MCPs board

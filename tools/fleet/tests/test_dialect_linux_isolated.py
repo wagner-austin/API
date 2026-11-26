@@ -98,6 +98,7 @@ def _plan(required_tags: tuple[NodeTag, ...]) -> ProjectConfig:
         worker_cores=1,
         worker_cores_measurement=None,
         release_artifact=None,
+        mutation_checker=None,
     )
 
 

@@ -26,6 +26,11 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
+from fleet.contracts.mutation_checker import (
+    MutationChecker,
+    decode_mutation_checker,
+    encode_mutation_checker,
+)
 from fleet.contracts.release_artifact import (
     ReleaseArtifact,
     decode_release_artifact,
@@ -147,6 +152,13 @@ class ProjectConfig(TypedDict):
             ``artifact=`` once the recipe ends
             (:mod:`fleet.contracts.release_artifact`), or None for a project
             that releases none. Optional: absent reads as None.
+        mutation_checker: The heap cap and memory one TypeScript checker of
+            the project's mutation step is given, and the run that measured
+            them (:mod:`fleet.contracts.mutation_checker`), which the step
+            reads from the staged registry to size StrykerJS to the check's
+            grant, or None for a project whose check runs no checker.
+            Optional: absent reads as None; a declaration whose minimum
+            grant cannot hold the step's smallest run is refused.
     """
 
     worker_ram_gb: float
@@ -161,6 +173,7 @@ class ProjectConfig(TypedDict):
     worker_cores: int
     worker_cores_measurement: str | None
     release_artifact: ReleaseArtifact | None
+    mutation_checker: MutationChecker | None
 
 
 def lease_seconds(project: ProjectConfig, *, slack: float) -> int:
@@ -216,6 +229,7 @@ def encode_project_config(project: ProjectConfig) -> JSONObject:
         "worker_cores": project["worker_cores"],
         "worker_cores_measurement": project["worker_cores_measurement"],
         "release_artifact": encode_release_artifact(project["release_artifact"]),
+        "mutation_checker": encode_mutation_checker(project["mutation_checker"]),
     }
 
 
@@ -393,6 +407,11 @@ def decode_project_config(value: JSONValue) -> ProjectConfig:
             value.get("worker_cores_measurement"), worker_cores=worker_cores
         ),
         release_artifact=decode_release_artifact(value.get("release_artifact")),
+        mutation_checker=decode_mutation_checker(
+            value.get("mutation_checker"),
+            worker_ram_gb=worker_ram_gb,
+            minimum_workers=minimum_workers,
+        ),
     )
 
 
