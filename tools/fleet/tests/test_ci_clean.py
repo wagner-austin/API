@@ -9,6 +9,7 @@ would pass a script that deletes everything or nothing.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import pathlib
 import shlex
@@ -182,6 +183,29 @@ def _marker(home: pathlib.Path, install: str, generation: str) -> None:
     (directory / names.GENERATION_MARKER_NAME).write_text(f"{generation}\n", encoding="utf-8")
 
 
+def _install_names(tmp_path: pathlib.Path, *roles: str) -> tuple[str, ...]:
+    """Name one runner install per role, unique to this run of the case.
+
+    ``running_installs`` reads every ``Runner.Worker`` on the host by its
+    install's directory name alone, so an install name another run of this
+    suite could also use lets that run's live Worker mark this run's install
+    busy. ``tmp_path.name`` is such a name, because pytest derives it from the
+    test's name: in fleet job f3c7068e on lacrymal, tools/fleet's own check ran
+    the same case at once and this run's after-pass read its install as busy
+    (MCPs board task 475158f3). The case's whole temporary path is unique
+    among the runs alive on a host, so a digest of it is too.
+
+    Args:
+        tmp_path: The case's temporary directory.
+        *roles: One role per install, e.g. ``"busy"``.
+
+    Returns:
+        ``actions-runner-<role>-<digest>`` for each role, in order.
+    """
+    run = hashlib.sha256(str(tmp_path).encode("utf-8")).hexdigest()[:16]
+    return tuple(f"actions-runner-{role}-{run}" for role in roles)
+
+
 def _worker(install: pathlib.Path) -> subprocess.Popen[bytes]:
     """Start a real process whose first argument is a Runner.Worker of an install.
 
@@ -254,11 +278,10 @@ def test_the_python_half_removes_only_orphans_and_generations_no_runner_reads(
     busy_read = _generation(tools, days_ago=16)
     current = _generation(tools, days_ago=1)
     (tools / names.CURRENT_GENERATION_NAME).write_text(f"{current}\n", encoding="utf-8")
-    # The install names carry the case's own directory, so a real runner on
-    # the host running this suite owns none of these markers.
-    busy, idle, retired, fresh = (
-        f"actions-runner-{role}-{tmp_path.name}" for role in ("busy", "idle", "retired", "fresh")
-    )
+    # The install names carry a digest of the case's own directory, so neither
+    # a real runner on the host nor another run of this suite owns any of
+    # these markers.
+    busy, idle, retired, fresh = _install_names(tmp_path, "busy", "idle", "retired", "fresh")
     _marker(home, busy, busy_read)
     _marker(home, idle, idle_read)
     _marker(home, retired, idle_read)
@@ -315,7 +338,7 @@ def test_a_generation_a_running_job_reads_is_kept_by_its_marker_alone(
     read = _generation(tools, days_ago=16)
     current = _generation(tools, days_ago=1)
     (tools / names.CURRENT_GENERATION_NAME).write_text(f"{current}\n", encoding="utf-8")
-    install = f"actions-runner-busy-{tmp_path.name}"
+    (install,) = _install_names(tmp_path, "busy")
     _marker(home, install, read)
     worker = _worker(tmp_path / install)
     try:
@@ -431,9 +454,7 @@ def test_a_settled_update_goes_and_every_install_s_job_trees_are_reported(
     toolchain stay, and each install's line says whether a job runs from it,
     when its hook last emptied it and what its job trees hold."""
     home = tmp_path / "home"
-    busy, cleared, fresh = (
-        f"actions-runner-{role}-{tmp_path.name}" for role in ("busy", "cleared", "fresh")
-    )
+    busy, cleared, fresh = _install_names(tmp_path, "busy", "cleared", "fresh")
     works = {
         busy: _install(home, busy, job_files=3),
         cleared: _install(home, cleared, job_files=0),
@@ -472,7 +493,7 @@ def test_an_update_unpacked_within_the_grace_is_kept(tmp_path: pathlib.Path) -> 
     """An archive keeps its own modification times when unpacked, so the
     change time, which is the unpacking's, is what the grace reads."""
     home = tmp_path / "home"
-    install = f"actions-runner-updating-{tmp_path.name}"
+    (install,) = _install_names(tmp_path, "updating")
     work = _install(home, install, job_files=0)
     archived = time.time() - 30 * DAY
     listener = work / "_update" / "bin" / "Runner.Listener"
