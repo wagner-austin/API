@@ -391,6 +391,18 @@ jobs:
         if: matrix.package == 'services/grandma-api'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
 
+      # tools/fleet only: unprivileged user namespaces for the egress gate's
+      # host case (MCPs board task e70cdf05), which runs the capacity probe
+      # inside `unshare --user --map-root-user --net` so that it meets a node
+      # with no network for real. Every fleet node's check unit allows them;
+      # the hosted ubuntu-latest image denies them through AppArmor, measured
+      # 2026-11-25 as 'unshare: write failed /proc/self/uid_map: Operation
+      # not permitted' (run 45721130300). An image without the setting fails
+      # this step by name rather than the case.
+      - name: Allow unprivileged user namespaces
+        if: matrix.package == 'tools/fleet'
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
       # Model-Trainer only: assert the host assets its suite honestly
       # requires, loudly and early, instead of 28 failures that read as code
       # defects. /data is the settings
