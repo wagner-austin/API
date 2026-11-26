@@ -63,8 +63,11 @@ CALLED: Final[frozenset[str]] = frozenset(
 #: :func:`fleet.core.main_history.held_heads`'s ``dispatch_main_heads``
 #: (MCPs board task ecd088e0), which fleet-mcp must serve before the roll
 #: that calls it. The 24th is :mod:`fleet.cli.freed_report`'s ``task_post``
-#: of the per-node bytes retires freed (MCPs board task 1526ece1).
-CALL_SITES: Final[int] = 24
+#: of the per-node bytes retires freed (MCPs board task 1526ece1). The 25th
+#: is :func:`fleet.core.queue.observe_refusal`'s ``task_session_observe``
+#: carrying a node's refusal (MCPs board task 56fee128), which taskboard-mcp
+#: must serve before the roll that calls it.
+CALL_SITES: Final[int] = 25
 
 
 def constants(tree: ast.Module) -> dict[str, str]:

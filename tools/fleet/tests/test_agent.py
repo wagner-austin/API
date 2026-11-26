@@ -27,7 +27,7 @@ from board_watch import _test_hooks as board_watch_hooks
 from board_watch import config as board_config
 from platform_core.error_codes_tooling import BoardWatchErrorCode
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import JSONTypeError, dump_json_str
+from platform_core.json_utils import JSONObject, JSONTypeError, dump_json_str
 from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from fleet.cli import agent, hub_jobs
@@ -363,15 +363,29 @@ class TestObservingSessions:
     ) -> None:
         board_watch_hooks.env = FakeEnv(BOARD_ENV)
         _test_hooks.run = FakeRun([UNROLLED, failed(255, "ssh: serendipity is asleep"), UNROLLED])
-        endpoint = FakeQueue([NOTHING_HELD, dump_json_str({"claimed": None})])
+        endpoint = FakeQueue(
+            [
+                NOTHING_HELD,
+                dump_json_str({"claimed": None}),
+                "not observed: linux:serendipity refused at t",
+            ]
+        )
         _test_hooks.http_post = endpoint
 
         with caplog.at_level("INFO"):
             assert agent.main(agent_argv(_registry(tmp_path), repo)) == 0
 
-        # The queue pass ran, the hub was skipped, the one worker was asked
-        # and its silence was logged as an outcome rather than raised.
-        assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
+        # The queue pass ran, the hub was skipped, the one worker was asked,
+        # and its silence was recorded on the board as its refusal and logged
+        # as an outcome rather than raised (MCPs board task 56fee128).
+        assert endpoint.tools == ["dispatch_list", "dispatch_claim", "task_session_observe"]
+        refusal: JSONObject = {
+            "code": "NODE_UNREACHABLE",
+            "detail": "ssh to serendipity failed while sending "
+            "/home/corvis/.fleet/observe-sessions.sh: ssh: serendipity is asleep",
+        }
+        assert endpoint.arguments[2]["machine"] == "linux:serendipity"
+        assert endpoint.arguments[2]["refusal"] == refusal
         # By the node's own prefix, not by the word anywhere in the line: on
         # serendipity the run's stage path carries it too, so the publish and
         # reap passes' lines naming the test repo matched (fleet job
@@ -382,8 +396,7 @@ class TestObservingSessions:
             if record.getMessage().startswith("serendipity: ")
         ]
         assert lines == [
-            "serendipity: not observed -- ssh to serendipity failed while sending "
-            "/home/corvis/.fleet/observe-sessions.sh: ssh: serendipity is asleep"
+            "serendipity: not observed -- not observed: linux:serendipity refused at t"
         ]
 
     def test_a_worker_that_answers_is_recorded_on_the_board(
