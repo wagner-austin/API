@@ -113,6 +113,10 @@ NO_STRING = "not a non-empty string"
             f"'platform' is str, {NO_STRING}",
         ),
         (
+            '{"platform":"linux","pidDomain":"linux:x","records":[]}',
+            f"'hostname' is NoneType, {NO_STRING}",
+        ),
+        (
             '{"platform":"linux","hostname":"x","records":[]}',
             f"'pidDomain' is NoneType, {NO_STRING}",
         ),

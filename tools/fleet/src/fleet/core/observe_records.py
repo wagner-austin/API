@@ -154,7 +154,7 @@ def _text(record: JSONObject, key: str, problems: list[str]) -> str | None:
         The value, or None when it is absent, empty or not a string.
     """
     value = record.get(key)
-    if isinstance(value, str) and value != "":
+    if isinstance(value, str) and value:
         return value
     problems.append(f"{key!r} is {type(value).__name__}, not a non-empty string")
     return None
@@ -220,17 +220,13 @@ def decode_node_sessions(host: str, output: str) -> NodeSessions | RecordRefusal
     records_raw = document.get("records")
     if not isinstance(records_raw, list):
         return _unreadable(host, [f"'records' is {type(records_raw).__name__}, not an array"], None)
-    problems: list[str] = []
-    records: list[JSONObject] = []
-    for entry in records_raw:
-        if isinstance(entry, dict):
-            records.append(entry)
-        else:
-            problems.append(f"a record is {type(entry).__name__}, not an object")
+    records = [entry for entry in records_raw if isinstance(entry, dict)]
+    strays = [entry for entry in records_raw if not isinstance(entry, dict)]
+    problems = [f"a record is {type(entry).__name__}, not an object" for entry in strays]
     platform = _text(document, "platform", problems)
     hostname = _text(document, "hostname", problems)
     pid_domain = _text(document, "pidDomain", problems)
-    if problems or platform is None or hostname is None or pid_domain is None:
+    if strays or platform is None or hostname is None or pid_domain is None:
         return _unreadable(host, problems, None)
     return NodeSessions(
         platform=platform,
@@ -258,7 +254,10 @@ def to_observation(
     problems: list[str] = []
     session_id = _text(record, "sessionId", problems)
     recorded = record.get("pidDomain")
-    if recorded is not None and not isinstance(recorded, str):
+    # Optional (2.1.236 writes none), so absence is no fault and only a
+    # value that is not a string is.
+    domain_unreadable = recorded is not None and not isinstance(recorded, str)
+    if domain_unreadable:
         problems.append(f"'pidDomain' is {type(recorded).__name__}, not a string")
     pid = _whole(record, "pid", problems)
     started = _whole(record, "startedAt", problems)
@@ -270,7 +269,7 @@ def to_observation(
     status = _text(record, "status", problems)
     updated = _whole(record, "updatedAt", problems)
     if (
-        problems
+        domain_unreadable
         or session_id is None
         or pid is None
         or started is None
