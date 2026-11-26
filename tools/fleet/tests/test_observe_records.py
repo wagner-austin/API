@@ -51,7 +51,7 @@ def decoded(output: str) -> observe_records.NodeSessions:
         The decoded document; a refusal fails the case, naming it.
     """
     sessions = observe_records.decode_node_sessions("colossus", output)
-    assert "code" not in sessions, sessions
+    assert not observe_records.is_refusal(sessions), sessions
     return sessions
 
 
@@ -69,7 +69,7 @@ def observed(
         The observation; a refusal fails the case, naming it.
     """
     observation = observe_records.to_observation(host, pid_domain, record)
-    assert "code" not in observation, observation
+    assert not observe_records.is_refusal(observation), observation
     return observation
 
 
@@ -253,7 +253,7 @@ def test_to_observation_refuses_an_unreadable_record_before_comparing_its_machin
     unreadable: the mismatch sentence would name a session it cannot copy."""
     record = harness_record(pidDomain="linux:lacrymal", name=None)
     refusal = observe_records.to_observation("colossus", MACHINE, record)
-    assert "code" in refusal
+    assert observe_records.is_refusal(refusal)
     assert refusal["code"] is FleetErrorCode.SESSION_RECORD_UNREADABLE
 
 
@@ -266,7 +266,7 @@ def test_to_observation_names_exactly_the_missing_fields_of_every_subset(size: i
         keys = tuple(key for key, _ in missing)
         result = observe_records.to_observation("colossus", MACHINE, harness_record(without=keys))
         if not missing:
-            assert "code" not in result
+            assert not observe_records.is_refusal(result)
             assert result["sessionId"] == SESSION
             continue
         named = "" if "sessionId" in keys else f" for session {SESSION}"
