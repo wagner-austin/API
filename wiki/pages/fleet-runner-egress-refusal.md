@@ -52,7 +52,7 @@ The gate case runs the probe the fleet sends inside a user and network namespace
 
 ## What this does not cover
 
-The probe asks two package indexes. A check whose setup downloads from somewhere else, such as GitHub or a model hub, is not protected when only that host is unreachable. The probe runs once per tick, so a node that loses egress mid-check fails that check as before. Why lavender's DHCP lease lapsed was not determined: the router reboot restored it, and the router's log was not read.[^cause]
+The probe asks two package indexes. A check whose setup downloads from somewhere else, such as GitHub or a model hub, is not protected when only that host is unreachable. The probe runs once per tick, so a node that loses egress mid-check fails that check as before. Why lavender's DHCP lease lapsed was not determined: the router reboot restored it, and the router's log was not read. The refusal and the lapsed lease were split into two board tasks on 2026-11-26. 7eba6aa1 carries the refusal described here. aed8af74 carries the lease's cause, and it stays open under the operator's hold of the same day: nobody changes the router, the Wi-Fi or a node's network configuration until he lifts it.[^cause]
 
 [^lavender]: `tools/fleet/src/fleet/contracts/egress_reading.py:5` -- "lost its IPv4 lease to the LAN's DHCP. It still answered ssh over the"
 [^targets]: `tools/fleet/src/fleet/core/linux_egress_probe.py:35` -- `TARGETS: Final = ("https://pypi.org/simple/pip/", "https://registry.npmjs.org/")`; `:38` -- `CONNECT_SECONDS: Final = 3`; `:41` -- `MAX_SECONDS: Final = 5`
@@ -66,4 +66,4 @@ The probe asks two package indexes. A check whose setup downloads from somewhere
 [^tick]: `tools/fleet/tests/test_node_agent_ticks.py:182` -- `def test_a_node_that_reaches_no_package_index_asks_the_queue_for_nothing(`
 [^gate]: `tools/fleet/tests/test_egress_gate.py:38` -- `NO_NETWORK = ("unshare", "--user", "--map-root-user", "--net")`; `:79` -- `def test_a_node_with_no_network_claims_nothing_and_names_its_lost_egress(`
 [^sh]: `tools/fleet/tests/test_linux_egress_probe.py:146` -- `class TestTheLinesUnderSh:`
-[^cause]: [synthesis] -- MCPs board task e70cdf05's thread: the operator's report that he rebooted the router, and the 2026-11-25T09:11Z measurement of DHCP leases on all five hosts after it.
+[^cause]: [synthesis] -- MCPs board task e70cdf05's thread: the operator's report that he rebooted the router, the 2026-11-25T09:11Z measurement of DHCP leases on all five hosts after it, his 2026-11-26 ruling holding all network changes (ruling 2f9a8b9f), and the parent's split into 7eba6aa1 and aed8af74.
