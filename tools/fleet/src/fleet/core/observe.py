@@ -56,6 +56,7 @@ from fleet.core import dialect, native_observe, native_wake, queue, remote
 from fleet.core.observe_records import (
     RecordRefusal,
     decode_node_sessions,
+    is_refusal,
     machine_of,
     observation_json,
     to_observation,
@@ -198,7 +199,7 @@ def observe_node(
             board, node, roster_machine(node), failure["code"], failure["message"], identity
         )
     sessions = decode_node_sessions(node["name"], outcome["output"])
-    if "code" in sessions:
+    if is_refusal(sessions):
         return _not_observed(
             board, node, roster_machine(node), sessions["code"], sessions["message"], identity
         )
@@ -207,7 +208,7 @@ def observe_node(
     refusals: list[RecordRefusal] = []
     for record in sessions["records"]:
         read = to_observation(node["name"], sessions["pid_domain"], record)
-        if "code" in read:
+        if is_refusal(read):
             refusals.append(read)
         else:
             observations.append(observation_json(read))

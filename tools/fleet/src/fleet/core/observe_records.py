@@ -34,13 +34,13 @@ tick from 01:09Z, before any later node was observed.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TypedDict, final
+from typing import TypedDict
 
 from platform_core.error_codes_fleet import FleetErrorCode
 from platform_core.json_utils import JSONObject, JSONValue, load_json_str
+from typing_extensions import TypeIs
 
 
-@final
 class NodeSessions(TypedDict):
     """What the script reported from one node.
 
@@ -59,7 +59,6 @@ class NodeSessions(TypedDict):
     records: tuple[JSONObject, ...]
 
 
-@final
 class SessionObservation(TypedDict):
     """One record in ``task_session_observe``'s wire shape.
 
@@ -80,12 +79,10 @@ class SessionObservation(TypedDict):
     heartbeatAt: str
 
 
-@final
 class RecordRefusal(TypedDict):
     """Why this pass cannot read what one node reported.
 
-    ``@final`` on this and the two shapes a decode returns beside it is what
-    lets ``"code" in result`` tell them apart under strict typing.
+    A decode returns this or its result; :func:`is_refusal` tells them apart.
 
     Attributes:
         code: ``SESSION_RECORD_UNREADABLE`` for a document or record not in
@@ -97,6 +94,28 @@ class RecordRefusal(TypedDict):
 
     code: FleetErrorCode
     message: str
+
+
+def is_refusal(
+    result: NodeSessions | SessionObservation | RecordRefusal,
+) -> TypeIs[RecordRefusal]:
+    """Whether a decode refused, narrowing its result either way.
+
+    ``code`` is a key of :class:`RecordRefusal` alone, so its presence is
+    the refusal. A ``TypeIs`` predicate rather than ``@final`` TypedDicts
+    narrowed by ``in``: that decorator is read by mypy alone, so a mutant
+    removing it changes nothing a test can observe.
+
+    Args:
+        result: What :func:`decode_node_sessions` or :func:`to_observation`
+            returned.
+
+    Returns:
+        True for a refusal; the type checker reads the result as a
+        :class:`RecordRefusal` when True and as the decode's own shape when
+        False.
+    """
+    return "code" in result
 
 
 def _unreadable(host: str, problems: list[str], session: str | None) -> RecordRefusal:
@@ -327,6 +346,7 @@ __all__ = [
     "RecordRefusal",
     "SessionObservation",
     "decode_node_sessions",
+    "is_refusal",
     "iso_from_millis",
     "machine_of",
     "observation_json",
