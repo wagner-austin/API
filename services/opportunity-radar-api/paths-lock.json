@@ -1,0 +1,9 @@
+{
+  "members": {
+    "../../libs/platform_calendar": "42a56315577c243e34d425929fe50f9f9f4793d093dd3fa8ea0b5cc5e8aa301e",
+    "../../libs/platform_codebase": "0150673228d1ca375db37030a35f2b2dc1aaf21603362c738988c24896f59799",
+    "../../libs/platform_core": "079846cfa280f39dd74ff630029a7df44a7d70d16eba99444715764e30b6163a",
+    "../../libs/platform_devpost": "11e49d7e521d34587c1671f209229a5fec9d3fc22170253c2d82c4ae2752c4fe",
+    "../../libs/platform_kaggle": "332ece054b4e9d1465bd3607dd0227f58534fc2049fedcdd797449fa23b2eacc"
+  }
+}
