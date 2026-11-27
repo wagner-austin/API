@@ -249,15 +249,26 @@ _PLACED_LANES: Final[Mapping[Lane, DispatchLane]] = {
     Lane.INSPECT: DispatchLane.INSPECT,
 }
 
+def _place_flags(placed: DispatchLane) -> tuple[tuple[str, ...], str]:
+    """A placed lane's flags and why every other lane refuses them.
+
+    Args:
+        placed: The queue lane whose places a tick hands its agent.
+
+    Returns:
+        Its entry of :data:`fleet.cli.agent_lanes.LANE_PLACES` without the
+        reason it refuses ``--node``, which the tick does not read.
+    """
+    flags, why, _ = agent_lanes.LANE_PLACES[placed]
+    return flags, why
+
+
 #: The flags each tick hands its agent, which it requires, and why every
 #: other tick refuses those of them it does not read itself: each placed
 #: lane's places and the host-target lane's project. Every other tick hands
 #: none.
 _HANDED_FLAGS: Final[Mapping[Lane, tuple[tuple[str, ...], str]]] = {
-    **{
-        lane: (agent_lanes.LANE_PLACES[placed][0], agent_lanes.LANE_PLACES[placed][1])
-        for lane, placed in _PLACED_LANES.items()
-    },
+    **{lane: _place_flags(placed) for lane, placed in _PLACED_LANES.items()},
     Lane.HOST_TARGET: ((PROJECT_FLAG,), "only a host-target tick runs a project's target"),
 }
 
@@ -436,9 +447,13 @@ def plan_tick(
     repo = str(api_root)
     announce = ("--announce",) if lane in _ANNOUNCE_LANES else ()
     arms = _handed_arguments(lane, handed)
-    if lane is Lane.HOST_TARGET:
-        return _host_target_plan(api_root, node, handed[PROJECT_FLAG])
-    agent_lane = _AGENT_LANES.get(lane)
+    # A match, so the one lane is chosen by its member and no comparison
+    # operator stands in for the lane's identity.
+    match lane:
+        case Lane.HOST_TARGET:
+            return _host_target_plan(api_root, node, handed[PROJECT_FLAG])
+        case _:
+            agent_lane = _AGENT_LANES.get(lane)
     if agent_lane is not None:
         return _agent_plan(api_root, lane, agent_lane, node, (*arms, *announce))
     if node is None:
