@@ -18,14 +18,14 @@ help:
 
 install:
 	@echo "=== install"
-	poetry lock
+	$(MAKETOOLS) lock-check
 	poetry install --no-cache --with dev
 	@echo "[install] done"
 
 lint:
 	@echo "=== lint"
 	$(MAKETOOLS) venv-check
-	poetry lock
+	$(MAKETOOLS) lock-check
 	poetry install --no-cache --with dev
 	@echo "  -- guard"
 	poetry run python -m scripts.guard
@@ -42,7 +42,7 @@ lint:
 # and reports 0.00% while every test passes), and the pre-run sweep.
 test:
 	@echo "=== test"
-	poetry lock
+	$(MAKETOOLS) lock-check
 	poetry install --no-cache --with dev
 	$(MAKETOOLS) test
 	@echo "[test] passed"
