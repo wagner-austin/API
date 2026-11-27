@@ -20,7 +20,7 @@ source_git_blobs:
   "tools/fleet/tests/test_linux_egress_probe.py": 4b202564990bdd9644cb88cf6761e6d78076620c
   "tools/fleet/tests/test_node_agent_ticks.py": 6d6937d0bdb8433c05e4950bd6eccd9bb8c26cbd
   "tools/fleet/tests/test_node_refusal.py": db5be586646c028f83863a205622821a550eafcb
-  "libs/platform_core/src/platform_core/error_codes_fleet.py": e897b564f1bb4ff7cefb6ce8ebf0803f5bb9e7b2
+  "libs/platform_core/src/platform_core/error_codes_fleet.py": f4c1728b03963c5eb2949ccd3f46af31ce5b0eca
 fact_checked: "2026-11-25"
 confidence: high
 hubs: [infrastructure]
