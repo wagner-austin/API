@@ -167,6 +167,7 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
             # host runs (MCPs board task 0c8ace8d).
             release_artifact=None,
             mutation_checker=None,
+            host_target=None,
         )
     )
     # Laid out as fleet's registry is (fleet.core.workspace_files, MCPs board
