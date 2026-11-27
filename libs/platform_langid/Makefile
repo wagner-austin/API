@@ -4,7 +4,7 @@ include ../../scripts/make/shell.mk
 
 lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py venv-check
-	poetry lock
+	$(PYTHON) ../../tools/maketools/scripts/run.py lock-check
 	poetry sync --no-cache --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py guard
 	poetry run ruff check . --fix
@@ -31,7 +31,7 @@ lint:
 # into the run's own HF_HOME, which --own-home alone never sees (MCPs board
 # task abb0a10e).
 test:
-	poetry lock
+	$(PYTHON) ../../tools/maketools/scripts/run.py lock-check
 	poetry sync --no-cache --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py test --own-home --hub-offline
 
