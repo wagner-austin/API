@@ -78,8 +78,11 @@ def test_every_scheduled_tick_runs_the_rolled_commit() -> None:
     # through the rolled launcher: the duty plan chooses fleet-research for
     # research and fleet-agent for hub, sessions and netboot. A node plan
     # names fleet-node-agent, through the rolled launcher's own NODE_AGENT
-    # since db1799df2. Fleet's test_cli_tick checks the actual argv for each
-    # lane; this cross-package check pins their rolled-launcher wiring.
+    # since db1799df2. A host-target plan names fleet-host-target, through
+    # the rolled launcher's own HOST_TARGET_AGENT (MCPs board task
+    # 7cd6036a, whose hourly hub row runs one project's host target). Fleet's
+    # test_cli_tick checks the actual argv for each lane; this cross-package
+    # check pins their rolled-launcher wiring.
     cli = ROOT / "tools" / "fleet" / "src" / "fleet" / "cli"
     tick = (cli / "tick.py").read_text(encoding="utf-8")
     assert '(sys.executable, "-m", "fleet.cli.rolled", *plan["arguments"])' in tick
@@ -89,7 +92,8 @@ def test_every_scheduled_tick_runs_the_rolled_commit() -> None:
     )
     rolled = (cli / "rolled.py").read_text(encoding="utf-8")
     assert '\nNODE_AGENT: Final = "fleet-node-agent"\n' in rolled
-    plans = ("module", "rolled_cli.NODE_AGENT")
+    assert '\nHOST_TARGET_AGENT: Final = "fleet-host-target"\n' in rolled
+    plans = ("module", "rolled_cli.NODE_AGENT", "rolled_cli.HOST_TARGET_AGENT")
     for agent in plans:
         assert len(list(re.finditer(rf"rolled_cli\.AGENT_FLAG,\s+{re.escape(agent)},", tick))) == 1
     assert len(list(re.finditer(r"rolled_cli\.AGENT_FLAG,", tick))) == len(plans)
