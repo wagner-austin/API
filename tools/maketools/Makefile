@@ -7,7 +7,7 @@ include ../../scripts/make/shell.mk
 # drift unseen (src/maketools/lift.py, MCPs board task 1b152218).
 lint:
 	$(PYTHON) scripts/run.py venv-check
-	poetry lock
+	$(PYTHON) ../../tools/maketools/scripts/run.py lock-check
 	poetry sync --no-cache --with dev
 	$(PYTHON) scripts/run.py guard
 	poetry run ruff check . --fix
@@ -30,7 +30,7 @@ lint:
 # five minutes; the fleet stages origin/main because this package's
 # registry entry declares base_branch main.
 test:
-	poetry lock
+	$(PYTHON) ../../tools/maketools/scripts/run.py lock-check
 	poetry sync --no-cache --with dev
 	$(PYTHON) scripts/run.py test --mutation
 
