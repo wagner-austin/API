@@ -11,10 +11,10 @@ command line's ``--no-cache`` sets ``disable_cache``; no config key does, so
 the fix is a flag on every install, and one Makefile left without it
 refills the generation it shares with every other project on the node.
 
-WHAT THE RULE HOLDS. A recipe line, a tab-led line that is neither a
-comment nor an ``echo``, that runs ``poetry install`` or ``poetry sync``
-carries ``--no-cache`` on the same line. An ``echo`` is help text naming the
-command, never running it, and is outside the rule.
+WHAT THE RULE HOLDS. A recipe line that runs a command
+(:func:`maketools.makefile_grammar.command_lines`: neither a comment nor an
+``echo``, which is help text naming the command) and runs ``poetry install``
+or ``poetry sync`` carries ``--no-cache`` on the same line.
 """
 
 from __future__ import annotations
@@ -23,16 +23,13 @@ import re
 from pathlib import Path
 from typing import Final
 
-from maketools.makefile_grammar import Violation, tracked_makefiles
+from maketools.makefile_grammar import Violation, command_lines, tracked_makefiles
 
 #: A poetry command that downloads wheels: ``install`` or ``sync``, as its own word.
 POETRY_INSTALL: Final[re.Pattern[str]] = re.compile(r"(?:^|[\s;&|(])poetry\s+(?:install|sync)\b")
 
 #: The flag that sets poetry's ``disable_cache``.
 NO_CACHE: Final[str] = "--no-cache"
-
-#: A recipe line that prints text and runs nothing, with or without make's ``@``.
-ECHO_LINE: Final[re.Pattern[str]] = re.compile(r"^@?echo(\s|$)")
 
 #: The rule's name, as :func:`maketools.makefile_grammar.render_violation` prints it.
 RULE_CACHED_INSTALL: Final[str] = f"poetry install and sync must pass {NO_CACHE}"
@@ -49,18 +46,11 @@ def check_poetry_cache_rule(path: Path, text: str) -> list[Violation]:
         One violation per recipe line that runs ``poetry install`` or
         ``poetry sync`` without :data:`NO_CACHE`, naming the line.
     """
-    found: list[Violation] = []
-    for number, line in enumerate(text.splitlines(), start=1):
-        if not line.startswith("\t"):
-            continue
-        body = line[1:].strip()
-        if body.startswith("#") or ECHO_LINE.match(body) is not None:
-            continue
-        if POETRY_INSTALL.search(body) is not None and NO_CACHE not in body.split():
-            found.append(
-                Violation(path=path, line_number=number, rule=RULE_CACHED_INSTALL, text=body)
-            )
-    return found
+    return [
+        Violation(path=path, line_number=number, rule=RULE_CACHED_INSTALL, text=body)
+        for number, body in command_lines(text)
+        if POETRY_INSTALL.search(body) is not None and NO_CACHE not in body.split()
+    ]
 
 
 def lint_poetry_caches(repo_root: Path) -> list[Violation]:
@@ -79,7 +69,6 @@ def lint_poetry_caches(repo_root: Path) -> list[Violation]:
 
 
 __all__ = [
-    "ECHO_LINE",
     "NO_CACHE",
     "POETRY_INSTALL",
     "RULE_CACHED_INSTALL",

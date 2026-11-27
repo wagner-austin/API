@@ -26,6 +26,8 @@ from maketools.makefile_banner_rule import lint_banners
 from maketools.makefile_budget_rule import lint_budgets
 from maketools.makefile_grammar import lint_grammar, render_violation
 from maketools.makefile_poetry_cache_rule import lint_poetry_caches
+from maketools.makefile_poetry_lock_rule import lint_poetry_locks
+from maketools.poetry_lock import check_lock, write_lock
 from maketools.reap import DEFAULT_OLDER_THAN_MINUTES, sweep_stale
 from maketools.test_command import command_test
 from maketools.venv_check import check_venv
@@ -55,6 +57,35 @@ def command_venv_check(arguments: Sequence[str]) -> int:
     require_no_arguments("venv-check", arguments)
     check_venv(Path.cwd())
     return 0
+
+
+def command_lock_check(arguments: Sequence[str]) -> int:
+    """``lock-check``: verify the package's committed lock, resolving nothing.
+
+    Args:
+        arguments: None expected.
+
+    Returns:
+        0 when the lock is current; a stale one is refused
+        ``MAKETOOLS_LOCK_STALE`` (:func:`maketools.poetry_lock.check_lock`).
+    """
+    require_no_arguments("lock-check", arguments)
+    check_lock(Path.cwd())
+    return 0
+
+
+def command_lock(arguments: Sequence[str]) -> int:
+    """``lock``: resolve the package's lock and record its path dependencies.
+
+    Args:
+        arguments: None expected.
+
+    Returns:
+        ``poetry lock``'s status when it failed, else 0 once the written
+        lock verifies (:func:`maketools.poetry_lock.write_lock`).
+    """
+    require_no_arguments("lock", arguments)
+    return write_lock(Path.cwd())
 
 
 def command_guard(arguments: Sequence[str]) -> int:
@@ -95,7 +126,7 @@ def command_reap_stale(arguments: Sequence[str]) -> int:
 
 
 def command_lint_makefiles(arguments: Sequence[str]) -> int:
-    """``lint-makefiles``: the grammar, banner, budget and poetry cache rules over every Makefile.
+    """``lint-makefiles``: the grammar, banner, budget and poetry rules over every Makefile.
 
     Args:
         arguments: None expected.
@@ -103,8 +134,8 @@ def command_lint_makefiles(arguments: Sequence[str]) -> int:
     Returns:
         1 when any Makefile is outside the grammar, a ``check:`` target
         does not print the pass banner last or does not run under the
-        five-minute budget, or a recipe runs ``poetry install`` or ``sync``
-        without ``--no-cache``, else 0.
+        five-minute budget, a recipe runs ``poetry install`` or ``sync``
+        without ``--no-cache``, or a recipe runs ``poetry lock``, else 0.
     """
     require_no_arguments("lint-makefiles", arguments)
     repo_root = repository_root()
@@ -114,6 +145,7 @@ def command_lint_makefiles(arguments: Sequence[str]) -> int:
         *lint_banners(repo_root),
         *lint_budgets(repo_root),
         *lint_poetry_caches(repo_root),
+        *lint_poetry_locks(repo_root),
     ]
     for violation in violations:
         _test_hooks.write_error(render_violation(violation, repo_root))
@@ -125,7 +157,8 @@ def command_lint_makefiles(arguments: Sequence[str]) -> int:
     _test_hooks.write_line(
         f"lint-makefiles: {examined} tracked Makefile(s) in the portable grammar, "
         "every one beginning with the shell prologue and every check printing the pass banner "
-        "under the five-minute budget, every poetry install and sync passing --no-cache"
+        "under the five-minute budget, every poetry install and sync passing --no-cache, "
+        "and no recipe running poetry lock"
     )
     return 0
 
@@ -427,6 +460,8 @@ def require_integer(flag: str, value: str) -> int:
 COMMANDS: Final[Mapping[str, Callable[[Sequence[str]], int]]] = {
     "align": command_align,
     "venv-check": command_venv_check,
+    "lock-check": command_lock_check,
+    "lock": command_lock,
     "guard": command_guard,
     "test": command_test,
     "reap-stale": command_reap_stale,
@@ -510,6 +545,8 @@ __all__ = [
     "command_lift_check",
     "command_lift_refresh",
     "command_lint_makefiles",
+    "command_lock",
+    "command_lock_check",
     "command_native_wheel",
     "command_poetry_build",
     "command_reap_stale",

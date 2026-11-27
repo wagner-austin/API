@@ -53,6 +53,10 @@ MAKE_SHELL_FUNCTIONS: Final[Sequence[tuple[str, str]]] = (
     (r"^\s*\.SHELLFLAGS\s*[:?]?=", ".SHELLFLAGS is set only in " + SHELL_INCLUDE),
 )
 
+#: A recipe command that prints text and runs nothing, read after
+#: :func:`recipe_body` has stripped make's prefixes.
+ECHO_LINE: Final[re.Pattern[str]] = re.compile(r"^echo(\s|$)")
+
 
 class Violation(TypedDict):
     """One line of one Makefile outside the grammar.
@@ -125,6 +129,30 @@ def recipe_body(line: str) -> str:
         blanks stripped, and trailing whitespace too.
     """
     return line[1:].lstrip("@-+ \t").strip()
+
+
+def command_lines(text: str) -> list[tuple[int, str]]:
+    """Every recipe line that runs a command, for the rules about what a recipe runs.
+
+    A comment runs nothing, and neither does an ``echo``: it is help text
+    naming a command. The poetry rules (:mod:`maketools.makefile_poetry_cache_rule`,
+    :mod:`maketools.makefile_poetry_lock_rule`) read recipes through this one
+    function so they agree on what counts as running a command.
+
+    Args:
+        text: A Makefile's contents.
+
+    Returns:
+        Each such line's 1-based number and :func:`recipe_body`, in order.
+    """
+    found: list[tuple[int, str]] = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        if not line.startswith("\t"):
+            continue
+        body = recipe_body(line)
+        if body != "" and not body.startswith("#") and ECHO_LINE.match(body) is None:
+            found.append((number, body))
+    return found
 
 
 def check_recipe_line(path: Path, line_number: int, line: str) -> list[Violation]:
@@ -233,6 +261,7 @@ def lint_grammar(repo_root: Path) -> tuple[int, list[Violation]]:
 
 
 __all__ = [
+    "ECHO_LINE",
     "MAKEFILE_PATHSPEC",
     "MAKE_SHELL_FUNCTIONS",
     "SHELL_INCLUDE",
@@ -240,6 +269,7 @@ __all__ = [
     "Violation",
     "check_makefile",
     "check_recipe_line",
+    "command_lines",
     "expected_include",
     "first_code_line",
     "lint_grammar",
