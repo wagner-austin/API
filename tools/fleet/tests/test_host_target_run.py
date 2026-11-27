@@ -31,7 +31,9 @@ from fleet.cli import _config
 from fleet.cli import host_target as host_target_cli
 from fleet.contracts.feed import FeedKind
 from fleet.contracts.host_target import HostTarget
+from fleet.contracts.project import ProjectConfig
 from fleet.contracts.retire_record import RetireState
+from fleet.contracts.workspace import FleetWorkspace
 from fleet.core import _test_hooks, host_target, leases, names, records, retire_owed, run_lease
 from tests._git_fixtures import git
 from tests._on_this_machine import on_this_machine
@@ -386,35 +388,61 @@ class TestARealRun:
         assert nothing.calls == []
 
 
+def _with_deadline(loaded: _config.LoadedWorkspace, seconds: int) -> _config.LoadedWorkspace:
+    """The loaded workspace with the project's host target stopped after ``seconds``.
+
+    The registry's decoder refuses a deadline under a minute, which guards a
+    deadline written in minutes; a case that waits out a real deadline would
+    then take a minute, so it shortens the declared one after decoding and
+    runs everything else exactly as loaded.
+
+    Args:
+        loaded: The workspace the registry decoded.
+        seconds: The deadline the case runs under.
+
+    Returns:
+        The same workspace, its one project's host target given that deadline.
+    """
+    project = loaded.workspace["projects"][PROJECT]
+    assert project["host_target"] == HostTarget(
+        target="slow", node="lavender", workers=3, deadline_seconds=60
+    )
+    short = HostTarget(target="slow", node="lavender", workers=3, deadline_seconds=seconds)
+    shortened: ProjectConfig = {**project, "host_target": short}
+    workspace: FleetWorkspace = {**loaded.workspace, "projects": {PROJECT: shortened}}
+    return _config.LoadedWorkspace(workspace, loaded.registry, loaded.directory)
+
+
 class TestTheDeadline:
     def test_a_target_outliving_its_deadline_is_stopped_with_timeout_s_status(
-        self, tmp_path: pathlib.Path
+        self, tmp_path: pathlib.Path, hub: tuple[pathlib.Path, str]
     ) -> None:
-        stage = (tmp_path / "stage").as_posix()
-        target = names.dispatch_directory(stage, RUN_ID)
-        (pathlib.Path(target) / "desk").mkdir(parents=True)
-        (pathlib.Path(target) / "desk" / "Makefile").write_text(MAKEFILE, encoding="utf-8")
-        _test_hooks.run = HubAndNode(tmp_path / "remote", reachable=True)
-        lavender = node()
-        lavender["stage_root"] = stage
-        declared = HostTarget(target="slow", node="lavender", workers=1, deadline_seconds=1)
+        """The verb itself, fetch, lease, commit staging, run and retire, on a real staged tree."""
+        _, head = hub
+        registry = _registry(tmp_path, host_target_entry=_entry("slow"))
+        loaded = _with_deadline(_config.load_workspace({_config.CONFIG_FLAG: str(registry)}), 1)
+        printed: list[str] = []
 
         began = time.monotonic()
-        ran = host_target.run_on_node(
-            lavender, run_id=RUN_ID, target=target, path="desk", host_target=declared
+        status = host_target_cli.run(
+            loaded, project=PROJECT, agent=AGENT, session_id=SESSION, emit=printed.append
         )
         took = time.monotonic() - began
 
         # GNU timeout's 124 for a command it stopped with TERM, and make's
         # line for its interrupted recipe, as both printed on 2026-11-27;
-        # the recipe's last line never ran.
-        assert ran == host_target.HostTargetRun(
-            lines=("started", "make: *** [Makefile:10: slow] Terminated"), status=124
-        )
+        # the recipe's last line, ``finished``, never ran.
+        assert status == 124
+        assert printed == [
+            f"{head} started",
+            f"{head} make: *** [Makefile:10: slow] Terminated",
+            f"host target slow of {PROJECT} at {head} on lavender, run {RUN_ID}: "
+            "stopped at its deadline of 1 s (timeout exited 124); retire ended",
+        ]
         assert took < host_target.KILL_AFTER_SECONDS
-        assert host_target.describe(ran, declared) == (
-            "stopped at its deadline of 1 s (timeout exited 124)"
-        )
+        assert _kinds(registry) == [FeedKind.LEASED, FeedKind.STAGED, FeedKind.FAILED]
+        stage = (tmp_path / "stage").as_posix()
+        assert not pathlib.Path(names.run_enclosure(stage, RUN_ID)).exists()
 
     def test_the_transport_waits_out_the_deadline_the_kill_and_its_own_bound(self) -> None:
         nodes = FakeRun([ok(""), ok(f"{host_target.STATUS_WORD} 0\n")])
