@@ -16,6 +16,6 @@
     "target": "update",
     "node": "loki",
     "workers": 6,
-    "deadline_seconds": 2400
+    "deadline_seconds": 1800
   }
 }

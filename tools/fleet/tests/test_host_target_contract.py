@@ -15,12 +15,14 @@ import random
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 
+from fleet.cli import rolled
 from fleet.contracts.host_target import (
-    MIN_DEADLINE_SECONDS,
+    MAX_DEADLINE_SECONDS,
     HostTarget,
     decode_host_target,
     encode_host_target,
 )
+from fleet.core import host_target, remote
 from fleet.contracts.project import decode_project_config, encode_project_config
 from fleet.contracts.workspace import decode_fleet_workspace, encode_fleet_workspace
 from fleet.core import run_lease
@@ -53,7 +55,8 @@ def _generated(rng: random.Random) -> HostTarget:
         target=target,
         node=node,
         workers=1 + rng.randrange(64),
-        deadline_seconds=MIN_DEADLINE_SECONDS + rng.randrange(7200),
+        # A minute to half an hour, the bounds the task gives, both ends included.
+        deadline_seconds=rng.randrange(60, 1801),
     )
 
 
@@ -61,9 +64,9 @@ def _declared() -> JSONObject:
     """The task's host target, as a registry line spells it.
 
     Returns:
-        ``update`` on loki with six workers and a 2400-second deadline.
+        ``update`` on loki with six workers and a 1800-second deadline.
     """
-    return {"target": "update", "node": "loki", "workers": 6, "deadline_seconds": 2400}
+    return {"target": "update", "node": "loki", "workers": 6, "deadline_seconds": 1800}
 
 
 class TestTheShippedRegistry:
@@ -71,7 +74,7 @@ class TestTheShippedRegistry:
         project = shipped_workspace()["projects"]["osrs-lab/manual-desktop"]
 
         assert project["host_target"] == HostTarget(
-            target="update", node="loki", workers=6, deadline_seconds=2400
+            target="update", node="loki", workers=6, deadline_seconds=1800
         )
 
 
@@ -79,8 +82,8 @@ class TestTheRoundTrip:
     def test_every_generated_host_target_survives_encode_then_decode(self) -> None:
         rng = random.Random(SEED)
         for _ in range(CASES):
-            host_target = _generated(rng)
-            assert decode_host_target(encode_host_target(host_target)) == host_target
+            generated = _generated(rng)
+            assert decode_host_target(encode_host_target(generated)) == generated
 
     def test_absent_reads_as_none_and_none_encodes_as_none(self) -> None:
         assert decode_host_target(None) is None
@@ -92,7 +95,7 @@ class TestTheRoundTrip:
         decoded = decode_project_config(encoded)
 
         assert decoded["host_target"] == HostTarget(
-            target="update", node="loki", workers=6, deadline_seconds=2400
+            target="update", node="loki", workers=6, deadline_seconds=1800
         )
         assert encode_project_config(decoded)["host_target"] == _declared()
 
@@ -107,6 +110,11 @@ class TestTheRoundTrip:
 
         assert decode_host_target(smallest) == HostTarget(
             target="a", node="n", workers=1, deadline_seconds=60
+        )
+
+    def test_the_longest_deadline_decodes(self) -> None:
+        assert decode_host_target({**_declared(), "deadline_seconds": 1800}) == HostTarget(
+            target="update", node="loki", workers=6, deadline_seconds=1800
         )
 
 
@@ -125,6 +133,11 @@ SPOILED: list[tuple[str, JSONValue, str]] = [
         "a deadline written in minutes",
         {**_declared(), "deadline_seconds": 59},
         r"host_target\.deadline_seconds must be at least 60",
+    ),
+    (
+        "a deadline past the launcher's wall",
+        {**_declared(), "deadline_seconds": 1801},
+        r"host_target\.deadline_seconds must be at most 1800",
     ),
 ]
 
@@ -172,16 +185,24 @@ class TestARefusalNamesItsField:
         )
 
         assert decoded["projects"]["osrs-lab/manual-desktop"]["host_target"] == HostTarget(
-            target="update", node="loki", workers=6, deadline_seconds=2400
+            target="update", node="loki", workers=6, deadline_seconds=1800
         )
 
 
 class TestTheLeaseWindow:
     def test_a_host_target_holds_its_lease_twice_its_deadline(self) -> None:
-        declared = HostTarget(target="update", node="loki", workers=6, deadline_seconds=2400)
+        declared = HostTarget(target="update", node="loki", workers=6, deadline_seconds=1800)
 
-        # 2400 s at a slack of 2, worked by hand.
-        assert run_lease.host_target_window(declared) == 4800
+        # 1800 s at a slack of 2, worked by hand.
+        assert run_lease.host_target_window(declared) == 3600
+
+    def test_the_longest_deadline_ends_inside_the_rolled_launcher_s_wall(self) -> None:
+        """The node's deadline, its kill and the transport's bound all end before the launcher's."""
+        longest = MAX_DEADLINE_SECONDS + host_target.KILL_AFTER_SECONDS
+        assert longest + remote.SSH_TIMEOUT_SECONDS < rolled.AGENT_WALL_SECONDS
+        # 1800 + 30 + 120 = 1950 of 39 x 60 = 2340 s, worked by hand: 390 s
+        # remain for the fetch, the stage and the retire.
+        assert rolled.AGENT_WALL_SECONDS - (longest + remote.SSH_TIMEOUT_SECONDS) == 390
 
     def test_a_check_holds_its_lease_twice_its_estimate(self) -> None:
         # Ten minutes is 600 s, at a slack of 2.

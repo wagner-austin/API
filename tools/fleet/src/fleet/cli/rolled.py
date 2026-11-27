@@ -73,6 +73,8 @@ AGENT_MODULES: Final[dict[str, str]] = {
     "fleet-agent": "fleet.cli.agent",
     "fleet-node-agent": "fleet.cli.node_agent",
     "fleet-research": "fleet.cli.research",
+    # A project's host target, run hourly by the hub (MCPs board task 57791f39).
+    "fleet-host-target": "fleet.cli.host_target",
 }
 
 #: The agent's deadline: one minute inside the 40-minute deadline

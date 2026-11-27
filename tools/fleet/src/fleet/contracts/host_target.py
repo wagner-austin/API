@@ -59,6 +59,14 @@ TARGET_NAME: Final[re.Pattern[str]] = re.compile(r"[a-z][a-z0-9-]*")
 #: at once.
 MIN_DEADLINE_SECONDS: Final[int] = 60
 
+#: The longest deadline a host target may declare: half an hour. The hub runs
+#: the target through the rolled launcher (:mod:`fleet.cli.rolled`), which
+#: ends its agent at :data:`fleet.cli.rolled.AGENT_WALL_SECONDS`, 39 minutes;
+#: inside it go this deadline, ``timeout``'s kill after it, the transport's
+#: own bound and the fetch, stage and retire around the run, so the node's
+#: deadline, never the launcher's, is what stops a run that overruns.
+MAX_DEADLINE_SECONDS: Final[int] = 1800
+
 #: The keys a host target declares, all of them required.
 KEYS: Final[frozenset[str]] = frozenset({"target", "node", "workers", "deadline_seconds"})
 
@@ -77,9 +85,10 @@ def decode_host_target(value: JSONValue) -> HostTarget | None:
             :data:`KEYS`; when the target is outside :data:`TARGET_NAME`;
             when the node is not a non-empty string
             (:func:`fleet.contracts.node.decode_node_name`); when workers is below
-            one; or when the deadline is below :data:`MIN_DEADLINE_SECONDS`.
-            A misspelt declaration would run some other target, nowhere, or
-            stop it before it began.
+            one; or when the deadline is below :data:`MIN_DEADLINE_SECONDS`
+            or above :data:`MAX_DEADLINE_SECONDS`. A misspelt declaration
+            would run some other target, nowhere, stop it before it began,
+            or outlast the launcher that runs it.
     """
     if value is None:
         return None
@@ -107,6 +116,12 @@ def decode_host_target(value: JSONValue) -> HostTarget | None:
             f"got {deadline_seconds}; a shorter deadline stops the target before its build "
             "can finish"
         )
+    if deadline_seconds > MAX_DEADLINE_SECONDS:
+        raise JSONTypeError(
+            f"project.host_target.deadline_seconds must be at most {MAX_DEADLINE_SECONDS}, "
+            f"got {deadline_seconds}; the rolled launcher would end the run before the node's "
+            "deadline stopped it, and no end would be recorded"
+        )
     return HostTarget(
         target=target, node=node, workers=workers, deadline_seconds=deadline_seconds
     )
@@ -133,6 +148,7 @@ def encode_host_target(host_target: HostTarget | None) -> JSONObject | None:
 
 __all__ = [
     "KEYS",
+    "MAX_DEADLINE_SECONDS",
     "MIN_DEADLINE_SECONDS",
     "TARGET_NAME",
     "HostTarget",
