@@ -122,9 +122,7 @@ def decode_host_target(value: JSONValue) -> HostTarget | None:
             f"got {deadline_seconds}; the rolled launcher would end the run before the node's "
             "deadline stopped it, and no end would be recorded"
         )
-    return HostTarget(
-        target=target, node=node, workers=workers, deadline_seconds=deadline_seconds
-    )
+    return HostTarget(target=target, node=node, workers=workers, deadline_seconds=deadline_seconds)
 
 
 def encode_host_target(host_target: HostTarget | None) -> JSONObject | None:

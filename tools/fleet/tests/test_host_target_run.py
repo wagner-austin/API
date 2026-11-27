@@ -416,9 +416,7 @@ class TestAFailureAfterTheLease:
         assert raised.value.code is FleetErrorCode.NODE_UNREACHABLE
         assert leases.read_leases(runs / "leases.json") == ()
         assert _kinds(registry) == [FeedKind.LEASED, FeedKind.REFUSED]
-        assert retire_owed.owed_on(runs / retire_owed.RETIRES_FILE, alias="lavender") == (
-            RUN_ID,
-        )
+        assert retire_owed.owed_on(runs / retire_owed.RETIRES_FILE, alias="lavender") == (RUN_ID,)
 
     def test_a_lease_another_run_holds_refuses_before_anything_is_staged(
         self, tmp_path: pathlib.Path, hub: tuple[pathlib.Path, str]

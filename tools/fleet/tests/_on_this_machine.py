@@ -44,6 +44,7 @@ def on_this_machine(
         What the command, or the node's script, did here.
     """
     words = list(argv)
+    here: tuple[str, ...]
     if words[:1] == ["scp"]:
         copy = ["scp", "-q", *SSH_OPTIONS]
         assert words[: len(copy)] == copy

@@ -22,10 +22,9 @@ from fleet.contracts.host_target import (
     decode_host_target,
     encode_host_target,
 )
-from fleet.core import host_target, remote
 from fleet.contracts.project import decode_project_config, encode_project_config
 from fleet.contracts.workspace import decode_fleet_workspace, encode_fleet_workspace
-from fleet.core import run_lease
+from fleet.core import host_target, remote, run_lease
 from tests._registry import shipped_workspace
 from tests.test_contracts import _project, _workspace
 
