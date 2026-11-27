@@ -17,8 +17,12 @@ WHICH TESTS RUN A MUTANT. Those the suite's coverage contexts name for its
 line: the suite runs with ``--cov-context=test``, so its coverage data
 records which test ran every line, and a mutant runs only those, the
 cheapest file's first (0.63 s a mutant measured on sedona, where the whole
-suite takes 50 s). A line run only at import (a decorator, a module
-constant, a default) was run by no test in particular, so its mutant runs
+suite takes 50 s). A decorator's line runs only at import, but what it
+makes is used by the tests coverage records on the definition it decorates,
+so its mutant runs those (:func:`line_tests`, board task b9bf5690): coax-drone's
+15 decorator mutants each ran its 1320 s suite before (fleet job afb54e6a).
+Any other line run only at import (a module constant, a default), or a
+definition no test ran, was run by no test in particular, so its mutant runs
 the whole suite, as StrykerJS runs every test for a static mutant. A line no
 test runs is a surviving mutant without a run. Before the first trial each
 file's distinct share of the mutants' tests is run once unmutated, which
@@ -275,7 +279,12 @@ def selection(contexts: frozenset[str] | None) -> tuple[str, ...] | None:
 def line_tests(
     facts: SourceFacts, line: int, recorded: Mapping[int, frozenset[str]]
 ) -> tuple[str, ...] | None:
-    """The tests a mutant on one line runs, from the coverage of the line standing for it.
+    """The tests a mutant on one line runs, from the coverage of the lines standing for it.
+
+    A decorator's line stands for every line of the definition it decorates
+    (:attr:`~.sites.SourceFacts.definitions`, board task b9bf5690): the
+    tests that ran any of them are those that use what the decorator made.
+    Any other line stands for the line :func:`~.sites.coverage_line` names.
 
     Args:
         facts: The mutant's file's facts.
@@ -283,11 +292,16 @@ def line_tests(
         recorded: Each line coverage recorded in that file, to its contexts.
 
     Returns:
-        As :func:`selection` gives for the line :func:`~.sites.coverage_line`
-        names: None when coverage did not record it, the empty tuple when
-        it ran only outside a test, else the tests that ran it.
+        As :func:`selection` gives for the contexts of those lines: None when
+        coverage recorded none of them, the empty tuple when they ran only
+        outside a test, else the tests that ran them.
     """
-    return selection(recorded.get(coverage_line(facts, line, frozenset(recorded))))
+    span = facts.definitions.get(line)
+    if span is None:
+        return selection(recorded.get(coverage_line(facts, line, frozenset(recorded))))
+    first, last = span
+    ran = [names for number, names in recorded.items() if first <= number <= last]
+    return selection(frozenset[str]().union(*ran)) if ran else None
 
 
 class Judged(NamedTuple):

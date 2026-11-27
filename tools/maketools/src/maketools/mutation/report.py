@@ -63,8 +63,8 @@ class Tally(NamedTuple):
         by_tests: Mutants run by the tests covering their line.
         by_suite: Mutants on lines run only at import, run by the whole suite.
         by_none: Mutants on lines no test runs.
-        declarations: Places in annotations and parameter markers, not code
-            and not run.
+        declarations: Places in annotations, parameter markers and typing-only
+            decorators, not code and not run.
     """
 
     files: int
@@ -116,7 +116,8 @@ def tally_line(tally: Tally) -> str:
     return (
         f"mutation: {made} mutant(s): {tally.by_tests} run by the tests covering their line, "
         f"{tally.by_suite} by the whole suite (lines run only at import), {tally.by_none} by "
-        f"no test; {tally.declarations} more in annotations and parameter markers are not code"
+        f"no test; {tally.declarations} more in annotations, parameter markers and typing-only "
+        "decorators are not code"
     )
 
 

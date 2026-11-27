@@ -192,12 +192,14 @@ def mutated_line(diff: str) -> str:
         diff: The unified diff cosmic-ray reports.
 
     Returns:
-        That line without its ``+`` and surrounding blanks.
+        That line without its ``+`` and surrounding blanks; empty when the
+        mutation only deletes, as ``RemoveDecorator`` does, so nothing stands
+        where the deleted line stood (board task b9bf5690).
     """
-    added = [
+    added = (
         line for line in diff.splitlines() if line.startswith("+") and not line.startswith("+++")
-    ]
-    return added[0].removeprefix("+").strip()
+    )
+    return next(added, "").removeprefix("+").strip()
 
 
 __all__ = [

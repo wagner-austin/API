@@ -1,13 +1,25 @@
 """What a source file says about the places cosmic-ray mutates (board task fec5851c).
 
-TWO KINDS OF PLACE ARE NOT CODE, and the step does not run a mutant there.
+THREE KINDS OF PLACE ARE NOT CODE, and the step does not run a mutant there.
 A type annotation is a declaration for mypy: under ``from __future__ import
 annotations`` it is never evaluated, so a mutant of ``str | None`` cannot be
 killed by any test, as StrykerJS never mutates a TypeScript type. The ``/``
 and ``*`` that end positional and begin keyword-only parameters are not
 operators, and cosmic-ray's binary-operator replacement of them is not a
 program. Measured over mcp-shared-py's src on 2026-11-07: 2730 of 8038
-mutants sat in annotations and 539 on those markers.
+mutants sat in annotations and 539 on those markers. ``typing``'s
+``overload`` and ``final`` (or ``typing_extensions``') declare to the type
+checker what a definition may be overloaded or overridden as; at run time
+they only record that in an attribute and a registry no test reads, so
+removing one is no program a test can tell apart (board task b9bf5690).
+
+WHICH DEFINITION A DECORATOR'S LINE BELONGS TO (board task b9bf5690). A
+decorator runs once, at import, when its definition is made, so coverage
+records its line under no test, and what removing ``@property`` or
+``@classmethod`` changes is seen only where the definition is used. Each
+line of a decorator is mapped to the lines of the definition it decorates,
+from its first decorator to its last line, whose coverage names the tests
+that use it.
 
 WHICH LINE A MUTANT'S TESTS ARE READ FROM. coverage records a statement
 spread over several lines under the lines its bytecode names, which for a
@@ -35,6 +47,12 @@ _LAYOUT: frozenset[int] = frozenset(
 #: The tokens a parameter marker can stand before, and an operator never can.
 _AFTER_MARKER: frozenset[str] = frozenset({",", ")", ":"})
 
+#: The modules whose decorators below are declarations for the type checker.
+_TYPING_MODULES: frozenset[str] = frozenset({"typing", "typing_extensions"})
+
+#: The decorators of those modules that change nothing a test can see.
+_TYPING_DECORATORS: frozenset[str] = frozenset({"overload", "final"})
+
 
 class SourceFacts(NamedTuple):
     """The places of one source file that are not code, and its statements' lines.
@@ -46,11 +64,18 @@ class SourceFacts(NamedTuple):
         markers: Where each ``/`` or ``*`` parameter marker starts.
         statement_lines: Each line of a statement, to the first line of the
             innermost statement holding it.
+        typing_decorator_lines: Each line of an ``overload`` or ``final``
+            decorator from :data:`_TYPING_MODULES`; a decorator's lines hold
+            nothing but it.
+        definitions: Each line of a decorator, to the first and last line
+            of the definition it decorates, its decorators included.
     """
 
     annotations: tuple[tuple[tuple[int, int], tuple[int, int]], ...]
     markers: frozenset[tuple[int, int]]
     statement_lines: dict[int, int]
+    typing_decorator_lines: frozenset[int]
+    definitions: dict[int, tuple[int, int]]
 
 
 def _annotations_of(node: ast.AST) -> list[ast.expr]:
@@ -106,6 +131,66 @@ def _markers(source: str) -> frozenset[tuple[int, int]]:
     )
 
 
+class _TypingNames(NamedTuple):
+    """The names a module binds to typing's declaring decorators and to typing itself.
+
+    Attributes:
+        decorators: Each name ``from typing import overload`` or ``final``
+            binds, under its alias when it has one.
+        modules: Each name ``import typing`` binds, under its alias when it
+            has one.
+    """
+
+    decorators: frozenset[str]
+    modules: frozenset[str]
+
+
+def _typing_names(tree: ast.Module) -> _TypingNames:
+    """Read which names a module binds to :data:`_TYPING_DECORATORS` and :data:`_TYPING_MODULES`.
+
+    Args:
+        tree: The module.
+
+    Returns:
+        The names its imports bind, wherever in the module they stand.
+    """
+    decorators: set[str] = set()
+    modules: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module in _TYPING_MODULES:
+            decorators.update(
+                alias.asname or alias.name
+                for alias in node.names
+                if alias.name in _TYPING_DECORATORS
+            )
+        if isinstance(node, ast.Import):
+            modules.update(
+                alias.asname or alias.name for alias in node.names if alias.name in _TYPING_MODULES
+            )
+    return _TypingNames(decorators=frozenset(decorators), modules=frozenset(modules))
+
+
+def _is_typing_decorator(decorator: ast.expr, names: _TypingNames) -> bool:
+    """Whether a decorator is typing's ``overload`` or ``final``.
+
+    Args:
+        decorator: One decorator's expression.
+        names: What the module's imports bind (:func:`_typing_names`).
+
+    Returns:
+        True for a name bound to one, or one read off a name bound to its
+        module; False for anything else, a call among them.
+    """
+    if isinstance(decorator, ast.Name):
+        return decorator.id in names.decorators
+    return (
+        isinstance(decorator, ast.Attribute)
+        and isinstance(decorator.value, ast.Name)
+        and decorator.value.id in names.modules
+        and decorator.attr in _TYPING_DECORATORS
+    )
+
+
 def read_source_facts(source: str) -> SourceFacts:
     """Read what :class:`SourceFacts` holds from one module's text.
 
@@ -113,15 +198,26 @@ def read_source_facts(source: str) -> SourceFacts:
         source: The module's text.
 
     Returns:
-        Its annotations, parameter markers and statement lines.
+        Its annotations, parameter markers, statement lines, typing
+        decorators and decorated definitions.
     """
     tree = ast.parse(source)
     lines = source.splitlines()
+    names = _typing_names(tree)
     annotations: list[tuple[tuple[int, int], tuple[int, int]]] = []
     statement_lines: dict[int, int] = {}
+    typing_decorator_lines: set[int] = set()
+    definitions: dict[int, tuple[int, int]] = {}
     # ast.walk visits a node before the nodes inside it, so an inner
     # statement overwrites the lines its outer statement claimed first.
     for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            for decorator in node.decorator_list:
+                held = range(decorator.lineno, (decorator.end_lineno or decorator.lineno) + 1)
+                span = (node.decorator_list[0].lineno, node.end_lineno or node.lineno)
+                definitions.update(dict.fromkeys(held, span))
+                if _is_typing_decorator(decorator, names):
+                    typing_decorator_lines.update(held)
         for annotation in _annotations_of(node):
             end_line = annotation.end_lineno or annotation.lineno
             end_offset = annotation.end_col_offset or annotation.col_offset
@@ -138,11 +234,13 @@ def read_source_facts(source: str) -> SourceFacts:
         annotations=tuple(annotations),
         markers=_markers(source),
         statement_lines=statement_lines,
+        typing_decorator_lines=frozenset(typing_decorator_lines),
+        definitions=definitions,
     )
 
 
 def is_declaration(facts: SourceFacts, position: tuple[int, int]) -> bool:
-    """Whether a mutant's place is an annotation or a parameter marker.
+    """Whether a mutant's place is an annotation, a parameter marker or a typing decorator.
 
     Args:
         facts: The file's facts.
@@ -154,7 +252,8 @@ def is_declaration(facts: SourceFacts, position: tuple[int, int]) -> bool:
         the place is not code.
     """
     in_annotation = any(start <= position < end for start, end in facts.annotations)
-    return in_annotation or position in facts.markers
+    in_typing_decorator = position[0] in facts.typing_decorator_lines
+    return in_annotation or position in facts.markers or in_typing_decorator
 
 
 def coverage_line(facts: SourceFacts, line: int, recorded: frozenset[int]) -> int:
