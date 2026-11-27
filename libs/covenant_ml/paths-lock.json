@@ -1,0 +1,9 @@
+{
+  "members": {
+    "../cleargbm": "651360183494292e7e300d289bd042ae3d4f63d73b5d2bf1f73833e3d2da9aa9",
+    "../cleargbm_rs": "6dfafdb6cc8c363471e7d43d6d75ba05d0d8f669ce3adfd71f25e4d3243d78ba",
+    "../covenant_domain": "dff0143294b4b6bd45db011712b1c2e6698fc3792178142151a6c221db24e6d6",
+    "../platform_core": "079846cfa280f39dd74ff630029a7df44a7d70d16eba99444715764e30b6163a",
+    "../platform_ml": "4019ca89fa582607847914d6234d749a86b155c5336d571da83761b49da983e4"
+  }
+}
