@@ -256,6 +256,7 @@ class TestTheLanes:
             "announce",
             "research",
             "research-announce",
+            "host-target",
         )
         assert [tick.require_lane(name) for name in names] == [
             tick.Lane.HUB,
@@ -270,6 +271,7 @@ class TestTheLanes:
             tick.Lane.ANNOUNCE,
             tick.Lane.RESEARCH,
             tick.Lane.RESEARCH_ANNOUNCE,
+            tick.Lane.HOST_TARGET,
         ]
         assert all(type(tick.require_lane(name)) is tick.Lane for name in names)
         with pytest.raises(ValueError) as refused:
@@ -280,7 +282,7 @@ class TestTheLanes:
             "FLEET_TICK_USAGE: --lane is one of ['hub', 'hub-announce', 'sessions', "
             "'sessions-announce', 'netboot', 'netboot-announce', 'inspect', "
             "'inspect-announce', 'node', 'announce', "
-            "'research', 'research-announce'], "
+            "'research', 'research-announce', 'host-target'], "
             "not 'elevated'"
         )
 

@@ -17,6 +17,8 @@ Usage:
     poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
         --lane inspect --inspect-release <release>/MCPs --nodejs /usr/bin/node \\
         --workspace <workspace>
+    poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
+        --lane host-target --project osrs-lab/manual-desktop
 
 The command behind every fleet job of the MCPs hub runner (MCPs board task
 b27bd34a, ``scripts/fleet/hub-jobs.json``): its ``fleet-hub`` job runs the
@@ -41,8 +43,14 @@ the ``inspect`` lane as ``fleet-inspect-<that machine's name>``, with
 ``inspect-announce`` its check-in (MCPs board task 3e9c99af): the row names
 the installed fleet-audit release it inspects from, the node binary and the
 workspace whose registry names the roster, each lane's flags read from
-:data:`fleet.cli.agent_lanes.LANE_PLACES`. Each row runs this module with
-``poetry run`` in the fleet package's own environment.
+:data:`fleet.cli.agent_lanes.LANE_PLACES`. The ``osrs-desktop-update`` job,
+placed on the machine holding the control duty, runs the ``host-target``
+lane every hour for the project its ``--project`` names (MCPs board task
+7cd6036a): rolled's ``fleet-host-target`` (:mod:`fleet.cli.host_target`)
+runs that project's declared target on its node, acting as
+``fleet-host-target-<that machine's name>``, the identity a lease names.
+Each row runs this module with ``poetry run`` in the fleet package's own
+environment.
 
 WHAT A TICK DOES:
 
@@ -62,7 +70,9 @@ WHAT A TICK DOES:
 
 THE EXIT CODE IS THE AGENT'S. The agents exit 0 whenever they worked, refused
 jobs and failed suites included, so a non-zero means the tick itself broke
-and the hub runner's record of the run shows something real.
+and the hub runner's record of the run shows something real. The host
+target exits with make's status, so a host-target tick's non-zero is the
+target failing, which is what its row's record is read for.
 
 THE DEADLINES NEST. The agent's wall is one minute inside the row's
 40-minute deadline (:data:`fleet.cli.rolled.AGENT_WALL_SECONDS`); this
@@ -89,6 +99,7 @@ from platform_core.members import find_member
 from platform_core.report_line import emit_error_line, emit_line
 
 from fleet.cli import agent_lanes
+from fleet.cli import host_target as host_target_cli
 from fleet.cli import rolled as rolled_cli
 from fleet.contracts.dispatch import DispatchLane
 from fleet.core import _test_hooks, names
@@ -97,13 +108,9 @@ API_ROOT_FLAG: Final = "--api-root"
 LOG_DIRECTORY_FLAG: Final = "--log-directory"
 LANE_FLAG: Final = "--lane"
 NODE_FLAG: Final = "--node"
-_FLAGS: Final = (
-    API_ROOT_FLAG,
-    LOG_DIRECTORY_FLAG,
-    LANE_FLAG,
-    NODE_FLAG,
-    *agent_lanes.PLACE_FLAGS,
-)
+#: The project whose host target a host-target tick runs, the host target's
+#: own flag, which the tick hands it unchanged.
+PROJECT_FLAG: Final = host_target_cli.PROJECT_FLAG
 
 
 class Lane(StrEnum):
@@ -121,6 +128,7 @@ class Lane(StrEnum):
     ANNOUNCE = "announce"
     RESEARCH = "research"
     RESEARCH_ANNOUNCE = "research-announce"
+    HOST_TARGET = "host-target"
 
 
 #: The ticks ``fleet-agent`` runs, each a duty's tick or its one-time
@@ -157,8 +165,8 @@ _ANNOUNCE_LANES: Final[frozenset[Lane]] = frozenset(
 SESSIONS_NAMESPACE: Final = uuid.NAMESPACE_URL
 
 
-def runner_identity(lane: DispatchLane, alias: str) -> tuple[str, str]:
-    """The label and session id a machine's ``fleet-agent`` runner acts as.
+def runner_identity(lane: DispatchLane | Lane, alias: str) -> tuple[str, str]:
+    """The label and session id a machine's duty runner acts as.
 
     Derived from the queue lane its duty claims and the machine's alias, as
     a node runner's are from the alias
@@ -167,11 +175,12 @@ def runner_identity(lane: DispatchLane, alias: str) -> tuple[str, str]:
     good, and a duty moving to another machine gives that machine its own.
     Until MCPs board task c39ee056 the one hub was austinpc, whose fixed
     pair, ``fleet-runner-austinpc`` and session a850f688, is bound for good
-    and so is not reused.
+    and so is not reused. The host-target tick claims no queue lane and is
+    named by its own lane alike (MCPs board task 7cd6036a).
 
     Args:
         lane: The queue lane the duty claims, one of :data:`_AGENT_LANES`'
-            values: hub, sessions or netboot. The node lane's runner is
+            values, or :attr:`Lane.HOST_TARGET`. The node lane's runner is
             ``fleet-node-agent``, named by ``node_identity``.
         alias: The machine's registry name.
 
@@ -221,7 +230,8 @@ class TickPlan(TypedDict):
         arguments: Everything after ``python -m fleet.cli.rolled``.
         stem: The log name before its date: ``fleet-agent`` for the hub,
             ``fleet-sessions-<alias>`` for the sessions runner,
-            ``fleet-netboot-<alias>`` for the netboot runner and
+            ``fleet-netboot-<alias>`` for the netboot runner,
+            ``fleet-host-target-<alias>`` for the host-target runner and
             ``fleet-node-<alias>`` for a node, each shared by its announce.
         header: What the ``TICK START`` line names after its time.
     """
@@ -239,28 +249,43 @@ _PLACED_LANES: Final[Mapping[Lane, DispatchLane]] = {
     Lane.INSPECT: DispatchLane.INSPECT,
 }
 
+#: The flags each tick hands its agent, which it requires, and why every
+#: other tick refuses those of them it does not read itself: each placed
+#: lane's places and the host-target lane's project. Every other tick hands
+#: none.
+_HANDED_FLAGS: Final[Mapping[Lane, tuple[tuple[str, ...], str]]] = {
+    **{lane: agent_lanes.LANE_PLACES[placed][:2] for lane, placed in _PLACED_LANES.items()},
+    Lane.HOST_TARGET: ((PROJECT_FLAG,), "only a host-target tick runs a project's target"),
+}
 
-def _place_arguments(lane: Lane, given: Mapping[str, str]) -> tuple[str, ...]:
-    """The flags a placed lane's tick hands the agent, and nothing for any other.
+#: Every flag a tick hands its agent, each once, in the parser's order.
+HANDED_FLAGS: Final[tuple[str, ...]] = tuple(
+    sorted({flag for flags, _ in _HANDED_FLAGS.values() for flag in flags})
+)
+
+_FLAGS: Final = (API_ROOT_FLAG, LOG_DIRECTORY_FLAG, LANE_FLAG, NODE_FLAG, *HANDED_FLAGS)
+
+
+def _handed_arguments(lane: Lane, given: Mapping[str, str]) -> tuple[str, ...]:
+    """The flags a lane's tick hands the agent, and nothing for any other.
 
     Args:
         lane: Which tick this is.
-        given: The tick's own values of
-            :data:`fleet.cli.agent_lanes.PLACE_FLAGS`.
+        given: The tick's own values of :data:`HANDED_FLAGS`.
 
     Returns:
         Each of the lane's own flags and its value, in that order, for a
-        placed lane; an empty tuple for every other lane.
+        placed or host-target lane; an empty tuple for every other lane.
 
     Raises:
-        ValueError: ``FLEET_TICK_USAGE`` when a placed lane lacks one of its
-            flags, or any lane is given a flag only another reads.
+        ValueError: ``FLEET_TICK_USAGE`` when a lane lacks one of its flags,
+            or any lane is given a flag only another reads.
     """
-    placed = _PLACED_LANES.get(lane)
-    own = () if placed is None else agent_lanes.LANE_PLACES[placed][0]
+    handed = _HANDED_FLAGS.get(lane)
+    own = () if handed is None else handed[0]
     # The lane's own entry leaves nothing once its own flags are taken out,
     # so every entry is read alike.
-    for flags, why, _ in agent_lanes.LANE_PLACES.values():
+    for flags, why in _HANDED_FLAGS.values():
         foreign = [flag for flag in flags if flag in given and flag not in own]
         if foreign:
             raise ValueError(
@@ -338,8 +363,52 @@ def _agent_plan(
     )
 
 
+def _host_target_plan(api_root: pathlib.Path, node: str | None, project: str) -> TickPlan:
+    """Plan a host-target tick: one run of a project's declared host target.
+
+    The tick runs on the machine holding the control duty, named by its
+    hostname, which is where the hub's mirrors and records are; the node the
+    target runs on is the project's registry entry's, never the tick's.
+
+    Args:
+        api_root: The API checkout.
+        node: The tick's ``--node``, which this lane refuses.
+        project: The project key its ``--project`` names.
+
+    Returns:
+        The launcher's command line, the runner's label as the log stem and
+        the lane and project as the record's header.
+
+    Raises:
+        ValueError: ``FLEET_TICK_USAGE`` when the tick names a node.
+    """
+    if node is not None:
+        raise ValueError(
+            f"FLEET_TICK_USAGE: the {Lane.HOST_TARGET.value} lane takes no {NODE_FLAG}; the "
+            "node a host target runs on is its project's registry entry's"
+        )
+    label, session = runner_identity(Lane.HOST_TARGET, _test_hooks.hostname())
+    return TickPlan(
+        arguments=(
+            rolled_cli.REPO_ROOT_FLAG,
+            str(api_root),
+            rolled_cli.AGENT_FLAG,
+            rolled_cli.HOST_TARGET_AGENT,
+            rolled_cli.SEPARATOR,
+            host_target_cli.AGENT_FLAG,
+            label,
+            host_target_cli.SESSION_FLAG,
+            session,
+            PROJECT_FLAG,
+            project,
+        ),
+        stem=label,
+        header=f"{Lane.HOST_TARGET.value} {project}",
+    )
+
+
 def plan_tick(
-    api_root: pathlib.Path, lane: Lane, node: str | None, places: Mapping[str, str]
+    api_root: pathlib.Path, lane: Lane, node: str | None, handed: Mapping[str, str]
 ) -> TickPlan:
     """Plan one lane's tick.
 
@@ -347,22 +416,25 @@ def plan_tick(
         api_root: The API checkout.
         lane: Which tick this is.
         node: The machine's alias for the node and sessions lanes; None for
-            the hub, netboot and inspect lanes.
-        places: The tick's own values of
-            :data:`fleet.cli.agent_lanes.PLACE_FLAGS`, which a placed lane
-            hands the agent its own of and every lane refuses another's.
+            the hub, netboot, inspect and host-target lanes.
+        handed: The tick's own values of :data:`HANDED_FLAGS`, which a
+            placed or host-target lane hands the agent its own of and every
+            lane refuses another's.
 
     Returns:
         The launcher's command line, the log stem and the record's header.
 
     Raises:
-        ValueError: ``FLEET_TICK_USAGE`` when a hub, netboot or inspect lane
-            names a node, a node or sessions lane names none, or a placed
-            lane's flags are missing from it or given to another.
+        ValueError: ``FLEET_TICK_USAGE`` when a hub, netboot, inspect or
+            host-target lane names a node, a node or sessions lane names
+            none, or a lane's handed flags are missing from it or given to
+            another.
     """
     repo = str(api_root)
     announce = ("--announce",) if lane in _ANNOUNCE_LANES else ()
-    arms = _place_arguments(lane, places)
+    arms = _handed_arguments(lane, handed)
+    if lane is Lane.HOST_TARGET:
+        return _host_target_plan(api_root, node, handed[PROJECT_FLAG])
     agent_lane = _AGENT_LANES.get(lane)
     if agent_lane is not None:
         return _agent_plan(api_root, lane, agent_lane, node, (*arms, *announce))
@@ -424,8 +496,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     api_root = pathlib.Path(cli_args.require_flag(parsed, API_ROOT_FLAG))
     log_directory = pathlib.Path(cli_args.require_flag(parsed, LOG_DIRECTORY_FLAG))
     lane = require_lane(cli_args.require_flag(parsed, LANE_FLAG))
-    places = {flag: parsed[flag] for flag in agent_lanes.PLACE_FLAGS if flag in parsed}
-    plan = plan_tick(api_root, lane, parsed.get(NODE_FLAG), places)
+    handed = {flag: parsed[flag] for flag in HANDED_FLAGS if flag in parsed}
+    plan = plan_tick(api_root, lane, parsed.get(NODE_FLAG), handed)
     env_file = api_root / ENV_FILE
     credentials = tuple(
         parse_env_file(_test_hooks.read_text(env_file), source=str(env_file)).items()
@@ -460,9 +532,11 @@ def entrypoint() -> None:
 __all__ = [
     "API_ROOT_FLAG",
     "ENV_FILE",
+    "HANDED_FLAGS",
     "LANE_FLAG",
     "LOG_DIRECTORY_FLAG",
     "NODE_FLAG",
+    "PROJECT_FLAG",
     "RETENTION_DAYS",
     "SESSIONS_NAMESPACE",
     "TICK_WALL_SECONDS",

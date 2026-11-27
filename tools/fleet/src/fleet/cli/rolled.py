@@ -68,13 +68,16 @@ _FLAGS: Final = (REPO_ROOT_FLAG, AGENT_FLAG)
 #: Where the launcher's own flags end and the agent's begin.
 SEPARATOR: Final = "--"
 
+#: The console-script name of a project's host target, which the host-target
+#: tick runs every hour (MCPs board tasks 57791f39 and 7cd6036a).
+HOST_TARGET_AGENT: Final = "fleet-host-target"
+
 #: The agents a tick may run, by console-script name, and the module each is.
 AGENT_MODULES: Final[dict[str, str]] = {
     "fleet-agent": "fleet.cli.agent",
     "fleet-node-agent": "fleet.cli.node_agent",
     "fleet-research": "fleet.cli.research",
-    # A project's host target, run hourly by the hub (MCPs board task 57791f39).
-    "fleet-host-target": "fleet.cli.host_target",
+    HOST_TARGET_AGENT: "fleet.cli.host_target",
 }
 
 #: The agent's deadline: one minute inside the 40-minute deadline
@@ -309,6 +312,7 @@ __all__ = [
     "AGENT_FLAG",
     "AGENT_MODULES",
     "AGENT_WALL_SECONDS",
+    "HOST_TARGET_AGENT",
     "LOG_ENCODING",
     "LOG_ERRORS",
     "NODE_AGENT",
