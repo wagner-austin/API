@@ -1,6 +1,6 @@
 {
   "worker_ram_gb": 0.5,
-  "minimum_workers": 4,
+  "minimum_workers": 8,
   "expected_minutes": 15,
   "required_tags": [
     "gpu"
