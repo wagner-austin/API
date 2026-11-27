@@ -170,22 +170,27 @@ class HubAndNode:
     Satisfies :class:`~fleet.core._test_hooks.RunProtocol`. The hub's git
     is given ``url.<repository>.insteadOf <REMOTE>`` through git's own
     ``GIT_CONFIG_*`` variables, so its real fetch of the registry's https
-    remote reads the case's repository; every ssh runs here without
-    :data:`MAKE_VARIABLES`.
+    remote reads the case's repository; every ssh and scp runs here without
+    :data:`MAKE_VARIABLES`, or, for a node that does not answer, ends as
+    ssh ends when it cannot connect.
 
     Attributes:
         repo: The repository the remote stands for.
+        reachable: Whether the node answers.
     """
 
     repo: pathlib.Path
+    reachable: bool
 
-    def __init__(self, repo: pathlib.Path) -> None:
-        """Route to one repository.
+    def __init__(self, repo: pathlib.Path, *, reachable: bool) -> None:
+        """Route to one repository and one node.
 
         Args:
             repo: The repository the remote stands for.
+            reachable: Whether the node answers.
         """
         self.repo = repo
+        self.reachable = reachable
 
     def __call__(
         self,
@@ -221,6 +226,9 @@ class HubAndNode:
                 unset_env=unset_env,
                 set_env=(*set_env, *redirect),
             )
+        if not self.reachable:
+            # ssh's own status and words for a refused connection.
+            return failed(255, "ssh: connect to host lavender port 22: Connection refused")
         return on_this_machine(
             argv,
             timeout_seconds=timeout_seconds,
@@ -243,7 +251,7 @@ def _hub(tmp_path: pathlib.Path) -> tuple[pathlib.Path, str]:
     repo, head = _remote(tmp_path)
     pin_clock(DEMO_NOW)
     _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
-    _test_hooks.run = HubAndNode(repo)
+    _test_hooks.run = HubAndNode(repo, reachable=True)
     return repo, head
 
 
@@ -362,7 +370,7 @@ class TestTheDeadline:
         target = names.dispatch_directory(stage, RUN_ID)
         (pathlib.Path(target) / "desk").mkdir(parents=True)
         (pathlib.Path(target) / "desk" / "Makefile").write_text(MAKEFILE, encoding="utf-8")
-        _test_hooks.run = HubAndNode(tmp_path / "remote")
+        _test_hooks.run = HubAndNode(tmp_path / "remote", reachable=True)
         node = _config.load_workspace(
             {_config.CONFIG_FLAG: str(_registry(tmp_path, host_target_entry=_entry("slow")))}
         ).workspace["nodes"]["lavender"]
@@ -394,33 +402,13 @@ class TestTheDeadline:
         )
 
 
-def _ssh_refused(
-    argv: Sequence[str],
-    *,
-    timeout_seconds: int,
-    stdin_bytes: bytes | None = None,
-    unset_env: Sequence[str] = (),
-    set_env: Sequence[tuple[str, str]] = (),
-) -> _test_hooks.CommandResult:
-    """The hub's git runs; every ssh fails as an unreachable node's does."""
-    if argv[0] == "ssh":
-        return failed(255, "ssh: connect to host lavender port 22: Connection refused")
-    return _test_hooks._default_run(
-        argv,
-        timeout_seconds=timeout_seconds,
-        stdin_bytes=stdin_bytes,
-        unset_env=unset_env,
-        set_env=set_env,
-    )
-
-
 class TestAFailureAfterTheLease:
     def test_an_unreachable_node_gives_the_lease_back_and_leaves_the_retire_owed(
         self, tmp_path: pathlib.Path, hub: tuple[pathlib.Path, str]
     ) -> None:
         registry = _registry(tmp_path, host_target_entry=_entry("pass"))
         runs = registry.parent / "runs"
-        _test_hooks.run = _ssh_refused
+        _test_hooks.run = HubAndNode(hub[0], reachable=False)
 
         with pytest.raises(AppError) as raised:
             host_target_cli.main(_argv(registry))
@@ -453,7 +441,7 @@ class TestAFailureAfterTheLease:
             ),
             now_unix=DEMO_NOW - 60,
         )
-        _test_hooks.run = _ssh_refused
+        _test_hooks.run = HubAndNode(hub[0], reachable=False)
 
         with pytest.raises(AppError) as raised:
             host_target_cli.main(_argv(registry))

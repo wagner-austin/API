@@ -24,11 +24,14 @@ def on_this_machine(
     unset_env: Sequence[str] = (),
     set_env: Sequence[tuple[str, str]] = (),
 ) -> _test_hooks.CommandResult:
-    """Carry out an ssh to the node here: its remote words, run by ``sh``.
+    """Carry out an ssh or an scp to the node here.
 
-    Everything after the destination is what ssh hands the far side's shell,
-    so ``sh -c`` of those words joined is what the node runs. An ssh must
-    carry the package's own options, exactly as the transport sends them.
+    Everything after an ssh's destination is what ssh hands the far side's
+    shell, so ``sh -c`` of those words joined is what the node runs. An scp
+    (:func:`fleet.core.remote.send_file`) copies its source to the path after
+    the destination's colon, so ``cp`` of the two is what lands on the node.
+    Each must carry the package's own options, exactly as the transport sends
+    them.
 
     Args:
         argv: The command the code under test ran.
@@ -41,19 +44,19 @@ def on_this_machine(
         What the command, or the node's script, did here.
     """
     words = list(argv)
-    if words[:1] != ["ssh"]:
-        return _test_hooks._default_run(
-            words,
-            timeout_seconds=timeout_seconds,
-            stdin_bytes=stdin_bytes,
-            unset_env=unset_env,
-            set_env=set_env,
-        )
-    prefix = ["ssh", *SSH_OPTIONS]
-    assert words[: len(prefix)] == prefix
-    remote = words[len(prefix) + 1 :]
+    if words[:1] == ["scp"]:
+        copy = ["scp", "-q", *SSH_OPTIONS]
+        assert words[: len(copy)] == copy
+        source, destination = words[len(copy) :]
+        here = ("cp", source, destination.split(":", 1)[1])
+    elif words[:1] == ["ssh"]:
+        prefix = ["ssh", *SSH_OPTIONS]
+        assert words[: len(prefix)] == prefix
+        here = ("sh", "-c", " ".join(words[len(prefix) + 1 :]))
+    else:
+        here = tuple(words)
     return _test_hooks._default_run(
-        ("sh", "-c", " ".join(remote)),
+        here,
         timeout_seconds=timeout_seconds,
         stdin_bytes=stdin_bytes,
         unset_env=unset_env,
