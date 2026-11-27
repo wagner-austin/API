@@ -13,15 +13,6 @@
           "poetry",
           "-C",
           "tools/code-style-eval",
-          "lock"
-        ]
-      },
-      {
-        "phase": "deps",
-        "argv": [
-          "poetry",
-          "-C",
-          "tools/code-style-eval",
           "sync",
           "--no-cache",
           "--with",
