@@ -150,7 +150,7 @@ def command_lines(text: str) -> list[tuple[int, str]]:
         if not line.startswith("\t"):
             continue
         body = recipe_body(line)
-        if body != "" and not body.startswith("#") and ECHO_LINE.match(body) is None:
+        if body and not body.startswith("#") and ECHO_LINE.match(body) is None:
             found.append((number, body))
     return found
 
