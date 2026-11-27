@@ -1,0 +1,7 @@
+{
+  "members": {
+    "../../libs/platform_core": "079846cfa280f39dd74ff630029a7df44a7d70d16eba99444715764e30b6163a",
+    "../../libs/platform_stt": "2fe0e7306aac24ab960c648c50ca4b87e3fbee7d30c848f362077a0a8cfb6b6b",
+    "../../libs/platform_workers": "533fa5bb70af32094752742109a9c5fc5b94b8d4980d3559534f0ad77f8a6638"
+  }
+}
