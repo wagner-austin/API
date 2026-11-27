@@ -15,15 +15,6 @@
           "poetry",
           "-C",
           "services/grandma-api",
-          "lock"
-        ]
-      },
-      {
-        "phase": "deps",
-        "argv": [
-          "poetry",
-          "-C",
-          "services/grandma-api",
           "sync",
           "--no-cache",
           "--with",

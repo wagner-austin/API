@@ -15,15 +15,6 @@
           "poetry",
           "-C",
           "services/covenant-radar-api",
-          "lock"
-        ]
-      },
-      {
-        "phase": "deps",
-        "argv": [
-          "poetry",
-          "-C",
-          "services/covenant-radar-api",
           "sync",
           "--no-cache",
           "--with",

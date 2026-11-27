@@ -15,15 +15,6 @@
           "poetry",
           "-C",
           "services/Model-Trainer",
-          "lock"
-        ]
-      },
-      {
-        "phase": "deps",
-        "argv": [
-          "poetry",
-          "-C",
-          "services/Model-Trainer",
           "sync",
           "--no-cache",
           "--with",
