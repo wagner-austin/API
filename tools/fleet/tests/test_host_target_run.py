@@ -37,7 +37,16 @@ from tests._git_fixtures import git
 from tests._on_this_machine import on_this_machine
 from tests._registry import write_registry
 from tests._roster_fixtures import machine_document, machines_of
-from tests.conftest import DEMO_NOW, FakeRun, FakeTempRoot, failed, pin_clock, workspace_document
+from tests._toolchain_fixtures import node
+from tests.conftest import (
+    DEMO_NOW,
+    FakeRun,
+    FakeTempRoot,
+    failed,
+    ok,
+    pin_clock,
+    workspace_document,
+)
 
 #: The project the cases run, and the remote its registry line declares.
 PROJECT = "games/desk"
@@ -361,6 +370,21 @@ class TestARealRun:
         assert raised.value.code == 0
         assert _kinds(registry) == [FeedKind.LEASED, FeedKind.STAGED, FeedKind.PASSED]
 
+    def test_run_under_any_other_name_it_runs_nothing(self) -> None:
+        """Only ``__main__`` starts it: under ``__a__``, a name sorting before
+        it, the module's body runs and nothing else, so no command is run and
+        no ``SystemExit`` comes from a parse of pytest's own argv."""
+        nothing = FakeRun([])
+        _test_hooks.run = nothing
+        saved_module = sys.modules.pop("fleet.cli.host_target", None)
+        try:
+            runpy.run_module("fleet.cli.host_target", run_name="__a__", alter_sys=False)
+        finally:
+            if saved_module is not None:
+                sys.modules["fleet.cli.host_target"] = saved_module
+
+        assert nothing.calls == []
+
 
 class TestTheDeadline:
     def test_a_target_outliving_its_deadline_is_stopped_with_timeout_s_status(
@@ -371,14 +395,13 @@ class TestTheDeadline:
         (pathlib.Path(target) / "desk").mkdir(parents=True)
         (pathlib.Path(target) / "desk" / "Makefile").write_text(MAKEFILE, encoding="utf-8")
         _test_hooks.run = HubAndNode(tmp_path / "remote", reachable=True)
-        node = _config.load_workspace(
-            {_config.CONFIG_FLAG: str(_registry(tmp_path, host_target_entry=_entry("slow")))}
-        ).workspace["nodes"]["lavender"]
+        lavender = node()
+        lavender["stage_root"] = stage
         declared = HostTarget(target="slow", node="lavender", workers=1, deadline_seconds=1)
 
         began = time.monotonic()
         ran = host_target.run_on_node(
-            node, run_id=RUN_ID, target=target, path="desk", host_target=declared
+            lavender, run_id=RUN_ID, target=target, path="desk", host_target=declared
         )
         took = time.monotonic() - began
 
@@ -392,6 +415,20 @@ class TestTheDeadline:
         assert host_target.describe(ran, declared) == (
             "stopped at its deadline of 1 s (timeout exited 124)"
         )
+
+    def test_the_transport_waits_out_the_deadline_the_kill_and_its_own_bound(self) -> None:
+        nodes = FakeRun([ok(""), ok(f"{host_target.STATUS_WORD} 0\n")])
+        _test_hooks.run = nodes
+        declared = HostTarget(target="pass", node="lavender", workers=1, deadline_seconds=60)
+
+        host_target.run_on_node(
+            node(), run_id=RUN_ID, target="/stage/run", path="desk", host_target=declared
+        )
+
+        # The script's send, then its run: 60 s of deadline, timeout's 30 s
+        # kill and ssh's own 120 s bound, worked by hand.
+        assert len(nodes.calls) == 2
+        assert nodes.timeouts[1] == 210
 
     def test_a_target_that_outlives_term_is_described_by_kill_s_status(self) -> None:
         declared = HostTarget(target="slow", node="lavender", workers=1, deadline_seconds=60)

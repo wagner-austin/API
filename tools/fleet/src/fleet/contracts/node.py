@@ -499,7 +499,7 @@ def decode_node_name(value: JSONValue, *, field: str) -> str:
             pinned to no name is a misspelt declaration, and would run
             nowhere.
     """
-    if not isinstance(value, str) or value == "":
+    if not isinstance(value, str) or not value:
         raise JSONTypeError(
             f"{field} must be a node's registry name, got {value!r}; an empty or non-string "
             "name would run the work nowhere"
