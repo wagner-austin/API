@@ -1,6 +1,6 @@
 {
   "worker_ram_gb": 1.6,
-  "minimum_workers": 2,
+  "minimum_workers": 4,
   "expected_minutes": 16,
   "required_tags": [
     "rust"
