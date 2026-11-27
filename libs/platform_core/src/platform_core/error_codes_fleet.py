@@ -80,6 +80,10 @@ class FleetErrorCode(ErrorCodeBase):
     # because the node is the right kind and still never the answer: only
     # the named node is.
     NODE_NOT_PINNED = "NODE_NOT_PINNED"
+    # A host target was asked of a project whose registry entry declares none
+    # (MCPs board task 57791f39): its node, workers and deadline are written
+    # nowhere, so there is no node whose account the target could run on.
+    HOST_TARGET_UNDECLARED = "HOST_TARGET_UNDECLARED"
     # The session ledger's fleet arm (MCPs board task 5a3865bf). The agent
     # reads a node's ~/.claude/sessions/<pid>.json records over ssh and hands
     # them to `task_session_observe`. A record that is not the shape the
