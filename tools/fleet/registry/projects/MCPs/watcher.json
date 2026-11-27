@@ -1,6 +1,11 @@
 {
   "worker_ram_gb": 0.5,
   "minimum_workers": 2,
+  "mutation_checker": {
+    "heap_mb": 1500,
+    "ram_gb": 1.75,
+    "measurement": "colossus 2026-11-27, MCPs 7e2334dedbc473f1399bf4477fe1db9df5dd51da, StrykerJS 10.1.1: one TypeScript checker finished src/actions/transcribe-meeting/other-sources.ts (70 mutants) at a 1200 MB heap cap in 109.61 s; maximum child RSS 1343028 KiB. Command runner measures memory only, not mutation acceptance. heap_mb adds 25 percent margin; ram_gb exceeds the cap in GiB plus 0.25 GiB. Artifacts: colossus:/home/corvis/watcher-checker-measure-01a2/{checker-1200.json,checker-1200.log,report-1200.json,receipt-1200.json}; board task b981e62b."
+  },
   "expected_minutes": 15,
   "exclusive_resources": [
     "corvis-fleet-testdb"
@@ -12,6 +17,7 @@
   "source": {
     "remote": "https://github.com/wagner-austin/MCPs.git",
     "path": "watcher",
+    "base_branch": "main",
     "install": [
       {
         "phase": "install",
