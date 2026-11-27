@@ -249,6 +249,7 @@ _PLACED_LANES: Final[Mapping[Lane, DispatchLane]] = {
     Lane.INSPECT: DispatchLane.INSPECT,
 }
 
+
 def _place_flags(placed: DispatchLane) -> tuple[tuple[str, ...], str]:
     """A placed lane's flags and why every other lane refuses them.
 
