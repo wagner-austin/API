@@ -35,7 +35,7 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_research_final.py"
   - "libs/covenant_ml/tests/markets/test_crsp_final.py"
 source_git_blobs:
-  "libs/covenant_ml/Makefile": "ad7d5dbde8c784bb781e5de8cc764eed2c506cd0"
+  "libs/covenant_ml/Makefile": "0a0fa592672fd070964ed346daeb5ecc74451fde"
   "libs/covenant_ml/tests/markets/test_research_proposals_cli.py": "ab6a5c10d03eaaf5703f5c4d1a3928a354f38720"
   "libs/covenant_ml/src/covenant_ml/markets/research_selection_report.py": "ac537055599f353fae294d9f01310a6e0a40d1eb"
   "libs/covenant_ml/src/covenant_ml/markets/research_ranking.py": "ca12a77ffe77312243c3f2d8b7671245587fd00c"
