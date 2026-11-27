@@ -465,6 +465,15 @@ class MaketoolsErrorCode(ErrorCodeBase):
     # not named in DROP (MCPs board task f2f89c69). Nothing moved.
     ALIGN = "MAKETOOLS_ALIGN"
 
+    # A package's ``poetry.lock`` is not the one its declarations resolve
+    # to: ``poetry check --lock`` refuses it against the package's own
+    # ``pyproject.toml``, or a path dependency's declared dependencies are
+    # not the ones ``paths-lock.json`` records the lock was resolved against
+    # (MCPs board task 972ea464). A check verifies the committed lock and
+    # never re-resolves it, so the fix is ``run.py lock`` in that package and
+    # a commit of both files.
+    LOCK_STALE = "MAKETOOLS_LOCK_STALE"
+
 
 class MutationErrorCode(ErrorCodeBase):
     """What the mutation step of ``tools/maketools`` refuses (MCPs board task e52e5148).
