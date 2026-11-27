@@ -20,10 +20,19 @@ lint:
 # .coverage: two overlapping runs would corrupt one file, and several
 # sessions work this repo at once. The launcher owns the token and the
 # scoped cleanup; see src/maketools/test_run.py.
+#
+# --mutation (MCPs board task e52e5148, here since board task db8de318):
+# after a passing suite the launcher mutates the src lines this commit adds
+# against origin/main with cosmic-ray, runs each mutant by the tests that
+# ran its line, and fails naming every mutant they leave alive. That covers
+# the mutation core this package lifts from MCPs, so a re-lift is mutated
+# by this package's own tests. Its time is held to its own bound, not the
+# five minutes; the fleet stages origin/main because this package's
+# registry entry declares base_branch main.
 test:
 	poetry lock
 	poetry sync --no-cache --with dev
-	$(PYTHON) scripts/run.py test
+	$(PYTHON) scripts/run.py test --mutation
 
 # Every package's check runs under the five-minute budget (MCPs board task
 # 1b152218): check-budget runs _check-unbudgeted, the old prerequisites,
