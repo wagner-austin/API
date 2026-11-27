@@ -13,15 +13,6 @@
           "poetry",
           "-C",
           "libs/platform_ml",
-          "lock"
-        ]
-      },
-      {
-        "phase": "deps",
-        "argv": [
-          "poetry",
-          "-C",
-          "libs/platform_ml",
           "sync",
           "--no-cache",
           "--with",

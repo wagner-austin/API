@@ -16,15 +16,6 @@
           "poetry",
           "-C",
           "libs/covenant_nn",
-          "lock"
-        ]
-      },
-      {
-        "phase": "deps",
-        "argv": [
-          "poetry",
-          "-C",
-          "libs/covenant_nn",
           "sync",
           "--no-cache",
           "--with",

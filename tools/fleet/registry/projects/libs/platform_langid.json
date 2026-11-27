@@ -13,15 +13,6 @@
           "poetry",
           "-C",
           "libs/platform_langid",
-          "lock"
-        ]
-      },
-      {
-        "phase": "deps",
-        "argv": [
-          "poetry",
-          "-C",
-          "libs/platform_langid",
           "sync",
           "--no-cache",
           "--with",
