@@ -272,6 +272,24 @@ def selection(contexts: frozenset[str] | None) -> tuple[str, ...] | None:
     return tuple(sorted({node_id(name) for name in contexts if name}))
 
 
+def line_tests(
+    facts: SourceFacts, line: int, recorded: Mapping[int, frozenset[str]]
+) -> tuple[str, ...] | None:
+    """The tests a mutant on one line runs, from the coverage of the line standing for it.
+
+    Args:
+        facts: The mutant's file's facts.
+        line: The mutant's line.
+        recorded: Each line coverage recorded in that file, to its contexts.
+
+    Returns:
+        As :func:`selection` gives for the line :func:`~.sites.coverage_line`
+        names: None when coverage did not record it, the empty tuple when
+        it ran only outside a test, else the tests that ran it.
+    """
+    return selection(recorded.get(coverage_line(facts, line, frozenset(recorded))))
+
+
 class Judged(NamedTuple):
     """What judging the chosen mutants found.
 
@@ -389,8 +407,7 @@ def _choose(
     for site in on_added:
         if site not in declared:
             recorded = contexts.get(site.path, {})
-            line = coverage_line(facts[site.path], site.line, frozenset(recorded))
-            chosen.append((site, selection(recorded.get(line))))
+            chosen.append((site, line_tests(facts[site.path], site.line, recorded)))
     sources = {path: text.splitlines() for path, text in texts.items()}
     return chosen, len(declared), sources
 
@@ -532,6 +549,7 @@ __all__ = [
     "changed_sources",
     "differing_from_head",
     "enumerate_sites",
+    "line_tests",
     "node_id",
     "package_sources",
     "read_contexts",
