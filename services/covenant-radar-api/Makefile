@@ -22,7 +22,7 @@ lint: _lint-prep _lint-guard _lint-mypy
 _deps: native-deps
 	$(MAKETOOLS) require-tool poetry "Install it with pipx: pip install pipx, then pipx install poetry"
 	$(MAKETOOLS) venv-check
-	poetry lock
+	$(MAKETOOLS) lock-check
 	poetry sync --no-cache --with dev
 
 # The two steps that REWRITE sources (ruff's fixes and its formatter), which
