@@ -103,7 +103,7 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
     ),
     RequiredTool(
         name="poetry",
-        reason="every Makefile's lint and test targets run poetry lock and poetry sync",
+        reason="every Makefile's lint and test targets run poetry check --lock and poetry sync",
         install={
             "pip": f"python -m pip install --user poetry=={PINNED_POETRY}",
             "pipx": f"pipx install poetry=={PINNED_POETRY}",
