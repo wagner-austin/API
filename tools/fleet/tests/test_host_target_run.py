@@ -157,39 +157,93 @@ def _argv(registry: pathlib.Path) -> list[str]:
     ]
 
 
-def _as_a_node_s_login(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Leave out the make variables this suite inherits from its own ``make check``.
+#: The make variables this suite inherits from its own ``make check``. A node
+#: runs its script in ssh's fresh login, which carries none of them; inherited,
+#: ``MAKELEVEL`` makes the target's make print ``make[1]: Entering directory``
+#: lines, measured with GNU make on 2026-11-27.
+MAKE_VARIABLES = ("MAKELEVEL", "MAKEFLAGS", "MFLAGS")
 
-    A node runs the script in ssh's fresh login, which carries none of them;
-    inherited here, ``MAKELEVEL`` makes the target's make print ``make[1]:
-    Entering directory`` lines, measured with GNU make on 2026-11-27.
 
-    Args:
-        monkeypatch: Removes them for this case.
+class HubAndNode:
+    """The hub's git against a real repository, and each ssh carried out here as a node's login.
+
+    Satisfies :class:`~fleet.core._test_hooks.RunProtocol`. The hub's git
+    is given ``url.<repository>.insteadOf <REMOTE>`` through git's own
+    ``GIT_CONFIG_*`` variables, so its real fetch of the registry's https
+    remote reads the case's repository; every ssh runs here without
+    :data:`MAKE_VARIABLES`.
+
+    Attributes:
+        repo: The repository the remote stands for.
     """
-    for name in ("MAKELEVEL", "MAKEFLAGS", "MFLAGS"):
-        monkeypatch.delenv(name, raising=False)
+
+    repo: pathlib.Path
+
+    def __init__(self, repo: pathlib.Path) -> None:
+        """Route to one repository.
+
+        Args:
+            repo: The repository the remote stands for.
+        """
+        self.repo = repo
+
+    def __call__(
+        self,
+        argv: Sequence[str],
+        *,
+        timeout_seconds: int,
+        stdin_bytes: bytes | None = None,
+        unset_env: Sequence[str] = (),
+        set_env: Sequence[tuple[str, str]] = (),
+    ) -> _test_hooks.CommandResult:
+        """Run one command as the hub or the node would.
+
+        Args:
+            argv: The command.
+            timeout_seconds: Its deadline.
+            stdin_bytes: Its standard input.
+            unset_env: Variables it withholds.
+            set_env: Variables it sets.
+
+        Returns:
+            What it did here.
+        """
+        if argv[0] == "git":
+            redirect = (
+                ("GIT_CONFIG_COUNT", "1"),
+                ("GIT_CONFIG_KEY_0", f"url.{self.repo.as_posix()}.insteadOf"),
+                ("GIT_CONFIG_VALUE_0", REMOTE),
+            )
+            return _test_hooks._default_run(
+                argv,
+                timeout_seconds=timeout_seconds,
+                stdin_bytes=stdin_bytes,
+                unset_env=unset_env,
+                set_env=(*set_env, *redirect),
+            )
+        return on_this_machine(
+            argv,
+            timeout_seconds=timeout_seconds,
+            stdin_bytes=stdin_bytes,
+            unset_env=(*unset_env, *MAKE_VARIABLES),
+            set_env=set_env,
+        )
 
 
 @pytest.fixture(name="hub")
-def _hub(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> tuple[pathlib.Path, str]:
+def _hub(tmp_path: pathlib.Path) -> tuple[pathlib.Path, str]:
     """Point the registry's remote at a real repository and carry ssh out here.
 
     Args:
         tmp_path: The case's directory.
-        monkeypatch: Sets git's ``insteadOf`` for this case's process.
 
     Returns:
         The repository and its head.
     """
     repo, head = _remote(tmp_path)
-    _as_a_node_s_login(monkeypatch)
-    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
-    monkeypatch.setenv("GIT_CONFIG_KEY_0", f"url.{repo.as_posix()}.insteadOf")
-    monkeypatch.setenv("GIT_CONFIG_VALUE_0", REMOTE)
     pin_clock(DEMO_NOW)
     _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
-    _test_hooks.run = on_this_machine
+    _test_hooks.run = HubAndNode(repo)
     return repo, head
 
 
@@ -302,14 +356,13 @@ class TestARealRun:
 
 class TestTheDeadline:
     def test_a_target_outliving_its_deadline_is_stopped_with_timeout_s_status(
-        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: pathlib.Path
     ) -> None:
-        _as_a_node_s_login(monkeypatch)
         stage = (tmp_path / "stage").as_posix()
         target = names.dispatch_directory(stage, RUN_ID)
         (pathlib.Path(target) / "desk").mkdir(parents=True)
         (pathlib.Path(target) / "desk" / "Makefile").write_text(MAKEFILE, encoding="utf-8")
-        _test_hooks.run = on_this_machine
+        _test_hooks.run = HubAndNode(tmp_path / "remote")
         node = _config.load_workspace(
             {_config.CONFIG_FLAG: str(_registry(tmp_path, host_target_entry=_entry("slow")))}
         ).workspace["nodes"]["lavender"]

@@ -171,9 +171,9 @@ class TestARefusalNamesItsField:
             {**encoded, "projects": {"osrs-lab/manual-desktop": project}}
         )
 
-        host_target = decoded["projects"]["osrs-lab/manual-desktop"]["host_target"]
-        assert host_target is not None
-        assert host_target["node"] == "loki"
+        assert decoded["projects"]["osrs-lab/manual-desktop"]["host_target"] == HostTarget(
+            target="update", node="loki", workers=6, deadline_seconds=2400
+        )
 
 
 class TestTheLeaseWindow:
