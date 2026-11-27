@@ -193,7 +193,7 @@ def run(
         run_id=run_id,
         node=node_name,
         project=project,
-        kind=FeedKind.PASSED if ran["status"] == 0 else FeedKind.FAILED,
+        kind=FeedKind.FAILED if ran["status"] else FeedKind.PASSED,
         detail=ended,
         now_unix=_test_hooks.now(),
     )
