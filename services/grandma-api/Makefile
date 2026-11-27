@@ -6,7 +6,7 @@ MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 
 lint:
 	$(MAKETOOLS) venv-check
-	poetry lock
+	$(MAKETOOLS) lock-check
 	poetry sync --no-cache --with dev
 	$(MAKETOOLS) guard
 	poetry run ruff check . --fix
@@ -18,7 +18,7 @@ lint:
 # inline recipe and the incident behind it. The web frontend's unit suite
 # runs through its own Makefile.
 test:
-	poetry lock
+	$(MAKETOOLS) lock-check
 	poetry sync --no-cache --with dev
 	$(MAKETOOLS) test
 	make -C web test

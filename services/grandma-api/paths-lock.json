@@ -1,0 +1,8 @@
+{
+  "members": {
+    "../../libs/platform_core": "079846cfa280f39dd74ff630029a7df44a7d70d16eba99444715764e30b6163a",
+    "../../libs/platform_langid": "c66863cef3f4b524c83c3ab327a95d07e618543512b80421f889c4373a3fa766",
+    "../../libs/platform_stt": "2fe0e7306aac24ab960c648c50ca4b87e3fbee7d30c848f362077a0a8cfb6b6b",
+    "../../libs/platform_translate": "f191324fc5ffd8367e7015fbd208aa514a97a568e507da11167dccf3755f1f71"
+  }
+}
