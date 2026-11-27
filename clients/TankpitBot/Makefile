@@ -75,7 +75,7 @@ help:
 install:
 	@echo ""
 	@echo "=== install"
-	poetry lock
+	$(MAKETOOLS) lock-check
 	poetry sync --no-cache --with dev
 	poetry run playwright install chromium
 	@echo "[install] done"
@@ -88,7 +88,7 @@ lint: _lint-prep _lint-guard _lint-mypy
 # lock and the dev dependencies synced.
 _deps:
 	$(MAKETOOLS) venv-check
-	poetry lock
+	$(MAKETOOLS) lock-check
 	poetry sync --no-cache --with dev
 
 # The quick gates, and the two steps that REWRITE sources (ruff's fixes and

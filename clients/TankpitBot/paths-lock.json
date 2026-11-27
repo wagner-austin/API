@@ -1,0 +1,6 @@
+{
+  "members": {
+    "../../libs/monorepo_guards": "2b6586b5cc0f5aa60cbe012dab9b371f824daeb86df9f4908b4c29c10d198380",
+    "../../libs/platform_core": "079846cfa280f39dd74ff630029a7df44a7d70d16eba99444715764e30b6163a"
+  }
+}
