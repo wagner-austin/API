@@ -254,7 +254,10 @@ _PLACED_LANES: Final[Mapping[Lane, DispatchLane]] = {
 #: lane's places and the host-target lane's project. Every other tick hands
 #: none.
 _HANDED_FLAGS: Final[Mapping[Lane, tuple[tuple[str, ...], str]]] = {
-    **{lane: agent_lanes.LANE_PLACES[placed][:2] for lane, placed in _PLACED_LANES.items()},
+    **{
+        lane: (agent_lanes.LANE_PLACES[placed][0], agent_lanes.LANE_PLACES[placed][1])
+        for lane, placed in _PLACED_LANES.items()
+    },
     Lane.HOST_TARGET: ((PROJECT_FLAG,), "only a host-target tick runs a project's target"),
 }
 
