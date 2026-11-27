@@ -43,7 +43,14 @@ these nodes a second check fits the core pool and still pushes both past the
   and setup 30 s, vitest 297 s), against 129 to 200 s on every other node,
   168 s at serendipity's 3 workers, so the suite declares a minimum of 3
   workers at its 0.5 GB each, which every other linux node already granted
-  it, and lenovold refuses it.
+  it, and lenovold refuses it. Nor libs/covenant_ml (MCPs board task
+  972ea464): at the minimum of 2 it declared, its check phase took 744 s and
+  712 s of 300 at lenovold's 2 workers with all 5653 tests passing (fleet
+  jobs f9e460f3 and 663ecf03), and 294 s at 2 on a busy colossus (6cbd499d),
+  against 202 to 287 s at 4 workers on colossus and lavender and 106 to
+  163 s at 7 and 8 on sedona and lacrymal, so the suite declares a minimum
+  of 4, the fewest a measured run fitted the budget at, and lenovold
+  refuses it.
 lavender-wsl carried a fourth bound (MCPs board task 30dba6d7: MCPs/mcp-shared
 took 130 s alone and 305 s beside two other checks on 2026-10-16) until it
 went with lavender's reimage to Ubuntu on 2026-10-19 (MCPs board task
@@ -198,32 +205,35 @@ def test_a_bounded_node_waits_for_the_whole_check_to_end(
 
 
 #: The suites lenovold refuses, each measured over the budget there with
-#: every test passing (the module docstring), and each declaring the minimum
-#: of 3 workers its 2 spare cores cannot afford; beside each, the stack hosts
+#: every test passing (the module docstring), and each declaring a minimum
+#: its 2 spare cores cannot afford: 3 workers, or libs/covenant_ml's 4, the
+#: fewest it was measured inside the budget at; beside each, the stack hosts
 #: that carry its tags and refuse it because it is not pinned to them. demure
 #: carries no testdb tag, so MCPs/packages/db never reaches it, and no docker
 #: tag since MCPs board task ae130923 (it has no rootless execdocker lane), so
 #: neither does MCPs/execution-deploy, and no netns tag since MCPs board task
 #: 61983278 (it has no rootlesskit), so neither does MCPs/mcp-shared. Each
-#: suite's row also names the workers lenovold's 2 spare cores afford it and
-#: the workers serendipity's 6 grant it: one core each, but 2 each for
+#: suite's row also names the workers lenovold's 2 spare cores afford it, the
+#: minimum it declares and the workers serendipity's 6 grant it: one core
+#: each, but 2 each for
 #: MCPs/execution-deploy, whose workers' containers run in the dispatch share
 #: (MCPs board task 34a9877f), and for MCPs/mcp-shared, whose workers' PDF
 #: parsing and browsers do (MCPs board task 5cd7f739), each the registry row's
 #: worker_cores_measurement.
 LENOVOLD_REFUSED = {
-    "MCPs/execution-deploy": (1, 3, ("diphtheria",)),
-    "MCPs/execution-linux": (2, 6, ("demure", "diphtheria")),
-    "MCPs/mcp-shared": (1, 3, ("diphtheria",)),
-    "MCPs/packages/db": (2, 6, ("diphtheria",)),
+    "MCPs/execution-deploy": (1, 3, 3, ("diphtheria",)),
+    "MCPs/execution-linux": (2, 3, 6, ("demure", "diphtheria")),
+    "MCPs/mcp-shared": (1, 3, 3, ("diphtheria",)),
+    "MCPs/packages/db": (2, 3, 6, ("diphtheria",)),
+    "libs/covenant_ml": (2, 4, 6, ("diphtheria",)),
 }
 
 
 @pytest.mark.parametrize(("project_name", "measured"), sorted(LENOVOLD_REFUSED.items()))
 def test_lenovold_refuses_the_suite_and_no_other_node_carrying_its_tags_does(
-    project_name: str, measured: tuple[int, int, tuple[str, ...]]
+    project_name: str, measured: tuple[int, int, int, tuple[str, ...]]
 ) -> None:
-    afforded, granted, unpinned = measured
+    afforded, minimum, granted, unpinned = measured
     workspace = shipped_workspace()
     project = workspace["projects"][project_name]
     lenovold = workspace["nodes"]["lenovold"]
@@ -232,15 +242,16 @@ def test_lenovold_refuses_the_suite_and_no_other_node_carrying_its_tags_does(
         "workers": 0,
         "code": FleetErrorCode.NODE_MEMORY_EXHAUSTED,
         "reason": (
-            f"lenovold affords {afforded} worker(s) for a suite that declares a minimum of 3: "
+            f"lenovold affords {afforded} worker(s) for a suite that declares a minimum of "
+            f"{minimum}: "
             f"4 cores against 2 reserved, 24.0 GB free, {project['worker_ram_gb']} GB per "
             "worker, 1.5 GB reserved for the node's owner. Dispatching anyway would run a suite "
             "at a fraction of its workers until its own lease expired underneath it."
         ),
     }
     # serendipity leaves the fewest cores of the nodes that admit these
-    # suites, 6, and ran each in at most 168 s of the budget; 3 is the
-    # smallest minimum lenovold's 2 cores refuse, and serendipity, which
+    # suites, 6; 3 is the smallest minimum lenovold's 2 cores refuse, and
+    # libs/covenant_ml declares 4 for its own measurement; serendipity, which
     # carries one check at once, grants every worker its 6 cores hold (MCPs
     # board task b96f9da1), at the cores each worker is charged.
     serendipity = workspace["nodes"]["serendipity"]
