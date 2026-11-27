@@ -12,6 +12,7 @@ from platform_core.errors import AppError
 from maketools.cli import COMMANDS, dispatch, main, repository_root, require_integer
 from maketools.guard_run import GUARD_ARGV
 from maketools.makefile_grammar import SHELL_INCLUDE
+from maketools.poetry_lock import CHECK_ARGV, LOCK_ARGV
 from maketools.test_run import POETRY_EXECUTABLE_ARGV
 from maketools.venv_check import PROBE_ARGV
 from maketools.venvs import EMBED_PROBE
@@ -41,6 +42,8 @@ def test_every_command_is_registered() -> None:
         "lift-check",
         "lift-refresh",
         "lint-makefiles",
+        "lock",
+        "lock-check",
         "native-wheel",
         "poetry-build",
         "reap-stale",
@@ -67,6 +70,30 @@ def test_venv_check_runs_in_the_cwd_and_refuses_arguments(world: World, cwd: Pat
     assert world.captured == [PROBE_ARGV]
     with pytest.raises(AppError, match=r"venv-check takes no arguments, got \['x'\]"):
         dispatch(["venv-check", "x"])
+
+
+def test_lock_check_verifies_the_cwds_lock_and_refuses_arguments(world: World, cwd: Path) -> None:
+    (cwd / "poetry.lock").write_text("", encoding="utf-8")
+    (cwd / "paths-lock.json").write_text('{"members": {}}\n', encoding="utf-8")
+    world.capturing_answers[CHECK_ARGV] = ok("")
+    assert dispatch(["lock-check"]) == 0
+    assert world.captured == [CHECK_ARGV]
+    assert world.lines == [
+        "lock-check: poetry.lock is current for pyproject.toml and its 0 path dependencies ()"
+    ]
+    with pytest.raises(AppError, match=r"lock-check takes no arguments, got \['x'\]"):
+        dispatch(["lock-check", "x"])
+
+
+def test_lock_resolves_the_cwds_lock_and_refuses_arguments(world: World, cwd: Path) -> None:
+    (cwd / "poetry.lock").write_text("", encoding="utf-8")
+    world.capturing_answers[CHECK_ARGV] = ok("")
+    assert dispatch(["lock"]) == 0
+    assert [call["argv"] for call in world.inheriting_calls] == [LOCK_ARGV]
+    assert world.inheriting_calls[0]["cwd"] == cwd
+    assert (cwd / "paths-lock.json").read_text(encoding="utf-8") == '{\n  "members": {}\n}\n'
+    with pytest.raises(AppError, match=r"lock takes no arguments, got \['x'\]"):
+        dispatch(["lock", "x"])
 
 
 def test_guard_runs_in_the_cwd(world: World, cwd: Path) -> None:
@@ -230,7 +257,8 @@ def test_lint_makefiles_reports_the_count_and_the_violations(world: World) -> No
     assert world.lines == [
         "lint-makefiles: 1 tracked Makefile(s) in the portable grammar, "
         "every one beginning with the shell prologue and every check printing the pass banner "
-        "under the five-minute budget, every poetry install and sync passing --no-cache"
+        "under the five-minute budget, every poetry install and sync passing --no-cache, "
+        "and no recipe running poetry lock"
     ]
     bad = root / "tools" / "maketools" / "runs" / "bad" / "Makefile"
     bad.parent.mkdir(parents=True, exist_ok=True)

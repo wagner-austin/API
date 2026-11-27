@@ -15,6 +15,7 @@ from maketools.makefile_grammar import (
     Violation,
     check_makefile,
     check_recipe_line,
+    command_lines,
     expected_include,
     lint_grammar,
     makefile_depth,
@@ -66,6 +67,25 @@ def test_the_recipe_body_drops_make_prefixes() -> None:
     assert recipe_body("\t  poetry run x  ") == "poetry run x"
     assert recipe_body("\t+echo hi") == "echo hi"
     assert recipe_body("\t@ -\t+echo hi") == "echo hi"
+
+
+def test_command_lines_are_the_recipe_lines_that_run_something() -> None:
+    text = (
+        "VAR = poetry sync\n"
+        "x:\n"
+        "\t\n"
+        "\t# a comment\n"
+        "\t@-echo help\n"
+        "\techo\n"
+        "\techoes x\n"
+        "\t@poetry sync --no-cache\n"
+        "\t+make -C sub\n"
+    )
+    assert command_lines(text) == [
+        (7, "echoes x"),
+        (8, "poetry sync --no-cache"),
+        (9, "make -C sub"),
+    ]
 
 
 @pytest.mark.parametrize(
