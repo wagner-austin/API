@@ -17,11 +17,17 @@ with the generation's ``POETRY_CACHE_DIR`` and in-project virtualenvs
 already exported (``fleet.core.dialect.build_script``), and each is timed
 as its own phase. So every package whose lock pulls a CUDA wheel (an
 ``nvidia-*`` library, ``torch`` or ``triton``, hundreds of MB each) runs its
-recipe's own lock and sync there first, in the phase ``deps``, the way
-grandma-api's ``npm ci`` already runs before the clock. The recipe's lock
-and sync then find the venv warm, and the budget keeps measuring lint and
-the suite. The packages are found from their locks, so one registered later
-is held to the same rule without being named here.
+recipe's own sync there first, in the phase ``deps``, the way grandma-api's
+``npm ci`` already runs before the clock. The recipe's sync then finds the
+venv warm, and the budget keeps measuring lint and the suite. The packages
+are found from their locks, so one registered later is held to the same
+rule without being named here.
+
+NO ``poetry lock`` RUNS BEFORE THE CLOCK (MCPs board task 972ea464). A
+recipe verifies its committed lock with ``run.py lock-check`` and never
+re-resolves it (tools/maketools' ``makefile_poetry_lock_rule``); a deps-phase
+resolution would rewrite a stale lock before that check could read it, so a
+fleet check would pass a commit whose lock CI refuses.
 """
 
 from __future__ import annotations
@@ -49,8 +55,8 @@ CUDA_WHEEL: Final[re.Pattern[str]] = re.compile(
 #: How a recipe line that runs poetry opens.
 RECIPE_POETRY: Final[str] = "\tpoetry "
 
-#: The poetry commands that lock or sync the package's venv.
-RECIPE_VERBS: Final[frozenset[str]] = frozenset({"lock", "sync"})
+#: The poetry command that syncs the package's venv from its committed lock.
+RECIPE_VERBS: Final[frozenset[str]] = frozenset({"sync"})
 
 #: The packages measured overrunning, or found by hand on 2026-11-01, which the scan must find.
 MEASURED: Final[frozenset[str]] = frozenset(
@@ -104,14 +110,14 @@ CUDA_PACKAGES: Final[tuple[str, ...]] = tuple(sorted(filter(_pulls_cuda, API_INS
 
 
 def _recipe_deps(path: str) -> tuple[InstallStep, ...]:
-    """The package recipe's own lock and sync, run at the export root.
+    """The package recipe's own sync, run at the export root.
 
     Args:
         path: The package's directory in the repository.
 
     Returns:
-        One step per distinct ``poetry lock`` or ``poetry sync`` line of its
-        Makefile, in recipe order.
+        One step per distinct ``poetry sync`` line of its Makefile, in
+        recipe order.
     """
     makefile = (REPO_ROOT / path / "Makefile").read_text(encoding="utf-8")
     lines: list[str] = []
@@ -133,10 +139,20 @@ def test_the_scan_finds_every_measured_package() -> None:
 
 
 @pytest.mark.parametrize("path", CUDA_PACKAGES)
-def test_the_package_locks_and_syncs_before_its_check(path: str) -> None:
+def test_the_package_syncs_before_its_check(path: str) -> None:
     expected = _recipe_deps(path)
     assert expected[-1]["argv"][3] == "sync"
     assert API_INSTALLS[path][: len(expected)] == expected
+
+
+def test_no_registered_project_resolves_its_lock_before_the_clock() -> None:
+    resolving = sorted(
+        path
+        for path, steps in API_INSTALLS.items()
+        for step in steps
+        if step["argv"][:1] == ("poetry",) and "lock" in step["argv"]
+    )
+    assert resolving == []
 
 
 def test_grandma_api_still_installs_its_web_dependencies_after_them() -> None:
