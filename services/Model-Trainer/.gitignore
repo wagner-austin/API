@@ -59,6 +59,10 @@ corpus_cache/
 # and a program is only checkable beside the weights it was written against
 # (board task 7964f9f6, 2026-11-05).
 !results/weight-space/*/*.json
+# The record of the path dependencies poetry.lock was resolved against, which
+# make lint's run.py lock-check verifies in every checkout (MCPs board task
+# 972ea464).
+!/paths-lock.json
 
 # Allow type stubs under typings even if named like ignored dirs
 !typings/datasets/

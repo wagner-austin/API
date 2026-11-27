@@ -10,7 +10,7 @@ lint: _lint-prep _lint-guard _lint-mypy
 # and the dev dependencies synced.
 _deps:
 	$(MAKETOOLS) venv-check
-	poetry lock
+	$(MAKETOOLS) lock-check
 	poetry sync --no-cache --with dev
 
 # The two steps that REWRITE sources (ruff's fixes and its formatter), which
