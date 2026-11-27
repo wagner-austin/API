@@ -61,10 +61,12 @@ snapshot and signal arms).
 |---|---|
 | `align --repo PATH --commit SHA [--drop SHA,SHA]` | move a main checkout (this one, or a peer such as a session host's `../corvis-stick`) to a commit its origin's default branch contains, read from `origin/HEAD`; the route `make align-commit [REPO=<path>]` takes because the hub's hook refuses hand-run git verbs that move a checkout with linked trees; a local commit the target carries (patch-equivalent, or every path's blob equal) is dropped and named, one it does not carry is refused unless `--drop` names it, and tracked dirt or an untracked path the target tracks refuses the move |
 | `venv-check` | remove `.venv` when `poetry run mypy --version` cannot answer, so the `poetry sync` that follows builds a fresh one |
+| `lock-check` | verify the package's committed `poetry.lock` without resolving anything: `poetry check --lock` against its own `pyproject.toml`, and `paths-lock.json` against its path dependencies' declarations; a stale lock is refused `MAKETOOLS_LOCK_STALE` (below) |
+| `lock` | the one writer of both files: `poetry lock`, then `paths-lock.json` from the declarations it resolved against, then `lock-check` over what it wrote |
 | `guard` | run `poetry run python -m scripts.guard` when the package has a shim; say "not applicable, 0 rules run" when it has none |
 | `test [--no-sweep] [pytest args...]` | the shared launcher: a new Linux session and a descendant reap, the pre-run sweep, `--max-worker-restart=0`, a per-run `COVERAGE_FILE` under `runs/` with a cleanup scoped to that token, and one BLAS thread per worker |
 | `reap-stale [--older-than-minutes N]` | the standalone sweep: candidates older than N minutes whose ancestry names this project, reaped only when the whole set is idle across a 5-second CPU sample |
-| `lint-makefiles` | the grammar, the pass-banner rule and the budget rule over every tracked Makefile |
+| `lint-makefiles` | the grammar, the pass-banner rule, the budget rule and the poetry rules (`--no-cache` on every install and sync, no `poetry lock` in any recipe) over every tracked Makefile |
 | `check-budget` | run this package's `_check-unbudgeted` and time it: print `CHECK BUDGET` with its seconds, or exit 3 with a `CHECK OVER BUDGET` block when it passed but took over 300 s (below) |
 | `concurrent TARGET TARGET...` | `make TARGET` for each target as concurrent children of one package, each child's output captured to its own file and printed as one block headed by its verdict and seconds, in the order named; exits with the first failed target's code, naming every failure. Whether `make -j --output-sync` replaces it now that every node runs GNU Make 4.4.1 is board task `3bee27e8`. The targets must not depend on each other (below) |
 | `lift-check`, `lift-refresh MCPS REVISION` | hold each file `lift-lock.json` names to its pinned bytes from MCPs; re-lift them all from an MCPs commit and re-pin (below) |
@@ -100,12 +102,36 @@ move.
 
 A package whose lint is long can run it BESIDE its suite instead of before
 it: `_check-unbudgeted` runs what every half needs first (`venv-check`,
-`poetry lock`, `poetry sync`, and the steps that rewrite sources, such as
+`lock-check`, `poetry sync`, and the steps that rewrite sources, such as
 `ruff --fix` and `ruff format`), then `concurrent` with targets that need
 nothing from one another, for example the guard, mypy and the suite.
 `make lint` and `make test` keep their own recipes. clients/TankpitBot is
 the first (board task `28e47ae3`): on sedona at `c20080a69` its tests took
 371 s on four workers after about 154 s of lint, all of it charged.
+
+## A check verifies the lock; only `lock` writes it
+
+Every package's `lint` and `test` used to open with `poetry lock`, a full
+resolution on every run (MCPs board task `972ea464`). On the GitHub runner
+`libs/covenant_nn`'s two took 292 s and 99 s of a 454 s check whose suite
+ran 26 s (API CI run 46048435508 at `773acfb75`), and its committed lock was
+stale against `libs/cleargbm_rs`'s dev extras all along, repaired unseen by
+every check. The recipes now run `lock-check` instead, and
+`lint-makefiles` refuses a recipe that runs `poetry lock`
+(`src/maketools/makefile_poetry_lock_rule.py`).
+
+`poetry check --lock` alone would not do: poetry's `content-hash` digests
+only the package's own `pyproject.toml`, so a path dependency gaining a
+dependency leaves it at exit 0. `paths-lock.json` beside the lock records,
+for every directory package the lock names, the sha256 of the declarations
+a dependent's resolution reads (name, version, Python range, main
+dependencies and extras), so a dev group, a tool's settings or a reordering
+in `libs/platform_core` does not stale thirty locks.
+
+Changing a package's dependencies, or a library's that others depend on
+by path: run `python3 <relative path>/tools/maketools/scripts/run.py lock` in
+each package whose `lock-check` then refuses, and commit its `poetry.lock`
+and `paths-lock.json` with the change.
 
 ## Where the process table comes from
 
