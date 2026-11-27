@@ -202,6 +202,14 @@ def test_a_lock_with_no_packages_names_no_members() -> None:
     assert lock_members("[metadata]\ncontent-hash = '0'\n") == ()
 
 
+@pytest.mark.parametrize("kind", ["artifact", "custom", "dir", "directory-like", "file", "url"])
+def test_only_the_directory_source_type_names_a_path_dependency(kind: str) -> None:
+    # Values on either side of "directory" in sort order: the type is matched
+    # exactly, never by ordering.
+    lock = f'[[package]]\nname = "a"\n[package.source]\ntype = "{kind}"\nurl = "../a"\n'
+    assert lock_members(lock) == ()
+
+
 def test_a_directory_source_without_a_url_is_refused() -> None:
     with pytest.raises(JSONTypeError, match="Missing required field 'url'"):
         lock_members('[[package]]\nname = "a"\n[package.source]\ntype = "directory"\n')
@@ -383,6 +391,13 @@ def test_a_refusal_without_error_lines_carries_its_status_and_output(
     assert stale(project) == f"pkg: poetry check --lock exited 2: poetry: no such command; {FIX}"
 
 
+def test_a_check_killed_by_a_signal_is_a_refusal(world: World, tmp_path: Path) -> None:
+    # subprocess reports a child ended by signal N as exit status -N.
+    project = package_tree(tmp_path)
+    world.capturing_answers[CHECK_ARGV] = failed(-9, "")
+    assert stale(project) == f"pkg: poetry check --lock exited -9: ; {FIX}"
+
+
 def test_a_package_without_a_record_is_refused(world: World, tmp_path: Path) -> None:
     project = package_tree(tmp_path)
     world.capturing_answers[CHECK_ARGV] = ok("")
@@ -436,6 +451,16 @@ def test_a_failed_resolution_returns_its_status_and_records_nothing(
     project = package_tree(tmp_path)
     world.inheriting_code = 3
     assert write_lock(project) == 3
+    assert not (project / "paths-lock.json").exists()
+    assert world.captured == []
+
+
+def test_a_resolution_killed_by_a_signal_returns_its_status_and_records_nothing(
+    world: World, tmp_path: Path
+) -> None:
+    project = package_tree(tmp_path)
+    world.inheriting_code = -15
+    assert write_lock(project) == -15
     assert not (project / "paths-lock.json").exists()
     assert world.captured == []
 
