@@ -169,8 +169,8 @@ def test_a_commit_is_mutated_judged_and_reported_in_one_run() -> None:
     assert world.lines == [
         *TIMING_LINES,
         "mutation: 4 mutant(s): 2 run by the tests covering their line, 1 by the whole suite "
-        "(lines run only at import), 1 by no test; 1 more in annotations and parameter "
-        "markers are not code",
+        "(lines run only at import), 1 by no test; 1 more in annotations, parameter markers "
+        "and typing-only decorators are not code",
         'MUTANT SURVIVED src/p/m.py:5:18 ReplaceComparisonOperator_GtE_Gt -> "return value > '
         'LIMIT and ("',
         "MUTANT SURVIVED, NO TEST RAN IT src/p/m.py:10:14 ReplaceBinaryOperator_Add_Sub -> "
@@ -262,8 +262,8 @@ def test_a_run_whose_mutants_are_all_killed_passes() -> None:
         "mutation timing: slow mutant selected seconds=1.000 "
         "src/p/m.py:5:18 core/ReplaceComparisonOperator_GtE_Gt occurrence=0 tests=2",
         "mutation: 4 mutant(s): 3 run by the tests covering their line, 1 by the whole suite "
-        "(lines run only at import), 0 by no test; 1 more in annotations and parameter "
-        "markers are not code",
+        "(lines run only at import), 0 by no test; 1 more in annotations, parameter markers "
+        "and typing-only decorators are not code",
         "mutation: passed: 0 of 4 mutant(s) made in 2 source file(s) changed against "
         "origin/main "
         "(merge base base123) survived",
@@ -302,8 +302,8 @@ def test_a_run_whose_bound_comes_starts_no_more_trials_names_them_and_refuses(bo
         "mutation timing: slow mutant whole-suite seconds=1.000 "
         "src/p/m.py:1:9 core/NumberReplacer occurrence=0 tests=0",
         "mutation: 4 mutant(s): 2 run by the tests covering their line, 1 by the whole suite "
-        "(lines run only at import), 1 by no test; 1 more in annotations and parameter "
-        "markers are not code",
+        "(lines run only at import), 1 by no test; 1 more in annotations, parameter markers "
+        "and typing-only decorators are not code",
         "MUTANT NOT RUN, THE BOUND CAME src/p/m.py:5:18 ReplaceComparisonOperator_GtE_Gt -> "
         '"return value >= LIMIT and ("',
         "MUTANT NOT RUN, THE BOUND CAME src/p/m.py:6:15 ReplaceComparisonOperator_Lt_LtE -> "

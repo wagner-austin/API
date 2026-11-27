@@ -127,6 +127,18 @@ def test_a_mutation_over_two_lines_is_shown_by_its_first() -> None:
     assert mutated_line(diff) == "x = (1 -"
 
 
+def test_a_mutation_that_only_deletes_a_line_puts_nothing_in_its_place() -> None:
+    # cosmic-ray 8.7.0's diff for a surviving RemoveDecorator, which MCPs fleet
+    # job e526e18d's log printed (pytest abbreviating its third context line)
+    # when reading it raised IndexError (MCPs board task b9bf5690).
+    diff = (
+        "--- mutation diff ---\n--- a/src/sample.py\n+++ b/src/sample.py\n@@ -16,7 +16,6 @@\n"
+        " \n     @overload\n     def get(self, key: int) -> int: ...\n-    @overload\n"
+        "     def get(self, key: str) -> str: ...\n     def get(self, key):\n         return key"
+    )
+    assert mutated_line(diff) == ""
+
+
 def test_cosmic_ray_is_the_script_beside_the_interpreter() -> None:
     assert command("/srv/pkg/.venv/bin/python") == "/srv/pkg/.venv/bin/cosmic-ray"
 

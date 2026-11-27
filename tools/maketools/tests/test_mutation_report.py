@@ -25,8 +25,8 @@ TALLY = Tally(files=2, base="abc123", by_tests=5, by_suite=2, by_none=1, declara
 
 RAN = (
     "mutation: 8 mutant(s): 5 run by the tests covering their line, 2 by the whole suite "
-    "(lines run only at import), 1 by no test; 4 more in annotations and parameter markers "
-    "are not code"
+    "(lines run only at import), 1 by no test; 4 more in annotations, parameter markers and "
+    "typing-only decorators are not code"
 )
 
 

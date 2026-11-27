@@ -115,3 +115,83 @@ def test_an_unrecorded_continuation_line_is_read_under_its_statement() -> None:
 def test_a_line_outside_every_statement_stands_for_itself() -> None:
     facts = read_source_facts(SOURCE)
     assert coverage_line(facts, 8, frozenset()) == 8
+
+
+#: MCPs' decorated module (board task b9bf5690): typing names bound three
+#: ways, decorators that only the type checker reads beside ones a test sees,
+#: and a decorator continued over three lines.
+DECORATED = "\n".join(
+    [
+        "import functools",  # 1
+        "import typing as t",  # 2
+        "from typing import Any, overload as ov",  # 3
+        "from typing_extensions import final",  # 4
+        "from os import path",  # 5
+        "",
+        "",
+        "@final",  # 8
+        "class Box:",  # 9
+        "    @property",  # 10
+        "    def v(self) -> int:",  # 11
+        "        return 1",  # 12
+        "",
+        "    @ov",  # 14
+        "    def get(self, x: int) -> int: ...",  # 15
+        "    @t.overload",  # 16
+        "    def get(self, x: str) -> str: ...",  # 17
+        "    @classmethod",  # 18
+        "    @functools.lru_cache(",  # 19
+        "        maxsize=2,",  # 20
+        "    )",  # 21
+        "    def get(cls, x: Any) -> Any:",  # 22
+        "        return x",  # 23
+        "",
+        "",
+        "@path.final",  # 26
+        "@t.cast",  # 27
+        "async def run(",  # 28
+        "    x: int,",  # 29
+        ") -> int:",  # 30
+        "    return x",  # 31
+    ]
+)
+
+
+def test_each_decorator_line_maps_to_the_lines_of_the_definition_it_decorates() -> None:
+    # A class decorator's definition runs to the class's last line; a method's
+    # decorators, a decorator continued over three lines among them, map to
+    # the method's first decorator through its last line.
+    assert read_source_facts(DECORATED).definitions == {
+        8: (8, 23),
+        10: (10, 12),
+        14: (14, 15),
+        16: (16, 17),
+        18: (18, 23),
+        19: (18, 23),
+        20: (18, 23),
+        21: (18, 23),
+        26: (26, 31),
+        27: (26, 31),
+    }
+
+
+def test_only_overload_and_final_imported_from_typing_are_decorators_for_the_type_checker() -> None:
+    # final from typing_extensions, overload imported as ov and through the
+    # module alias t; not property, classmethod, a cache, os.path's attribute
+    # of the same name or another typing function.
+    facts = read_source_facts(DECORATED)
+    assert is_declaration(facts, (8, 0))
+    assert is_declaration(facts, (14, 4))
+    assert is_declaration(facts, (16, 4))
+    assert not is_declaration(facts, (10, 4))
+    assert not is_declaration(facts, (18, 4))
+    assert not is_declaration(facts, (26, 0))
+    assert not is_declaration(facts, (27, 0))
+    assert facts.typing_decorator_lines == frozenset({8, 14, 16})
+
+
+def test_a_module_importing_nothing_from_typing_has_no_typing_decorator() -> None:
+    source = "def final(f):\n    return f\n\n\n@final\ndef g() -> None:\n    pass\n"
+    facts = read_source_facts(source)
+    assert facts.typing_decorator_lines == frozenset()
+    assert facts.definitions == {5: (5, 7)}
