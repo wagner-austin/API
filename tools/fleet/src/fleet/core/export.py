@@ -163,6 +163,48 @@ def prepare_mirror(mirrors_root: pathlib.Path, *, remote: str, sha: str) -> path
     return mirror
 
 
+#: The ref a remote's default branch is fetched by.
+DEFAULT_BRANCH_REF: Final = "HEAD"
+
+
+class DefaultBranch(TypedDict):
+    """A remote's default branch, fetched into the hub's mirror.
+
+    Attributes:
+        mirror: The mirror holding it.
+        head: The forty-hex commit the branch named when it was fetched.
+    """
+
+    mirror: pathlib.Path
+    head: str
+
+
+def prepare_default_branch(mirrors_root: pathlib.Path, *, remote: str) -> DefaultBranch:
+    """Make sure the remote's mirror exists and holds its default branch's head now.
+
+    The one fetch of a default branch: the main-history read
+    (:func:`fleet.core.main_history.read_main`) and a host target's run
+    (:mod:`fleet.core.host_target`) both ask what the branch names now.
+
+    Args:
+        mirrors_root: The mirrors directory under the workspace's records.
+        remote: The project's declared remote.
+
+    Returns:
+        The mirror and the head.
+
+    Raises:
+        AppError: As :func:`ensure_mirror` and
+            :func:`fleet.core.mirror_fetch.fetch_ref` describe.
+    """
+    mirror = mirror_path(mirrors_root, remote_mirror_key(remote))
+    ensure_mirror(mirror)
+    head = mirror_fetch.fetch_ref(
+        mirror, remote, DEFAULT_BRANCH_REF, declared_as="the repository's default branch"
+    )
+    return DefaultBranch(mirror=mirror, head=head)
+
+
 def install_paths(step: tuple[str, ...]) -> tuple[str, ...]:
     """The tokens of one install step that name a path in the repository.
 
@@ -347,7 +389,9 @@ def prepare_companion(mirrors_root: pathlib.Path, companion: ProjectCompanion) -
 __all__ = [
     "ARCHIVE_TIMEOUT_SECONDS",
     "COMPANION_FETCHES",
+    "DEFAULT_BRANCH_REF",
     "CompanionExport",
+    "DefaultBranch",
     "PreparedCompanion",
     "companion_mirror_key",
     "ensure_mirror",
@@ -355,6 +399,7 @@ __all__ = [
     "install_paths",
     "mirror_path",
     "prepare_companion",
+    "prepare_default_branch",
     "prepare_mirror",
     "remote_mirror_key",
     "require_install_paths",

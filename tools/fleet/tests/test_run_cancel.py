@@ -71,6 +71,7 @@ def _plan() -> ProjectConfig:
         worker_cores_measurement=None,
         release_artifact=None,
         mutation_checker=None,
+        host_target=None,
     )
 
 
@@ -95,6 +96,7 @@ class TestRunIdentity:
             agent="opus-fleet-0904",
             session_id="s",
             plan=_plan(),
+            window_seconds=run_lease.check_window(_plan()),
             node_local=(),
             now_unix=DEMO_NOW,
         )
@@ -405,6 +407,7 @@ class TestFinish:
             agent="opus-fleet-0904",
             session_id="s",
             plan=_plan(),
+            window_seconds=run_lease.check_window(_plan()),
             node_local=(),
             now_unix=DEMO_NOW,
         )

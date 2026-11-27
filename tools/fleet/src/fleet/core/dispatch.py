@@ -324,6 +324,7 @@ def start(
         node_name=node_name,
         project=project,
         plan=plan,
+        window_seconds=run_lease.check_window(plan),
         workers=workers,
         agent=agent,
         session_id=session_id,

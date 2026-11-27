@@ -480,6 +480,33 @@ def describe_node(node: NodeConfig, state: NodeState) -> str:
     )
 
 
+def decode_node_name(value: JSONValue, *, field: str) -> str:
+    """Decode a node's registry name, where a declaration names the node its work runs on.
+
+    One decoder for every such name: a project's pin
+    (:func:`fleet.contracts.project.decode_pinned_node`) and its host target's
+    node (:func:`fleet.contracts.host_target.decode_host_target`).
+
+    Args:
+        value: The declared value.
+        field: The declaration's field, as its refusal names it.
+
+    Returns:
+        The name.
+
+    Raises:
+        JSONTypeError: When the value is not a string or is empty: work
+            pinned to no name is a misspelt declaration, and would run
+            nowhere.
+    """
+    if not isinstance(value, str) or value == "":
+        raise JSONTypeError(
+            f"{field} must be a node's registry name, got {value!r}; an empty or non-string "
+            "name would run the work nowhere"
+        )
+    return value
+
+
 __all__ = [
     "LiveLoad",
     "NodeConfig",
@@ -489,6 +516,7 @@ __all__ = [
     "declared_capability",
     "decode_node_config",
     "decode_node_gpu",
+    "decode_node_name",
     "describe_node",
     "encode_node_config",
     "encode_node_gpu",

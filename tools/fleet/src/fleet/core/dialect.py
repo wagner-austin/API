@@ -376,7 +376,7 @@ def build_script(
         'PLAYWRIGHT_BROWSERS_PATH="$tool_cache/ms-playwright"',
         f"{PLAYWRIGHT_KEEP_BROWSERS[0]}='{PLAYWRIGHT_KEEP_BROWSERS[1]}'",
         f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}'",
-        f"CORVIS_TEST_MAX_WORKERS='{workers}'",
+        f"{names.WORKERS_VARIABLE}='{workers}'",
         f"{names.RAM_VARIABLE}='{ram_gb!r}'",
         f"{AGENT_LABEL_VARIABLE}='{label}'",
         f"{CACHE_VARIABLE}='{cache_root}'",

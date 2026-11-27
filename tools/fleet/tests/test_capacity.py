@@ -175,6 +175,7 @@ def _project(
         worker_cores_measurement=worker_cores_measurement,
         release_artifact=None,
         mutation_checker=None,
+        host_target=None,
     )
 
 

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pathlib
 import subprocess
-from collections.abc import Generator, Sequence
+from collections.abc import Generator
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
@@ -27,7 +27,7 @@ from fleet.contracts.lease import Lease
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.retire_record import RetireState
 from fleet.core import _test_hooks, leases, names, records, retire_owed
-from fleet.core.ssh_options import SSH_OPTIONS
+from tests._on_this_machine import on_this_machine
 from tests._retire_answers import RETIRED_BYTES, RETIRED_OUTPUT
 from tests._toolchain_fixtures import node
 from tests.conftest import DEMO_NOW, DEMO_RUN_ID, FakeRun, ok, pin_clock, retire_replies
@@ -38,32 +38,6 @@ OTHER_RUN_ID = "libs-demo-lavender-1757000100"
 #: What the node prints when a process keeps the demo run whole.
 HOLDER = f"/proc/4242/cwd /home/corvis/fleet/stage/{DEMO_RUN_ID}/{DEMO_RUN_ID}"
 IN_USE_OUTPUT = f"in-use {HOLDER}\n"
-
-
-def _on_this_machine(
-    argv: Sequence[str],
-    *,
-    timeout_seconds: int,
-    stdin_bytes: bytes | None = None,
-    unset_env: Sequence[str] = (),
-    set_env: Sequence[tuple[str, str]] = (),
-) -> _test_hooks.CommandResult:
-    """Carry out an ssh to the node here: its remote words, run by ``sh``.
-
-    Everything after the destination is what ssh hands the far side's shell,
-    so ``sh -c`` of those words joined is what the node runs.
-    """
-    words = list(argv)
-    prefix = ["ssh", *SSH_OPTIONS]
-    assert words[: len(prefix)] == prefix
-    remote = words[len(prefix) + 1 :]
-    return _test_hooks._default_run(
-        ("sh", "-c", " ".join(remote)),
-        timeout_seconds=timeout_seconds,
-        stdin_bytes=stdin_bytes,
-        unset_env=unset_env,
-        set_env=set_env,
-    )
 
 
 #: What the fixture's export holds, worked by hand: build/out.bin's 70000
@@ -128,7 +102,7 @@ class TestARealProcessKeepsItsRun:
             runs / "leases.json", _lease(DEMO_RUN_ID, expires=DEMO_NOW + 600), now_unix=DEMO_NOW
         )
         retire_owed.owe(path, alias="lavender", run_id=DEMO_RUN_ID)
-        _test_hooks.run = _on_this_machine
+        _test_hooks.run = on_this_machine
 
         # The run is live: its lease is held, so nothing is sent.
         _pass(path, runs, at)

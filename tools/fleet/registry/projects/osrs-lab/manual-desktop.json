@@ -11,5 +11,11 @@
     "path": "manual-desktop",
     "install": [],
     "companions": []
+  },
+  "host_target": {
+    "target": "update",
+    "node": "loki",
+    "workers": 6,
+    "deadline_seconds": 2400
   }
 }

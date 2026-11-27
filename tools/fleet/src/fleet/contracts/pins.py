@@ -39,7 +39,12 @@ HUB_SUITE: Final = "tools/fleet-execution-hub"
 def check_pinned_nodes(
     projects: dict[str, ProjectConfig], nodes: dict[str, NodeConfig]
 ) -> dict[str, ProjectConfig]:
-    """Refuse a project pinned to a node the workspace cannot match.
+    """Refuse a project naming a node the workspace cannot match.
+
+    A project names a node in two places: its pin, and the node its host
+    target runs on (:mod:`fleet.contracts.host_target`, MCPs board task
+    57791f39). Each must be a declared node, or the work it names runs
+    nowhere.
 
     Args:
         projects: The decoded projects.
@@ -49,18 +54,25 @@ def check_pinned_nodes(
         ``projects``, unchanged.
 
     Raises:
-        JSONTypeError: Naming the project and its pin when the pin is not a
-            declared node.
+        JSONTypeError: Naming the project, which declaration names the
+            node, and the node, when it is not a declared node.
     """
     for path, project in sorted(projects.items()):
-        pinned = project["node"]
-        if pinned is None:
-            continue
-        if pinned not in nodes:
-            raise JSONTypeError(
-                f"project {path} is pinned to node {pinned!r}, which the workspace does not "
-                f"declare (it declares {', '.join(sorted(nodes))}); no runner would ever claim it"
-            )
+        host_target = project["host_target"]
+        named = (
+            ("is pinned to", project["node"], "no runner would ever claim it"),
+            (
+                "runs its host target on",
+                None if host_target is None else host_target["node"],
+                "no host could run it",
+            ),
+        )
+        for declared_as, node, consequence in named:
+            if node is not None and node not in nodes:
+                raise JSONTypeError(
+                    f"project {path} {declared_as} node {node!r}, which the workspace does not "
+                    f"declare (it declares {', '.join(sorted(nodes))}); {consequence}"
+                )
     return projects
 
 

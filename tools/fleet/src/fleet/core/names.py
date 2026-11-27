@@ -152,6 +152,9 @@ WORKSPACE_VARIABLE = "CORVIS_FLEET_WORKSPACE"
 #: sizes StrykerJS to (MCPs board task 330b0465).
 RAM_VARIABLE = "CORVIS_TEST_RAM_GB"
 
+#: The variable carrying the workers granted, to a check and to a host target.
+WORKERS_VARIABLE = "CORVIS_TEST_MAX_WORKERS"
+
 #: The variable every build exports naming :func:`registry_directory`, the
 #: fleet's registry as the runner that launched the build read it, so a
 #: suite reads the one roster (``machines``, MCPs board task e447de72) with

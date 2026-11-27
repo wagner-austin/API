@@ -33,10 +33,12 @@ runner ended has lapsed.
 
 from __future__ import annotations
 
+import math
 import pathlib
 from collections.abc import Mapping
 
 from fleet.contracts.feed import FeedEvent, FeedKind
+from fleet.contracts.host_target import HostTarget
 from fleet.contracts.lease import Lease
 from fleet.contracts.project import ProjectConfig, lease_seconds
 from fleet.contracts.resources import companion_names, scoped
@@ -82,6 +84,38 @@ def run_id_for(project: str, *, node: str, started_unix: int) -> str:
     return f"{project.replace('/', '-')}-{node}-{started_unix}"
 
 
+def check_window(plan: ProjectConfig) -> int:
+    """How long a check of one project holds its lease.
+
+    Args:
+        plan: The project, whose expected duration sizes the window.
+
+    Returns:
+        :data:`LEASE_SLACK` times the estimate, in whole seconds
+        (:func:`fleet.contracts.project.lease_seconds`).
+    """
+    return lease_seconds(plan, slack=LEASE_SLACK)
+
+
+def host_target_window(host_target: HostTarget) -> int:
+    """How long a run of a project's host target holds its lease.
+
+    Sized from the target's own deadline, not the project's check estimate:
+    osrs-lab's manual-desktop declares a ten-minute check while its update
+    target runs recorder-release's whole check before installing (MCPs board
+    task 57791f39). :data:`LEASE_SLACK` over the deadline covers the stage
+    before make starts and the retire after it ends, so the lease outlives
+    the run and no collect pass retires its tree under it.
+
+    Args:
+        host_target: The declared host target.
+
+    Returns:
+        :data:`LEASE_SLACK` times its deadline, in whole seconds.
+    """
+    return math.ceil(host_target["deadline_seconds"] * LEASE_SLACK)
+
+
 def open_lease(
     *,
     node: str,
@@ -90,6 +124,7 @@ def open_lease(
     agent: str,
     session_id: str,
     plan: ProjectConfig,
+    window_seconds: int,
     node_local: tuple[str, ...],
     now_unix: int,
 ) -> Lease:
@@ -101,17 +136,19 @@ def open_lease(
         run_id: The dispatch.
         agent: Board label of the dispatching session.
         session_id: That session's UUID.
-        plan: The project, whose expected duration sizes the window.
+        plan: The project, whose exclusive resources the lease holds.
+        window_seconds: How long the lease is held: :func:`check_window` for
+            a check, :func:`host_target_window` for a host target.
         node_local: The workspace's node-local resource names, which the
             lease holds as this node's copy
             (:func:`fleet.contracts.resources.scoped`).
         now_unix: Current time, whole seconds since the epoch.
 
     Returns:
-        The lease, sized at :data:`LEASE_SLACK` times the estimate and
-        carrying whatever exclusive resources the project declared. Read
-        from the plan rather than passed separately, so a caller cannot
-        dispatch a project while forgetting what it contends for.
+        The lease, held for the window and carrying whatever exclusive
+        resources the project declared. Read from the plan rather than
+        passed separately, so a caller cannot dispatch a project while
+        forgetting what it contends for.
     """
     return Lease(
         node=node,
@@ -120,7 +157,7 @@ def open_lease(
         agent=agent,
         session_id=session_id,
         acquired_unix=now_unix,
-        expires_unix=now_unix + lease_seconds(plan, slack=LEASE_SLACK),
+        expires_unix=now_unix + window_seconds,
         resources=held_names(plan, node=node, node_local=node_local),
     )
 
@@ -246,6 +283,7 @@ def take(
     node_name: str,
     project: str,
     plan: ProjectConfig,
+    window_seconds: int,
     workers: int,
     agent: str,
     session_id: str,
@@ -264,7 +302,9 @@ def take(
         node_name: The node's workspace name.
         project: Repo-relative project path.
         plan: The project's declaration.
-        workers: Test workers the capacity check granted, for the feed line.
+        window_seconds: How long the lease is held (:func:`open_lease`).
+        workers: Workers granted, the check's or the host target's, for the
+            feed line.
         agent: Board label of the dispatching session.
         session_id: That session's UUID.
         node_local: The workspace's node-local resource names.
@@ -285,6 +325,7 @@ def take(
         agent=agent,
         session_id=session_id,
         plan=plan,
+        window_seconds=window_seconds,
         node_local=node_local,
         now_unix=now_unix,
     )
@@ -346,9 +387,11 @@ def abandon(
 __all__ = [
     "LEASE_SLACK",
     "abandon",
+    "check_window",
     "emit",
     "held_names",
     "held_on_node",
+    "host_target_window",
     "open_lease",
     "run_id_for",
     "take",

@@ -11,6 +11,12 @@ project's own business and the dispatcher's business is only where to run it.
 A per-project command field would let a project be dispatched by a recipe that
 is not the one a human runs locally, and the two would drift silently. If a
 project needs a different recipe, it changes its Makefile.
+
+A project may ALSO declare ``host_target``: one make target run outside any
+check, on one named node's own account, by ``python -m fleet.cli.host_target``
+(:mod:`fleet.contracts.host_target`). It does not name a second recipe for
+the check; it names work a check is kept from doing, such as installing into
+that account's home.
 """
 
 from __future__ import annotations
@@ -26,12 +32,14 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
+from fleet.contracts.host_target import HostTarget, decode_host_target, encode_host_target
 from fleet.contracts.mutation_checker import (
     MutationChecker,
     decode_mutation_checker,
     encode_mutation_checker,
     mutation_floor_gb,
 )
+from fleet.contracts.node import decode_node_name
 from fleet.contracts.release_artifact import (
     ReleaseArtifact,
     decode_release_artifact,
@@ -159,6 +167,10 @@ class ProjectConfig(TypedDict):
             reads from the staged registry to size StrykerJS to the memory
             the check was booked (:func:`run_ram_gb`), or None for a project
             whose check runs no checker. Optional: absent reads as None.
+        host_target: The make target the project runs on one node's own
+            account outside any check, with its workers and deadline
+            (:mod:`fleet.contracts.host_target`), or None for a project that
+            declares none. Optional: absent reads as None.
     """
 
     worker_ram_gb: float
@@ -174,6 +186,7 @@ class ProjectConfig(TypedDict):
     worker_cores_measurement: str | None
     release_artifact: ReleaseArtifact | None
     mutation_checker: MutationChecker | None
+    host_target: HostTarget | None
 
 
 def run_ram_gb(project: ProjectConfig, workers: int) -> float:
@@ -259,6 +272,7 @@ def encode_project_config(project: ProjectConfig) -> JSONObject:
         "worker_cores_measurement": project["worker_cores_measurement"],
         "release_artifact": encode_release_artifact(project["release_artifact"]),
         "mutation_checker": encode_mutation_checker(project["mutation_checker"]),
+        "host_target": encode_host_target(project["host_target"]),
     }
 
 
@@ -272,18 +286,13 @@ def decode_pinned_node(value: JSONValue) -> str | None:
         The node's registry name, or None for a project any node may run.
 
     Raises:
-        JSONTypeError: When the value is not a string or is empty: a
-            project pinned to no name is a misspelt declaration, not an
-            unpinned one.
+        JSONTypeError: When the value is not a string or is empty, as
+            :func:`fleet.contracts.node.decode_node_name` refuses: a project
+            pinned to no name is a misspelt declaration, not an unpinned one.
     """
     if value is None:
         return None
-    if not isinstance(value, str) or value == "":
-        raise JSONTypeError(
-            f"project.node must be a node's registry name or absent, got {value!r}; an empty "
-            "or non-string pin would run the project nowhere"
-        )
-    return value
+    return decode_node_name(value, field="project.node")
 
 
 def decode_loopback_only(value: JSONValue) -> bool:
@@ -437,6 +446,7 @@ def decode_project_config(value: JSONValue) -> ProjectConfig:
         ),
         release_artifact=decode_release_artifact(value.get("release_artifact")),
         mutation_checker=decode_mutation_checker(value.get("mutation_checker")),
+        host_target=decode_host_target(value.get("host_target")),
     )
 
 

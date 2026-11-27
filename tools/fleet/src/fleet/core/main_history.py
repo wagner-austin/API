@@ -84,9 +84,6 @@ PUBLISH_TOOL: Final = "dispatch_main_publish"
 #: The queue's tool that answers each repository's held head.
 HEADS_TOOL: Final = "dispatch_main_heads"
 
-#: The ref a remote's default branch is fetched by.
-DEFAULT_BRANCH_REF: Final = "HEAD"
-
 #: The most commits one repository's read sends: corvis-db's
 #: ``MAX_MAIN_HISTORY_COMMITS``, which refuses more. MCPs, the busiest
 #: repository, landed about 190 first-parent commits a day in the week to
@@ -301,15 +298,11 @@ def read_main(mirrors_root: pathlib.Path, repository: str, remote: str) -> MainR
         newest first, each with its generation.
 
     Raises:
-        AppError: As :func:`fleet.core.export.ensure_mirror` and
-            :func:`fleet.core.mirror_fetch.fetch_ref` say, or as
-            :func:`_listed` does.
+        AppError: As :func:`fleet.core.export.prepare_default_branch` says,
+            or as :func:`_listed` does.
     """
-    mirror = export.mirror_path(mirrors_root, export.remote_mirror_key(remote))
-    export.ensure_mirror(mirror)
-    head = mirror_fetch.fetch_ref(
-        mirror, remote, DEFAULT_BRANCH_REF, declared_as="the repository's default branch"
-    )
+    fetched = export.prepare_default_branch(mirrors_root, remote=remote)
+    mirror, head = fetched["mirror"], fetched["head"]
     ranked = generations(mirror, head)
     newest = _listed(mirror, ("--first-parent", f"--max-count={MAX_COMMITS}", head))
     return MainRead(
@@ -568,7 +561,6 @@ def publish_mains(
 
 __all__ = [
     "ANCESTRY_UNREADABLE_CODE",
-    "DEFAULT_BRANCH_REF",
     "HEADS_TOOL",
     "HISTORY_UNREADABLE_CODE",
     "MAX_COMMITS",

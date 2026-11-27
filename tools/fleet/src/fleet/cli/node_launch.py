@@ -188,6 +188,7 @@ def launch_claimed(
             node_name=alias,
             project=job["project"],
             plan=prepared["plan"],
+            window_seconds=run_lease.check_window(prepared["plan"]),
             workers=prepared["workers"],
             agent=job["submitted_by"],
             session_id=job["session_id"],

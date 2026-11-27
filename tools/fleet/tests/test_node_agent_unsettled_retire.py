@@ -161,6 +161,7 @@ class TestALaunchWhoseRunnerEnded:
             node_name="lavender",
             project=DEMO_PROJECT,
             plan=require_project(loaded.workspace, DEMO_PROJECT),
+            window_seconds=run_lease.check_window(require_project(loaded.workspace, DEMO_PROJECT)),
             workers=1,
             agent="opus-fleet-0904",
             session_id="acc774c0-3bc3-4cce-9dda-c7a12fb99519",

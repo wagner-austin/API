@@ -173,6 +173,7 @@ class TestTheLeaseFile:
             agent="opus-fleet-0929",
             session_id="s",
             plan=require_project(workspace, DEMO_PROJECT),
+            window_seconds=run_lease.check_window(require_project(workspace, DEMO_PROJECT)),
             node_local=workspace["node_local_resources"],
             now_unix=DEMO_NOW,
         )
@@ -278,6 +279,7 @@ def _staging(directories: tuple[str, ...], *, exclusive: tuple[str, ...] = ()) -
         worker_cores_measurement=None,
         release_artifact=None,
         mutation_checker=None,
+        host_target=None,
     )
 
 

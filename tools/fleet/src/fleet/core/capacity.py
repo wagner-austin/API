@@ -496,6 +496,7 @@ def room_for_any(
         worker_cores_measurement=None,
         release_artifact=None,
         mutation_checker=None,
+        host_target=None,
     )
     verdict = assess(node, state, default_tenant, tags)
     if verdict["code"] is None:

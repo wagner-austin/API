@@ -279,6 +279,7 @@ class TestAnotherDispatchesLeaseStands:
             agent="opus-other-0926",
             session_id="22222222-bbbb-4bbb-8bbb-222222222222",
             plan=require_project(loaded.workspace, DEMO_PROJECT),
+            window_seconds=run_lease.check_window(require_project(loaded.workspace, DEMO_PROJECT)),
             node_local=loaded.workspace["node_local_resources"],
             now_unix=DEMO_NOW - 60,
         )

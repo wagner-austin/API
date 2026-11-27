@@ -148,7 +148,7 @@ class TestReadMains:
         assert reads[0]["commits"][0]["sha"] == commits["merge"]
         assert len(unread) == 1
         assert unread[0].startswith(
-            f"gone: EXPORT_FAILED: git fetch {missing} {main_history.DEFAULT_BRANCH_REF} into "
+            f"gone: EXPORT_FAILED: git fetch {missing} {export.DEFAULT_BRANCH_REF} into "
         )
 
     def test_fetches_nothing_more_from_a_host_one_fetch_could_not_resolve(
