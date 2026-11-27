@@ -4,7 +4,7 @@ include ../../scripts/make/shell.mk
 
 lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py venv-check
-	poetry lock
+	$(PYTHON) ../../tools/maketools/scripts/run.py lock-check
 	poetry sync --no-cache --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py guard
 	poetry run ruff check . --fix
@@ -24,7 +24,7 @@ lint:
 # that dies cannot strand its xdist workers; its module header carries the
 # 2026-08-19 incident that motivated both.
 test:
-	poetry lock
+	$(PYTHON) ../../tools/maketools/scripts/run.py lock-check
 	poetry sync --no-cache --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py test
 
