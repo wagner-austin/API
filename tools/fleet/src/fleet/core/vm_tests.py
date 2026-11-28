@@ -130,9 +130,9 @@ def _read_counted(
     # Split at each count line, its count kept: the text before the first
     # count, then each count and the text after it, so the last count is
     # parts[-2] and the text it closes is parts[-3].
-    parts = counts.split(tail)
-    if len(parts) == 1:
+    if counts.search(tail) is None:
         return "unread"
+    parts = counts.split(tail)
     read = sorted((match.group(1), match.group(2)) for match in items.finditer(parts[-3]))
     if not read:
         return parts[-2]
