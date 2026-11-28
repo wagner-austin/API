@@ -13,7 +13,9 @@ companion_repository_commands). idle's check reads nothing beside it, and its
 browser project draws with WebGL in Chromium, so it takes the gpu tag; so
 does centipede's (MCPs board task 2a06915d), whose lint checks its lifted
 files against lift-lock.json offline and whose browser project draws the game
-with WebGL in Chromium.
+with WebGL in Chromium. centipede's row also carries MCPs for its
+mutation step and declares ``base_branch``, which this case's parameters
+cannot state, so tests/test_centipede_project.py pins it.
 tree-bot's and Dashboards/rabbit's checks read nothing beside them and
 install through their own make check (MCPs board task ddd25310), and like
 the Dashboards root's and metabolomics-dashboard's they run under sh on any
@@ -63,15 +65,6 @@ MCPS_COMPANION = ProjectCompanion(
     [
         (
             "idle",
-            (NodeTag.GPU,),
-            (
-                NPM_CI,
-                InstallStep(phase="install", argv=("npx", "playwright", "install", "chromium")),
-            ),
-            (),
-        ),
-        (
-            "centipede",
             (NodeTag.GPU,),
             (
                 NPM_CI,
