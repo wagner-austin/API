@@ -217,6 +217,22 @@ class TestTheReading:
 
         assert read_vm_drivers(tail) == "1:print-host=built"
 
+    def test_of_three_counts_only_the_items_the_last_one_closes_are_read(self) -> None:
+        # Three runs' lines in one tail, each count closing a different
+        # driver, and the last closing two: the reading is the last run's.
+        tail = (
+            "FLEET_VM_DRIVER: corvis-hub fetched\n"
+            "FLEET_VM_DRIVERS: 1 realised\n"
+            "FLEET_VM_DRIVER: print-host built\n"
+            "FLEET_VM_DRIVERS: 1 realised\n"
+            "FLEET_VM_DRIVER: uci-vpn-agents fetched\n"
+            "FLEET_VM_DRIVER: corvis-worker-vm built\n"
+            "FLEET_VM_DRIVERS: 2 realised\n"
+        )
+
+        assert read_vm_drivers(tail) == "2:corvis-worker-vm=built,uci-vpn-agents=fetched"
+        assert read_vm_drivers(tail + "FLEET_VM_DRIVERS: 0 realised\n") == "0"
+
     def test_the_verdict_line_carries_the_reading(self) -> None:
         run = "MCPs-fleet-nixos-lavender-1793887262"
         tail = (

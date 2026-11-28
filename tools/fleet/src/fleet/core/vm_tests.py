@@ -127,17 +127,16 @@ def _read_counted(
         before it; the count alone when none is there; else ``unread`` (a
         build from before the lines, or one stopped before them).
     """
-    found = list(counts.finditer(tail))
-    if not found:
+    # Split at each count line, its count kept: the text before the first
+    # count, then each count and the text after it, so the last count is
+    # parts[-2] and the text it closes is parts[-3].
+    parts = counts.split(tail)
+    if len(parts) == 1:
         return "unread"
-    counted = found[-1]
-    since = found[-2].end() if len(found) > 1 else 0
-    read = sorted(
-        (match.group(1), match.group(2)) for match in items.finditer(tail, since, counted.start())
-    )
+    read = sorted((match.group(1), match.group(2)) for match in items.finditer(parts[-3]))
     if not read:
-        return counted.group(1)
-    return f"{counted.group(1)}:" + ",".join(render(first, second) for first, second in read)
+        return parts[-2]
+    return f"{parts[-2]}:" + ",".join(render(first, second) for first, second in read)
 
 
 def read_vm_tests(tail: str) -> str:
