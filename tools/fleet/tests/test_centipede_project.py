@@ -1,4 +1,4 @@
-"""centipede's check runs MCPs' shared mutation step from the companion beside it (MCPs board task 2359f0ac).
+"""centipede's check runs MCPs' mutation step from the companion beside it (board task 2359f0ac).
 
 centipede (wagner-austin/centipede) is one game at its root, and its make
 check ends in the StrykerJS mutation step MCPs keeps in
