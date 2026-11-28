@@ -1,5 +1,6 @@
 #!/bin/sh
-# Refuse a commit, before it exists, that names no board task it serves.
+# Refuse a commit, before it exists, that names no board task it serves, or
+# that weakens a test no upheld test claim licenses.
 #
 # EVERY COMMIT NAMES ITS TASK (MCPs board task 691b0067, b6eb30c8's R8).
 # Work nobody filed is refused rather than logged; the operator,
@@ -17,6 +18,18 @@
 # address. There is no variable that skips it and no author it exempts, and
 # a board that cannot be asked refuses the commit.
 #
+# THE COMMIT WEAKENS NO TEST UNCLAIMED (MCPs board task 031b2072). A worker
+# never deletes, loosens or skips a test to make its change pass; a test it
+# believes is wrong is disputed by a TEST CLAIM another session judges, and
+# only a claim upheld against that test, on the blob the test file has at
+# this commit's HEAD (MCPs board task 34d120aa), licenses weakening it.
+# maketools' test-claims reads every 'test claim <id>' the message names off
+# the board into the git directory's COMMIT_TEST_CLAIMS, and maketools'
+# py-guard runs mcp-shared-py's test-weakening guard on every staged Python
+# test file against those claims, refusing with the file, the test and the
+# change. Both run as MCPs' origin/main carries them, as the task question
+# does; MCPs' own commit-msg runs the same guard at its HEAD.
+#
 # INSTALLED PER CLONE: `make install-hooks`.
 
 set -eu
@@ -24,3 +37,5 @@ set -eu
 REPO="$(git rev-parse --show-toplevel)"
 . "$REPO/.githooks/python.sh"
 "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" commit-message-tasks "$REPO/../MCPs" "$1"
+"$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" test-claims "$REPO/../MCPs" "$1" > "$(git rev-parse --git-dir)/COMMIT_TEST_CLAIMS"
+"$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" py-guard "$REPO/../MCPs" origin/main weakening "$REPO" API "$(git rev-parse --git-dir)/COMMIT_TEST_CLAIMS"
