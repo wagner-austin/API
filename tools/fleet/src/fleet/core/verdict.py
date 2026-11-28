@@ -49,7 +49,7 @@ from fleet.core.slice_load import (
     read_run_pressure,
     read_slice_load,
 )
-from fleet.core.vm_tests import read_vm_tests
+from fleet.core.vm_tests import read_vm_drivers, read_vm_tests
 
 #: The line every package's ``make check`` prints last when it passed.
 CHECK_BANNER: Final = "=== ALL CHECKS PASSED ==="
@@ -141,6 +141,11 @@ class Verdict(TypedDict):
             test-script seconds (:func:`fleet.core.vm_tests.read_vm_tests`):
             which tests a run paid for and what each cost, read from the
             whole transcript, not its tail (MCPs board task d6b03ba3).
+        drivers: The VM test drivers the run had to substitute or build
+            (:func:`fleet.core.vm_tests.read_vm_drivers`), read the same
+            way: which drivers the node's store lacked before the run, so a
+            cold-store run is told from a warm one by a record rather than
+            a session's note (MCPs board task 7b62e759).
         generation: The cache generation the build read, and
         began: whether this build began it, and
         phases: each phase's seconds, all three read off the build's last
@@ -207,6 +212,7 @@ class Verdict(TypedDict):
     ci: str
     dispatch: str
     vmtests: str
+    drivers: str
     generation: str
     began: str
     phases: str
@@ -363,6 +369,7 @@ def judge(
         ci=read_slice_load(tail, CI_SLICE),
         dispatch=read_slice_load(tail, DISPATCH_SLICE),
         vmtests=read_vm_tests(tail),
+        drivers=read_vm_drivers(tail),
         generation=summary["generation"],
         began=summary["began"],
         phases=summary["phases"],
@@ -386,7 +393,8 @@ def render_verdict(verdict: Verdict) -> str:
         ``FLEET-CHECK <job8> <project> sha=<sha> node=<node> exit=<n>
         banner=<yes|no> tests=<...> coverage=<...> budget=<...>
         ended=<time> log=<node>:<path> run=<run id> workers=<n>
-        slowest=<...> ci=<...> dispatch=<...> vmtests=<...> generation=<...> began=<...>
+        slowest=<...> ci=<...> dispatch=<...> vmtests=<...> drivers=<...>
+        generation=<...> began=<...>
         phases=<...>
         steps=<...> registry=<commit> artifact=<...> mutation=<...>
         stalls=<...> containers=<...> results=<node>:<path>``,
@@ -403,7 +411,7 @@ def render_verdict(verdict: Verdict) -> str:
         f"ended={verdict['ended']} log={verdict['node']}:{verdict['log_path']} "
         f"run={verdict['run_id']} workers={verdict['workers']} "
         f"slowest={verdict['slowest']} ci={verdict['ci']} dispatch={verdict['dispatch']} "
-        f"vmtests={verdict['vmtests']} "
+        f"vmtests={verdict['vmtests']} drivers={verdict['drivers']} "
         f"generation={verdict['generation']} began={verdict['began']} "
         f"phases={verdict['phases']} steps={verdict['steps']} "
         f"registry={verdict['registry']} artifact={verdict['artifact']} "

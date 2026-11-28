@@ -113,7 +113,8 @@ class TestACloseTheQueueDidNotAnswer:
         assert settled_line == refused_line
         assert settled_line.endswith(
             f"log=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID} "
-            "workers=7 slowest=unread ci=unread dispatch=unread vmtests=unread generation=unread "
+            "workers=7 slowest=unread ci=unread dispatch=unread vmtests=unread drivers=unread "
+            "generation=unread "
             "began=unread phases=unread steps=unread registry=unread artifact=unread "
             "mutation=unread stalls=unread containers=unread "
             f"results=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.results"
@@ -324,7 +325,8 @@ def _settle_killed(
 #: Where every verdict line here ends, before the unit's ending.
 VERDICT_END = (
     f"log=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID} workers=7 "
-    "slowest=unread ci=unread dispatch=unread vmtests=unread generation=unread began=unread "
+    "slowest=unread ci=unread dispatch=unread vmtests=unread drivers=unread generation=unread "
+    "began=unread "
     "phases=unread steps=unread registry=unread artifact=unread mutation=unread "
     "stalls=unread containers=unread "
     f"results=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.results"

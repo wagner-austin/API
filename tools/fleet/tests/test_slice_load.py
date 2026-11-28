@@ -431,7 +431,7 @@ class TestTheReading:
             f"log=lavender:/home/corvis/fleet/stage/logs/{RUN}.log run={RUN} workers=3 "
             "slowest=tests/passkey-twin.test.ts:139s,tests/cascade-dependencies.test.ts:56s,"
             "tests/served/proxy.test.ts:7s ci=2111s/664s/throttled:0s "
-            "dispatch=940s/664s/throttled:212s vmtests=unread "
+            "dispatch=940s/664s/throttled:212s vmtests=unread drivers=unread "
             "generation=unread began=unread phases=unread steps=unread registry=unread "
             "artifact=unread mutation=unread stalls=lane:80s-cpu/2s-io/0s-memory "
             "containers=400000/100000,max/100000 "
