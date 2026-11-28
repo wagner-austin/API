@@ -136,7 +136,7 @@ class TestTheLinesOnTheNode:
     def test_each_driver_fetched_or_built_is_printed_and_counted(
         self, tmp_path: pathlib.Path
     ) -> None:
-        printed = _run(tmp_path, NOT_REALISED + REALISED + _transcript(FINISHED[:1]))
+        printed = _run(tmp_path, NOT_REALISED + REALISED + _transcript((FINISHED[0],)))
 
         assert printed == (
             "FLEET_VM_TEST: corvis-hub 66.41\n"
