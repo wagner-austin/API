@@ -1,13 +1,19 @@
 {
   "worker_ram_gb": 0.25,
   "minimum_workers": 2,
-  "expected_minutes": 10,
+  "expected_minutes": 75,
   "required_tags": ["linux"],
   "source": {
     "remote": "https://github.com/wagner-austin/flowuav.git",
     "path": "",
     "base_branch": "main",
     "install": [],
-    "companions": []
+    "companions": [
+      {
+        "remote": "https://github.com/wagner-austin/MCPs.git",
+        "ref": "main",
+        "directory": "MCPs"
+      }
+    ]
   }
 }
