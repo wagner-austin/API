@@ -31,7 +31,7 @@ from tests.test_dialect_linux import fields_of
 #: The pins as the line passes them, each name then its version.
 PINS = (
     "ruff 0.17.1 mypy 2.4.0 pytest 9.1.1 pytest-xdist 3.8.0 pytest-cov 7.1.0 "
-    "coverage 7.16.2 pytest-timeout 2.4.0 cosmic-ray 8.7.0"
+    "coverage 7.16.2 pytest-timeout 2.4.0 cosmic-ray 8.9.0"
 )
 
 #: The arguments the line passes, as the fake's ``$*`` records them.

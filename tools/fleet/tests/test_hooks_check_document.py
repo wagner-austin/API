@@ -41,7 +41,7 @@ class TestTheDocument:
             {"name": "pytest-cov", "version": "7.1.0"},
             {"name": "coverage", "version": "7.16.2"},
             {"name": "pytest-timeout", "version": "2.4.0"},
-            {"name": "cosmic-ray", "version": "8.7.0"},
+            {"name": "cosmic-ray", "version": "8.9.0"},
         ]
         assert load_json_str(render_hooks_check_document()) == {"packages": pins}
         joined = tuple(f"{pin['name']}=={pin['version']}" for pin in pins)

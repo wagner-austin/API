@@ -116,11 +116,11 @@ HOOKS_REASON = (
 #: The pip line a node with pip is offered for the hooks check's tools, at the
 #: latest releases measured on 2026-10-16 (MCPs board task 09a34e03), and
 #: cosmic-ray at the version MCPs mcp-shared-py's poetry.lock holds (MCPs
-#: board task b45a8913).
+#: board tasks b45a8913 and b8413ae2).
 HOOKS_INSTALL = (
     "python -m pip install --user ruff==0.17.1 mypy==2.4.0 pytest==9.1.1 "
     "pytest-xdist==3.8.0 pytest-cov==7.1.0 coverage==7.16.2 pytest-timeout==2.4.0 "
-    "cosmic-ray==8.7.0"
+    "cosmic-ray==8.9.0"
 )
 
 #: Why a node is told about go, in the tagged gap's words (MCPs board task
