@@ -66,6 +66,24 @@ def test_commit_msg_asks_before_the_commit_exists_reading_the_repository_and_its
     assert _variables_read(lines) == ["HOOK_PYTHON", "REPO"]
 
 
+def test_commit_msg_then_judges_the_staged_python_tests_against_the_claims_it_names() -> None:
+    # MCPs board tasks 031b2072 and 34d120aa: after the task question, the
+    # claims the message names are read off the board and mcp-shared-py's
+    # test-weakening guard judges the staged Python test files against them,
+    # both as MCPs' origin/main carries them, with nothing around either call
+    # that lets a commit through (set -eu ends the hook on a refusal).
+    launch = '"$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py"'
+    claims = '"$(git rev-parse --git-dir)/COMMIT_TEST_CLAIMS"'
+    assert [line for line in _executable(".githooks/commit-msg") if line.strip()] == [
+        "set -eu",
+        'REPO="$(git rev-parse --show-toplevel)"',
+        '. "$REPO/.githooks/python.sh"',
+        f'{launch} commit-message-tasks "$REPO/../MCPs" "$1"',
+        f'{launch} test-claims "$REPO/../MCPs" "$1" > {claims}',
+        f'{launch} py-guard "$REPO/../MCPs" origin/main weakening "$REPO" API {claims}',
+    ]
+
+
 def test_every_hook_launches_python_by_the_one_choice_python_sh_makes_before_it() -> None:
     # MCPs board task 6c0664bf: the hooks named `python`, which a Linux
     # session host does not have, so none could run there. The choice is
