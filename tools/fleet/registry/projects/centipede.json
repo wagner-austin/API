@@ -1,0 +1,32 @@
+{
+  "worker_ram_gb": 0.5,
+  "minimum_workers": 4,
+  "expected_minutes": 30,
+  "required_tags": [
+    "gpu"
+  ],
+  "loopback_only": true,
+  "source": {
+    "remote": "https://github.com/wagner-austin/centipede.git",
+    "path": "",
+    "install": [
+      {
+        "phase": "install",
+        "argv": [
+          "npm",
+          "ci"
+        ]
+      },
+      {
+        "phase": "install",
+        "argv": [
+          "npx",
+          "playwright",
+          "install",
+          "chromium"
+        ]
+      }
+    ],
+    "companions": []
+  }
+}

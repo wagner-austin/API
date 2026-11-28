@@ -41,6 +41,11 @@ LOOPBACK_REASONS = {
         "and it needs gpu, which lavender alone of the enabled nodes that run checks carries, "
         "beside three GitHub Actions runners; its check reads nothing else since idle b5f133d"
     ),
+    "centipede": (
+        "its browser tests import the game from vitest's Vite server on localhost as idle's do, "
+        "it needs gpu for the same WebGL, and its lint checks lifted files against "
+        "lift-lock.json without fetching (MCPs board task 2a06915d)"
+    ),
 }
 
 #: What a declaration that is no boolean is refused with.
