@@ -72,9 +72,11 @@ HOOKS_ROUTE_FILE: Final = (".claude", "corvis-hooks.json")
 #: and pytest-timeout was missing, so fleet job 4ef9f20f on sedona logged
 #: ``Unknown config option: timeout`` and ran with no per-test timeout. And
 #: cosmic-ray, which runs mcp-shared-py's mutation step (MCPs board tasks
-#: b45a8913 and 9c456c33), at 8.7.0, the version mcp-shared-py's poetry.lock
+#: b45a8913 and 9c456c33), at 8.9.0, the version mcp-shared-py's poetry.lock
 #: and this package's pyproject.toml hold, so the hooks are mutation tested by
-#: the release every other package is. The step runs the ``cosmic-ray``
+#: the release every other package is; 8.9.0 replaced 8.7.0, whose exception
+#: operator crashed on a dotted name in an except tuple (MCPs board tasks
+#: 9edd3631 and b8413ae2). The step runs the ``cosmic-ray``
 #: program beside the interpreter, where a NixOS node's environment puts it. A
 #: node is ready only at these versions (:data:`HOOKS_CHECK_PROGRAM`), so every
 #: machine lints and tests a commit by the same rules. Readers outside this
@@ -89,7 +91,7 @@ HOOKS_CHECK_PACKAGES: Final = (
     "pytest-cov==7.1.0",
     "coverage==7.16.2",
     "pytest-timeout==2.4.0",
-    "cosmic-ray==8.7.0",
+    "cosmic-ray==8.9.0",
 )
 
 #: The probe's ``hooks`` question, a program for ``python -c``: it exits 0
