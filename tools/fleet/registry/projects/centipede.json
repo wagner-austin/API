@@ -6,10 +6,25 @@
     "gpu"
   ],
   "loopback_only": true,
+  "mutation_checker": {
+    "heap_mb": 625,
+    "ram_gb": 0.87,
+    "measurement": "ziggurat 2026-11-28, StrykerJS 10.1.1: one TypeScript checker finished src/leg-pose.ts (4 mutants) at a 500 MB heap cap, the least in 100 MB steps, peaking at 0.71 GB RSS; heap_mb is 1.25 times that cap and ram_gb heap_mb plus 0.25 GB (MCPs wiki typescript-mutation-step)"
+  },
   "source": {
     "remote": "https://github.com/wagner-austin/centipede.git",
     "path": "",
+    "base_branch": "main",
     "install": [
+      {
+        "phase": "mcps-install",
+        "argv": [
+          "make",
+          "-s",
+          "--directory=../MCPs/scripts/fleet-prepare",
+          "install"
+        ]
+      },
       {
         "phase": "install",
         "argv": [
@@ -27,6 +42,12 @@
         ]
       }
     ],
-    "companions": []
+    "companions": [
+      {
+        "remote": "https://github.com/wagner-austin/MCPs.git",
+        "ref": "main",
+        "directory": "MCPs"
+      }
+    ]
   }
 }
